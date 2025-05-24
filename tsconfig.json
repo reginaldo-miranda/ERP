@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+
+    // "typeRoots": ["./node_modules/@types", "./src/@types"]
+  },
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+
+
+/*
+{
+  "compilerOptions": {
+    "baseUrl": "src", // <- define /src como base para os imports
+    "paths": {
+      "@types/*": ["@types/*"] // <- permite usar `@types/theme`
+    },
+    "typeRoots": ["./node_modules/@types", "./src/@types"],
+    "module": "esnext",
+    "moduleResolution": "node",
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+*/
