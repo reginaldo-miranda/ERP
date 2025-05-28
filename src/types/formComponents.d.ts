@@ -1,15 +1,16 @@
-import { HtmlHTMLAttributes } from "react";
+import { InputHTMLAttributes, ButtonHTMLAttributes } from "react";
 
-export type InputProps = React.HTMLInputTypeAttribute<HTMLInputElement>
-export type ButtonProps = React.HTMLButtonElement<HtmlHTMLAttributes>
+export type InputProps = InputHTMLAttributes<HTMLInputElement>;
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
+
 
 export type MessageProps = {
-    msg: string
-    type: 'error' | 'success'; 
+    msg: string;
+    type: 'error' | 'success';
 }
 
 export interface FormComponentsProps {
-    inputs : InputProps[]
-    buttons: ButtonProps[]
-    message?: MessageProps
+    inputs: InputProps[];
+    buttons: ButtonProps[];
+    message?: MessageProps;
 }
