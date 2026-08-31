@@ -1,0 +1,51 @@
+<MudNavMenu Class="mud-width-full">
+    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="px-4 py-2 font-weight-bold">PAINEL PRINCIPAL</MudText>
+    <MudNavLink Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard" Href="/">Dashboard</MudNavLink>
+
+    <MudNavGroup Title="Cadastros" Icon="@Icons.Material.Filled.Assignment" Expanded="true">
+        <MudNavLink Href="/cadastros/empresas" Icon="@Icons.Material.Filled.Business">Empresas</MudNavLink>
+        <MudNavLink Href="/cadastros/clientes" Icon="@Icons.Material.Filled.People">Clientes</MudNavLink>
+        <MudNavLink Href="/cadastros/fornecedores" Icon="@Icons.Material.Filled.LocalShipping">Fornecedores</MudNavLink>
+        <MudNavLink Href="/cadastros/produtos" Icon="@Icons.Material.Filled.Category">Produtos</MudNavLink>
+        <MudNavLink Href="/cadastros/servicos" Icon="@Icons.Material.Filled.Build">Serviços</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Financeiro" Icon="@Icons.Material.Filled.AttachMoney" Expanded="false">
+        <MudNavLink Href="/financeiro/contas-pagar" Icon="@Icons.Material.Filled.MoneyOff">Contas a Pagar</MudNavLink>
+        <MudNavLink Href="/financeiro/contas-receber" Icon="@Icons.Material.Filled.AccountBalanceWallet">Contas a Receber</MudNavLink>
+        <MudNavLink Href="/financeiro/movimentacoes" Icon="@Icons.Material.Filled.SwapHoriz">Caixa & Bancos</MudNavLink>
+        <MudNavLink Href="/financeiro/conciliacao" Icon="@Icons.Material.Filled.CompareArrows">Conciliação Bancária</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Vendas" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="false">
+        <MudNavLink Href="/vendas/orcamentos" Icon="@Icons.Material.Filled.RequestQuote">Orçamentos</MudNavLink>
+        <MudNavLink Href="/vendas/pedidos" Icon="@Icons.Material.Filled.ShoppingBag">Pedidos de Venda</MudNavLink>
+        <MudNavLink Href="/vendas/faturamento" Icon="@Icons.Material.Filled.Receipt">Faturamento</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Compras" Icon="@Icons.Material.Filled.Store" Expanded="false">
+        <MudNavLink Href="/compras/solicitacoes" Icon="@Icons.Material.Filled.PlaylistAdd">Solicitações</MudNavLink>
+        <MudNavLink Href="/compras/pedidos" Icon="@Icons.Material.Filled.AddShoppingCart">Pedidos de Compra</MudNavLink>
+        <MudNavLink Href="/compras/entradas" Icon="@Icons.Material.Filled.Input">Entrada de Mercadorias</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Estoque" Icon="@Icons.Material.Filled.Inventory" Expanded="false">
+        <MudNavLink Href="/estoque/posicao" Icon="@Icons.Material.Filled.Storage">Posição de Estoque</MudNavLink>
+        <MudNavLink Href="/estoque/movimentacoes" Icon="@Icons.Material.Filled.TransferWithinAStation">Movimentações</MudNavLink>
+        <MudNavLink Href="/estoque/inventario" Icon="@Icons.Material.Filled.FactCheck">Inventário</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Fiscal" Icon="@Icons.Material.Filled.Description" Expanded="false">
+        <MudNavLink Href="/fiscal/notas" Icon="@Icons.Material.Filled.ReceiptLong">Notas Fiscais (NF-e/NFC-e)</MudNavLink>
+        <MudNavLink Href="/fiscal/regras" Icon="@Icons.Material.Filled.Gavel">Regras Tributárias</MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Contabilidade" Icon="@Icons.Material.Filled.AccountBalance" Expanded="false">
+        <MudNavLink Href="/contabilidade/eventos" Icon="@Icons.Material.Filled.Sync">Fila de Eventos</MudNavLink>
+        <MudNavLink Href="/contabilidade/mapeamento" Icon="@Icons.Material.Filled.Map">Mapeamento Contábil</MudNavLink>
+    </MudNavGroup>
+
+    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="px-4 py-2 mt-4 font-weight-bold">ADMINISTRAÇÃO</MudText>
+    <MudNavLink Href="/admin/usuarios" Icon="@Icons.Material.Filled.ManageAccounts">Usuários & Permissões</MudNavLink>
+    <MudNavLink Href="/admin/auditoria" Icon="@Icons.Material.Filled.History">Logs de Auditoria</MudNavLink>
+</MudNavMenu>

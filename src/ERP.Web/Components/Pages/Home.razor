@@ -1,0 +1,126 @@
+@page "/"
+@using MudBlazor
+
+<PageTitle>Dashboard — ERP Multi-Empresa</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-1 font-weight-bold">Dashboard</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">Visão geral em tempo real da empresa matriz.</MudText>
+
+<MudGrid Class="mb-6">
+    <!-- Card 1: Vendas Hoje -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #10B981;">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">VENDAS DO DIA</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">R$ 15.420,00</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-2 d-block">+12.5% em relação a ontem</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Card 2: Contas a Receber -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #3B82F6;">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">A RECEBER HOJE</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">R$ 4.250,00</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Info" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">5 duplicatas a receber</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Card 3: Contas a Pagar -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #F59E0B;">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">A PAGAR HOJE</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">R$ 2.100,00</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Warning" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-2 d-block">2 fornecedores a pagar</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Card 4: Estoque Baixo -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #EF4444;">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ESTOQUE CRÍTICO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">3 Itens</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2 d-block">Abaixo do estoque mínimo</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudGrid>
+    <!-- Ações Rápidas -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Ações Rápidas</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" FullWidth="true" Href="/vendas/pedidos">
+                            Novo Pedido
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PersonAdd" FullWidth="true" Href="/cadastros/clientes">
+                            Novo Cliente
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.CompareArrows" FullWidth="true" Href="/financeiro/conciliacao">
+                            Conciliar OFX
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.ReceiptLong" FullWidth="true" Href="/fiscal/notas">
+                            Emitir NF-e
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Status de Módulos e Integração -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Status de Integrações</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudList T="string">
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        <MudText Typo="Typo.body2"><b>Banco de Dados PostgreSQL:</b> Conectado (localhost:5432)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        <MudText Typo="Typo.body2"><b>Fila de Integração Contábil:</b> Ativa (0 eventos com erro)</MudText>
+                    </MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
+                        <MudText Typo="Typo.body2"><b>Autenticação & Permissões:</b> ASP.NET Identity + JWT ativo</MudText>
+                    </MudListItem>
+                </MudList>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>

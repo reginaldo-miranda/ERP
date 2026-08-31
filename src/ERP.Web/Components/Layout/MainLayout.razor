@@ -1,0 +1,101 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="_customTheme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="2" Color="Color.Surface">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h6" Class="ml-3 font-weight-bold" Color="Color.Primary">ERP Multi-Empresa</MudText>
+
+        <MudSpacer />
+
+        <!-- Seletor de Empresa Ativa -->
+        <MudMenu Label="@(_empresaAtivaNome ?? "Empresa Matriz Padrão S.A.")" Icon="@Icons.Material.Filled.Business" Color="Color.Primary" Variant="Variant.Outlined" Class="mr-3" Dense="true">
+            <MudMenuItem Icon="@Icons.Material.Filled.Check" OnClick="@(() => SelecionarEmpresa(1, "Empresa Matriz Padrão S.A."))">
+                Empresa Matriz Padrão S.A.
+            </MudMenuItem>
+        </MudMenu>
+
+        <!-- Sino de Notificações -->
+        <MudBadge Content="3" Color="Color.Error" Overlap="true" Class="mr-3">
+            <MudIconButton Icon="@Icons.Material.Filled.Notifications" Color="Color.Inherit" Href="/notificacoes" />
+        </MudBadge>
+
+        <!-- Toggle de Tema Dark / Light -->
+        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                       Color="Color.Inherit" 
+                       OnClick="@ToggleTheme" 
+                       Class="mr-2" 
+                       Title="Alternar Tema" />
+
+        <!-- Menu de Perfil do Usuário -->
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <MudMenuItem Disabled="true">
+                <MudText Typo="Typo.body2"><b>Administrador do Sistema</b></MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">admin@erp.com</MudText>
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Filled.Person" Href="/perfil">Meu Perfil</MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Filled.Logout" Color="Color.Error">Sair</MudMenuItem>
+        </MudMenu>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" ClipMode="DrawerClipMode.Always">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="pa-6">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = true; // Tema Dark por padrão conforme alinhado
+    private string _empresaAtivaNome = "Empresa Matriz Padrão S.A.";
+
+    private readonly MudTheme _customTheme = new MudTheme()
+    {
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#3B82F6",
+            Secondary = "#10B981",
+            AppbarBackground = "#1F2937",
+            Background = "#111827",
+            Surface = "#1F2937",
+            DrawerBackground = "#1F2937",
+            DrawerText = "#F3F4F6",
+            TextPrimary = "#F9FAFB",
+            TextSecondary = "#9CA3AF"
+        },
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#2563EB",
+            Secondary = "#059669",
+            AppbarBackground = "#FFFFFF",
+            Background = "#F3F4F6",
+            Surface = "#FFFFFF",
+            DrawerBackground = "#FFFFFF",
+            TextPrimary = "#111827",
+            TextSecondary = "#4B5563"
+        }
+    };
+
+    private void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void ToggleTheme()
+    {
+        _isDarkMode = !_isDarkMode;
+    }
+
+    private void SelecionarEmpresa(int id, string nome)
+    {
+        _empresaAtivaNome = nome;
+    }
+}
