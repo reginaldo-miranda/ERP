@@ -1,0 +1,26 @@
+@using ERP.Application.Cadastros.Categorias.DTOs
+
+<div style="margin-left: @(Categoria.Nivel > 1 ? "16px" : "0")">
+    <div class="d-flex align-center py-1">
+        @if (Categoria.Nivel > 1)
+        {
+            <MudIcon Icon="Icons.Material.Filled.SubdirectoryArrowRight" Size="Size.Small" Class="mr-1 mud-text-secondary" />
+        }
+        <MudText Typo="Typo.body2">@Categoria.Nome</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="Icons.Material.Filled.Add" Size="Size.Small" Title="Nova subcategoria"
+                       OnClick="@(() => OnNovaFilha.InvokeAsync(Categoria))" />
+        <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                       OnClick="@(() => OnEditar.InvokeAsync(Categoria))" />
+    </div>
+    @foreach (var filho in Categoria.Filhos)
+    {
+        <RenderCategoriaItem Categoria="filho" OnEditar="OnEditar" OnNovaFilha="OnNovaFilha" />
+    }
+</div>
+
+@code {
+    [Parameter] public CategoriaDto Categoria { get; set; } = null!;
+    [Parameter] public EventCallback<CategoriaDto?> OnEditar { get; set; }
+    [Parameter] public EventCallback<CategoriaDto?> OnNovaFilha { get; set; }
+}

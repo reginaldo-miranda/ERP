@@ -1,0 +1,130 @@
+@page "/cadastros/unidades-medida"
+@using ERP.Application.Cadastros.UnidadesMedida.Commands
+@using ERP.Application.Cadastros.UnidadesMedida.DTOs
+@using ERP.Application.Cadastros.UnidadesMedida.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Unidades de Medida</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.Straighten" Class="mr-2" />
+    Unidades de Medida
+</MudText>
+
+<MudPaper Class="pa-4">
+    <MudTable Items="@_unidades" Dense="true" Hover="true" Loading="@_carregando" Filter="new Func<UnidadeMedidaDto, bool>(FiltrarUnidade)">
+        <ToolBarContent>
+            <MudTextField @bind-Value="_filtro" Placeholder="Buscar..." Adornment="Adornment.Start"
+                          AdornmentIcon="Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mr-4" />
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+                       OnClick="AbrirDialogNovo">Nova Unidade</MudButton>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Sigla</MudTh>
+            <MudTh>Descrição</MudTh>
+            <MudTh>Ativo</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Sigla</MudTd>
+            <MudTd>@context.Descricao</MudTd>
+            <MudTd><MudChip T="string" Color="@(context.Ativo ? Color.Success : Color.Default)" Size="Size.Small">@(context.Ativo ? "Ativo" : "Inativo")</MudChip></MudTd>
+            <MudTd>
+                <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => AbrirDialogEditar(context))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText>Nenhuma unidade de medida encontrada.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@if (_dialogAberto)
+{
+    <MudDialog @bind-IsVisible="_dialogAberto" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }">
+        <TitleContent>@(_editando?.Id > 0 ? "Editar" : "Nova") Unidade de Medida</TitleContent>
+        <DialogContent>
+            <MudTextField @bind-Value="_siglaEdit" Label="Sigla" MaxLength="10" Required="true" />
+            <MudTextField @bind-Value="_descricaoEdit" Label="Descrição" MaxLength="100" Required="true" Class="mt-3" />
+            @if (_editando?.Id > 0)
+            {
+                <MudSwitch @bind-Value="_ativoEdit" Label="Ativo" Color="Color.Primary" Class="mt-3" />
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _dialogAberto = false)">Cancelar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar">Salvar</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    private List<UnidadeMedidaDto> _unidades = new();
+    private bool _carregando = true;
+    private string _filtro = string.Empty;
+    private bool _dialogAberto = false;
+    private UnidadeMedidaDto? _editando;
+    private string _siglaEdit = string.Empty;
+    private string _descricaoEdit = string.Empty;
+    private bool _ativoEdit = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        _carregando = true;
+        _unidades = await Mediator.Send(new GetUnidadesMedidaQuery(ApenasAtivas: false));
+        _carregando = false;
+    }
+
+    private bool FiltrarUnidade(UnidadeMedidaDto u) =>
+        string.IsNullOrWhiteSpace(_filtro) ||
+        u.Sigla.Contains(_filtro, StringComparison.OrdinalIgnoreCase) ||
+        u.Descricao.Contains(_filtro, StringComparison.OrdinalIgnoreCase);
+
+    private void AbrirDialogNovo()
+    {
+        _editando = null;
+        _siglaEdit = string.Empty;
+        _descricaoEdit = string.Empty;
+        _ativoEdit = true;
+        _dialogAberto = true;
+    }
+
+    private void AbrirDialogEditar(UnidadeMedidaDto u)
+    {
+        _editando = u;
+        _siglaEdit = u.Sigla;
+        _descricaoEdit = u.Descricao;
+        _ativoEdit = u.Ativo;
+        _dialogAberto = true;
+    }
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_siglaEdit) || string.IsNullOrWhiteSpace(_descricaoEdit))
+        {
+            Snackbar.Add("Preencha todos os campos.", Severity.Warning);
+            return;
+        }
+
+        if (_editando?.Id > 0)
+        {
+            var result = await Mediator.Send(new UpdateUnidadeMedidaCommand(_editando.Id, _siglaEdit, _descricaoEdit, _ativoEdit));
+            if (result.Sucesso) { Snackbar.Add("Atualizado com sucesso.", Severity.Success); _dialogAberto = false; await CarregarDados(); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+        else
+        {
+            var result = await Mediator.Send(new CreateUnidadeMedidaCommand(_siglaEdit, _descricaoEdit));
+            if (result.Sucesso) { Snackbar.Add("Criado com sucesso.", Severity.Success); _dialogAberto = false; await CarregarDados(); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+    }
+}

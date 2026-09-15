@@ -1,0 +1,209 @@
+@page "/cadastros/clientes/novo"
+@page "/cadastros/clientes/{Id:int}"
+@using ERP.Application.Cadastros.Clientes.Commands
+@using ERP.Application.Cadastros.Clientes.DTOs
+@using ERP.Application.Cadastros.Clientes.Queries
+@using ERP.Application.Common.Interfaces
+@using ERP.Domain.Core.Enums
+@using MudBlazor
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject ICepService CepService
+
+<PageTitle>@(Id.HasValue ? "Editar Cliente" : "Novo Cliente")</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.PersonAdd" Class="mr-2" />
+    @(Id.HasValue ? "Editar Cliente" : "Novo Cliente")
+</MudText>
+
+@if (_carregando)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
+        <MudTabPanel Text="Dados Gerais" Icon="Icons.Material.Filled.Person">
+            <MudPaper Class="pa-4 mt-2">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="TipoPessoa" @bind-Value="_tipoPessoa" Label="Tipo Pessoa" Required="true">
+                            <MudSelectItem Value="TipoPessoa.Fisica">Pessoa Física</MudSelectItem>
+                            <MudSelectItem Value="TipoPessoa.Juridica">Pessoa Jurídica</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="8">
+                        <MudTextField @bind-Value="_nome" Label="@(_tipoPessoa == TipoPessoa.Fisica ? "Nome Completo" : "Razão Social")" Required="true" MaxLength="200" />
+                    </MudItem>
+                    @if (_tipoPessoa == TipoPessoa.Juridica)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_nomeFantasia" Label="Nome Fantasia" MaxLength="200" />
+                        </MudItem>
+                    }
+                    <MudItem xs="12" md="4">
+                        <MudTextField @bind-Value="_cpfCnpj" Label="@(_tipoPessoa == TipoPessoa.Fisica ? "CPF" : "CNPJ")" Required="true" />
+                    </MudItem>
+                    @if (_tipoPessoa == TipoPessoa.Juridica)
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="_inscricaoEstadual" Label="Inscrição Estadual" />
+                        </MudItem>
+                    }
+                    <MudItem xs="12" md="4">
+                        <MudTextField @bind-Value="_email" Label="E-mail" InputType="InputType.Email" />
+                    </MudItem>
+                    <MudItem xs="6" md="3">
+                        <MudTextField @bind-Value="_telefone" Label="Telefone" />
+                    </MudItem>
+                    <MudItem xs="6" md="3">
+                        <MudTextField @bind-Value="_celular" Label="Celular" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudNumericField T="decimal?" @bind-Value="_limiteCredito" Label="Limite de Crédito" Format="C2" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_observacoes" Label="Observações" Lines="3" MaxLength="500" />
+                    </MudItem>
+                    @if (Id.HasValue)
+                    {
+                        <MudItem xs="12">
+                            <MudSwitch @bind-Value="_ativo" Label="Cliente Ativo" Color="Color.Primary" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Endereços" Icon="Icons.Material.Filled.Home">
+            <MudPaper Class="pa-4 mt-2">
+                @foreach (var end in _enderecos)
+                {
+                    <MudCard Class="mb-3" Outlined="true">
+                        <MudCardContent>
+                            <MudGrid>
+                                <MudItem xs="4" md="2">
+                                    <MudTextField @bind-Value="end.Cep" Label="CEP" MaxLength="9" OnBlur="@(async () => await BuscarCep(end))" />
+                                </MudItem>
+                                <MudItem xs="8" md="6">
+                                    <MudTextField @bind-Value="end.Logradouro" Label="Logradouro" />
+                                </MudItem>
+                                <MudItem xs="4" md="2">
+                                    <MudTextField @bind-Value="end.Numero" Label="Número" />
+                                </MudItem>
+                                <MudItem xs="8" md="2">
+                                    <MudTextField @bind-Value="end.Complemento" Label="Complemento" />
+                                </MudItem>
+                                <MudItem xs="12" md="4">
+                                    <MudTextField @bind-Value="end.Bairro" Label="Bairro" />
+                                </MudItem>
+                                <MudItem xs="8" md="5">
+                                    <MudTextField @bind-Value="end.Cidade" Label="Cidade" />
+                                </MudItem>
+                                <MudItem xs="4" md="1">
+                                    <MudTextField @bind-Value="end.Uf" Label="UF" MaxLength="2" />
+                                </MudItem>
+                                <MudItem xs="12" md="2" Class="d-flex align-center">
+                                    <MudSwitch @bind-Value="end.Principal" Label="Principal" Color="Color.Primary" />
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => _enderecos.Remove(end))" />
+                        </MudCardActions>
+                    </MudCard>
+                }
+                <MudButton StartIcon="Icons.Material.Filled.Add" OnClick="AdicionarEndereco">Adicionar Endereço</MudButton>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+
+    <MudPaper Class="pa-3 mt-4 d-flex justify-end gap-3">
+        <MudButton Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo("/cadastros/clientes"))">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar">Salvar</MudButton>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _carregando = false;
+    private TipoPessoa _tipoPessoa = TipoPessoa.Fisica;
+    private string _nome = string.Empty;
+    private string _nomeFantasia = string.Empty;
+    private string _cpfCnpj = string.Empty;
+    private string _inscricaoEstadual = string.Empty;
+    private string _email = string.Empty;
+    private string _telefone = string.Empty;
+    private string _celular = string.Empty;
+    private decimal? _limiteCredito;
+    private string _observacoes = string.Empty;
+    private bool _ativo = true;
+    private List<CreateEnderecoRequest> _enderecos = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id.HasValue)
+        {
+            _carregando = true;
+            var result = await Mediator.Send(new GetClienteByIdQuery(Id.Value));
+            if (result.Sucesso && result.Dados != null)
+            {
+                var c = result.Dados;
+                _tipoPessoa = c.TipoPessoa;
+                _nome = c.Nome;
+                _nomeFantasia = c.NomeFantasia ?? string.Empty;
+                _cpfCnpj = c.CpfCnpj;
+                _inscricaoEstadual = c.InscricaoEstadual ?? string.Empty;
+                _email = c.Email ?? string.Empty;
+                _telefone = c.Telefone ?? string.Empty;
+                _celular = c.Celular ?? string.Empty;
+                _limiteCredito = c.LimiteCredito;
+                _observacoes = c.Observacoes ?? string.Empty;
+                _ativo = c.Ativo;
+                _enderecos = c.Enderecos.Select(e => new CreateEnderecoRequest
+                {
+                    Logradouro = e.Logradouro, Numero = e.Numero, Complemento = e.Complemento,
+                    Bairro = e.Bairro, Cidade = e.Cidade, Uf = e.Uf, Cep = e.Cep, Principal = e.Principal
+                }).ToList();
+            }
+            _carregando = false;
+        }
+    }
+
+    private void AdicionarEndereco() => _enderecos.Add(new CreateEnderecoRequest { Principal = !_enderecos.Any() });
+
+    private async Task BuscarCep(CreateEnderecoRequest end)
+    {
+        var cepLimpo = new string(end.Cep.Where(char.IsDigit).ToArray());
+        if (cepLimpo.Length != 8) return;
+        var resultado = await CepService.BuscarPorCepAsync(cepLimpo);
+        if (resultado != null)
+        {
+            end.Logradouro = resultado.Logradouro;
+            end.Bairro = resultado.Bairro;
+            end.Cidade = resultado.Localidade;
+            end.Uf = resultado.Uf;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Salvar()
+    {
+        if (Id.HasValue)
+        {
+            var result = await Mediator.Send(new UpdateClienteCommand(Id.Value, _nome, _tipoPessoa, _cpfCnpj, _email, _telefone, _celular, _nomeFantasia, _inscricaoEstadual, _limiteCredito, _observacoes, _ativo));
+            if (result.Sucesso) { Snackbar.Add("Cliente atualizado.", Severity.Success); Nav.NavigateTo("/cadastros/clientes"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+        else
+        {
+            var result = await Mediator.Send(new CreateClienteCommand(_nome, _tipoPessoa, _cpfCnpj, _email, _telefone, _celular, _nomeFantasia, _inscricaoEstadual, _limiteCredito, _observacoes, _enderecos));
+            if (result.Sucesso) { Snackbar.Add("Cliente criado.", Severity.Success); Nav.NavigateTo("/cadastros/clientes"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+    }
+}

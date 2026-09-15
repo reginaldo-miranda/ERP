@@ -1,0 +1,113 @@
+@page "/cadastros/clientes"
+@using ERP.Application.Cadastros.Clientes.Commands
+@using ERP.Application.Cadastros.Clientes.DTOs
+@using ERP.Application.Cadastros.Clientes.Queries
+@using ERP.Application.Common.Models
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Clientes</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.People" Class="mr-2" />
+    Clientes
+</MudText>
+
+<MudPaper Class="pa-4">
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_busca" Label="Buscar por nome, CPF/CNPJ ou e-mail" Adornment="Adornment.End"
+                          AdornmentIcon="Icons.Material.Filled.Search" OnAdornmentClick="Buscar"
+                          OnKeyUp="@(async (e) => { if (e.Key == "Enter") await Buscar(); })" />
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudSelect T="TipoPessoa?" @bind-Value="_tipoPessoaFiltro" Label="Tipo Pessoa">
+                <MudSelectItem T="TipoPessoa?" Value="null">Todos</MudSelectItem>
+                <MudSelectItem T="TipoPessoa?" Value="TipoPessoa.Fisica">Pessoa Física</MudSelectItem>
+                <MudSelectItem T="TipoPessoa?" Value="TipoPessoa.Juridica">Pessoa Jurídica</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="6" md="2">
+            <MudSelect T="bool?" @bind-Value="_ativoFiltro" Label="Status">
+                <MudSelectItem T="bool?" Value="null">Todos</MudSelectItem>
+                <MudSelectItem T="bool?" Value="true">Ativos</MudSelectItem>
+                <MudSelectItem T="bool?" Value="false">Inativos</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-end justify-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Buscar" Class="mr-2">Filtrar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+                       OnClick="@(() => Nav.NavigateTo("/cadastros/clientes/novo"))">Novo Cliente</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudDataGrid T="ClienteListItemDto" Items="@_resultado?.Itens" Loading="@_carregando" Dense="true" Hover="true"
+                 ReadOnly="true" RowClick="@(args => Nav.NavigateTo($"/cadastros/clientes/{args.Item.Id}"))">
+        <Columns>
+            <PropertyColumn Property="x => x.Nome" Title="Nome" />
+            <TemplateColumn Title="Tipo">
+                <CellTemplate>
+                    <MudChip Size="Size.Small" Color="@(context.Item.TipoPessoa == TipoPessoa.Fisica ? Color.Info : Color.Secondary)">
+                        @(context.Item.TipoPessoa == TipoPessoa.Fisica ? "PF" : "PJ")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <PropertyColumn Property="x => x.CpfCnpj" Title="CPF/CNPJ" />
+            <PropertyColumn Property="x => x.Email" Title="E-mail" />
+            <PropertyColumn Property="x => x.Telefone" Title="Telefone" />
+            <TemplateColumn Title="Status">
+                <CellTemplate>
+                    <MudChip Size="Size.Small" Color="@(context.Item.Ativo ? Color.Success : Color.Default)">
+                        @(context.Item.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Ações">
+                <CellTemplate>
+                    <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => Nav.NavigateTo($"/cadastros/clientes/{context.Item.Id}"))" />
+                    <MudIconButton Icon="Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(async () => await Desativar(context.Item.Id))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudText>Nenhum cliente encontrado.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <div class="d-flex align-center justify-between pa-2">
+                <MudText>@_resultado?.TotalItens clientes encontrados</MudText>
+                <MudPagination BoundaryCount="1" MiddleCount="3" Count="@(_resultado?.TotalPaginas ?? 1)"
+                               Selected="_paginaAtual" SelectedChanged="@(async (p) => { _paginaAtual = p; await Buscar(); })" />
+            </div>
+        </PagerContent>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    private PaginatedList<ClienteListItemDto>? _resultado;
+    private bool _carregando = true;
+    private string _busca = string.Empty;
+    private TipoPessoa? _tipoPessoaFiltro;
+    private bool? _ativoFiltro = true;
+    private int _paginaAtual = 1;
+
+    protected override async Task OnInitializedAsync() => await Buscar();
+
+    private async Task Buscar()
+    {
+        _carregando = true;
+        _resultado = await Mediator.Send(new GetClientesQuery(_busca, _tipoPessoaFiltro, _ativoFiltro, _paginaAtual));
+        _carregando = false;
+    }
+
+    private async Task Desativar(int id)
+    {
+        var result = await Mediator.Send(new DeleteClienteCommand(id));
+        if (result.Sucesso) { Snackbar.Add("Cliente desativado.", Severity.Success); await Buscar(); }
+        else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+    }
+}

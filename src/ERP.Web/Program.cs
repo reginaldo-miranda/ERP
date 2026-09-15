@@ -15,6 +15,11 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 // MudBlazor Services
 builder.Services.AddMudServices();
 
+// API Controllers (para endpoints REST)
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 // Services do Blazor
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -46,6 +51,11 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
+else
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -53,6 +63,8 @@ app.UseAntiforgery();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapControllers();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

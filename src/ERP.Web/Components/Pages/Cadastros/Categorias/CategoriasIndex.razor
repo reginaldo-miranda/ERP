@@ -1,0 +1,103 @@
+@page "/cadastros/categorias"
+@using ERP.Application.Cadastros.Categorias.Commands
+@using ERP.Application.Cadastros.Categorias.DTOs
+@using ERP.Application.Cadastros.Categorias.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Categorias</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.Category" Class="mr-2" />
+    Categorias
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <div class="d-flex justify-space-between align-center mb-3">
+                <MudText Typo="Typo.subtitle1">📦 Produtos</MudText>
+                <MudButton StartIcon="Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
+                           OnClick="@(() => AbrirNova(TipoCategoria.Produto))">Nova</MudButton>
+            </div>
+            @foreach (var cat in _categoriasProdutos)
+            {
+                <RenderCategoriaItem Categoria="cat" OnEditar="AbrirEditar" OnNovaFilha="AbrirNovaSubcategoria" />
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <div class="d-flex justify-space-between align-center mb-3">
+                <MudText Typo="Typo.subtitle1">🔧 Serviços</MudText>
+                <MudButton StartIcon="Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
+                           OnClick="@(() => AbrirNova(TipoCategoria.Servico))">Nova</MudButton>
+            </div>
+            @foreach (var cat in _categoriasServicos)
+            {
+                <RenderCategoriaItem Categoria="cat" OnEditar="AbrirEditar" OnNovaFilha="AbrirNovaSubcategoria" />
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@if (_dialogAberto)
+{
+    <MudDialog @bind-IsVisible="_dialogAberto" Options="new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true }">
+        <TitleContent>@(_editandoId.HasValue ? "Editar" : "Nova") Categoria</TitleContent>
+        <DialogContent>
+            <MudTextField @bind-Value="_nomeEdit" Label="Nome" Required="true" MaxLength="100" />
+            @if (_pai != null)
+            {
+                <MudText Typo="Typo.caption" Class="mt-2">Subcategoria de: <strong>@_pai.Nome</strong></MudText>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@(() => _dialogAberto = false)">Cancelar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar">Salvar</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    private List<CategoriaDto> _categoriasProdutos = new();
+    private List<CategoriaDto> _categoriasServicos = new();
+    private bool _dialogAberto;
+    private int? _editandoId;
+    private string _nomeEdit = string.Empty;
+    private TipoCategoria _tipoAtual = TipoCategoria.Produto;
+    private CategoriaDto? _pai;
+
+    protected override async Task OnInitializedAsync() => await CarregarDados();
+
+    private async Task CarregarDados()
+    {
+        var todas = await Mediator.Send(new GetCategoriasQuery());
+        _categoriasProdutos = todas.Where(c => c.Tipo == TipoCategoria.Produto).ToList();
+        _categoriasServicos = todas.Where(c => c.Tipo == TipoCategoria.Servico).ToList();
+    }
+
+    private void AbrirNova(TipoCategoria tipo) { _tipoAtual = tipo; _pai = null; _editandoId = null; _nomeEdit = string.Empty; _dialogAberto = true; }
+    private void AbrirNovaSubcategoria(CategoriaDto? pai) { _tipoAtual = pai?.Tipo ?? TipoCategoria.Produto; _pai = pai; _editandoId = null; _nomeEdit = string.Empty; _dialogAberto = true; }
+    private void AbrirEditar(CategoriaDto? cat) { if (cat == null) return; _editandoId = cat.Id; _nomeEdit = cat.Nome; _tipoAtual = cat.Tipo; _pai = null; _dialogAberto = true; }
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_nomeEdit)) { Snackbar.Add("Nome é obrigatório.", Severity.Warning); return; }
+
+        if (_editandoId.HasValue)
+        {
+            var result = await Mediator.Send(new UpdateCategoriaCommand(_editandoId.Value, _nomeEdit));
+            if (result.Sucesso) { Snackbar.Add("Atualizado.", Severity.Success); _dialogAberto = false; await CarregarDados(); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+        else
+        {
+            var result = await Mediator.Send(new CreateCategoriaCommand(_nomeEdit, _tipoAtual, _pai?.Id));
+            if (result.Sucesso) { Snackbar.Add("Criado.", Severity.Success); _dialogAberto = false; await CarregarDados(); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+    }
+}

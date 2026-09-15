@@ -1,0 +1,79 @@
+@page "/cadastros/fornecedores"
+@using ERP.Application.Cadastros.Fornecedores.Commands
+@using ERP.Application.Cadastros.Fornecedores.DTOs
+@using ERP.Application.Cadastros.Fornecedores.Queries
+@using ERP.Application.Common.Models
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Fornecedores</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.LocalShipping" Class="mr-2" />
+    Fornecedores
+</MudText>
+
+<MudPaper Class="pa-4">
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="_busca" Label="Buscar por nome, CNPJ..." Adornment="Adornment.End"
+                          AdornmentIcon="Icons.Material.Filled.Search" OnAdornmentClick="Buscar"
+                          OnKeyUp="@(async (e) => { if (e.Key == "Enter") await Buscar(); })" />
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex align-end justify-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+                       OnClick="@(() => Nav.NavigateTo("/cadastros/fornecedores/novo"))">Novo Fornecedor</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudDataGrid T="FornecedorListItemDto" Items="@_resultado?.Itens" Loading="@_carregando" Dense="true" Hover="true"
+                 RowClick="@(args => Nav.NavigateTo($"/cadastros/fornecedores/{args.Item.Id}"))">
+        <Columns>
+            <PropertyColumn Property="x => x.RazaoSocial" Title="Razão Social" />
+            <PropertyColumn Property="x => x.NomeFantasia" Title="Nome Fantasia" />
+            <PropertyColumn Property="x => x.Cnpj" Title="CNPJ" />
+            <PropertyColumn Property="x => x.Email" Title="E-mail" />
+            <PropertyColumn Property="x => x.Telefone" Title="Telefone" />
+            <TemplateColumn Title="Status">
+                <CellTemplate>
+                    <MudChip Size="Size.Small" Color="@(context.Item.Ativo ? Color.Success : Color.Default)">
+                        @(context.Item.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Ações">
+                <CellTemplate>
+                    <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => Nav.NavigateTo($"/cadastros/fornecedores/{context.Item.Id}"))" />
+                    <MudIconButton Icon="Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(async () => await Desativar(context.Item.Id))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent><MudText>Nenhum fornecedor encontrado.</MudText></NoRecordsContent>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    private PaginatedList<FornecedorListItemDto>? _resultado;
+    private bool _carregando = true;
+    private string _busca = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Buscar();
+
+    private async Task Buscar()
+    {
+        _carregando = true;
+        _resultado = await Mediator.Send(new GetFornecedoresQuery(_busca));
+        _carregando = false;
+    }
+
+    private async Task Desativar(int id)
+    {
+        var result = await Mediator.Send(new DeleteFornecedorCommand(id));
+        if (result.Sucesso) { Snackbar.Add("Fornecedor desativado.", Severity.Success); await Buscar(); }
+        else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+    }
+}

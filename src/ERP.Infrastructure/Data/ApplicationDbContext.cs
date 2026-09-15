@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using ERP.Application.Common.Interfaces;
 using ERP.Domain.Common;
 using ERP.Domain.Core.Entities;
+using ERP.Domain.Core.Entities.Cadastros;
 using ERP.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         _currentEmpresaService = currentEmpresaService;
     }
 
+    // Fase 1 - Base
     public DbSet<Empresa> Empresas => Set<Empresa>();
     public DbSet<UsuarioEmpresa> UsuarioEmpresas => Set<UsuarioEmpresa>();
     public DbSet<Permissao> Permissoes => Set<Permissao>();
@@ -32,11 +34,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<Notificacao> Notificacoes => Set<Notificacao>();
     public DbSet<Moeda> Moedas => Set<Moeda>();
 
+    // Fase 2 - Cadastros
+    public DbSet<Cliente> Clientes => Set<Cliente>();
+    public DbSet<Fornecedor> Fornecedores => Set<Fornecedor>();
+    public DbSet<Produto> Produtos => Set<Produto>();
+    public DbSet<Servico> Servicos => Set<Servico>();
+    public DbSet<Categoria> Categorias => Set<Categoria>();
+    public DbSet<UnidadeMedida> UnidadesMedida => Set<UnidadeMedida>();
+    public DbSet<Endereco> Enderecos => Set<Endereco>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
-        // Mapeamentos e Nomes de Tabelas
+        // Mapeamentos e Nomes de Tabelas - Fase 1
         builder.Entity<Empresa>(entity =>
         {
             entity.ToTable("Empresas");
@@ -81,6 +92,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.ToTable("Moedas");
             entity.HasIndex(m => m.Codigo).IsUnique();
         });
+
+        // Aplicar todas as configurações Fluent API via IEntityTypeConfiguration (inclui Cadastros)
+        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
         // Configuração do Filtro Global de Multi-Tenancy (EmpresaId)
         foreach (var entityType in builder.Model.GetEntityTypes())

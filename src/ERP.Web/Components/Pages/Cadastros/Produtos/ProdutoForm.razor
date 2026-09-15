@@ -1,0 +1,188 @@
+@page "/cadastros/produtos/novo"
+@page "/cadastros/produtos/{Id:int}"
+@using ERP.Application.Cadastros.Categorias.DTOs
+@using ERP.Application.Cadastros.Categorias.Queries
+@using ERP.Application.Cadastros.Produtos.Commands
+@using ERP.Application.Cadastros.Produtos.DTOs
+@using ERP.Application.Cadastros.Produtos.Queries
+@using ERP.Application.Cadastros.UnidadesMedida.DTOs
+@using ERP.Application.Cadastros.UnidadesMedida.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>@(Id.HasValue ? "Editar Produto" : "Novo Produto")</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.Inventory2" Class="mr-2" />
+    @(Id.HasValue ? "Editar Produto" : "Novo Produto")
+</MudText>
+
+@if (_carregando)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudTextField @bind-Value="_codigo" Label="Código" Required="true" MaxLength="50" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_nome" Label="Nome do Produto" Required="true" MaxLength="200" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudTextField @bind-Value="_codigoBarras" Label="Código de Barras / EAN" MaxLength="50" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_descricao" Label="Descrição detalhada" Lines="2" MaxLength="500" />
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudSelect T="int?" @bind-Value="_categoriaId" Label="Categoria">
+                    <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
+                    @foreach (var c in _categorias)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="int?" @bind-Value="_unidadeMedidaId" Label="Unidade de Medida">
+                    <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
+                    @foreach (var u in _unidades)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)u.Id)">@u.Sigla - @u.Descricao</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" @bind-Value="_precoVenda" Label="Preço de Venda" Format="C2" Min="0" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" @bind-Value="_precoCusto" Label="Preço de Custo" Format="C2" Min="0" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" @bind-Value="_estoqueMinimo" Label="Estoque Mínimo" Min="0" />
+            </MudItem>
+
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_controlaLote" Label="Controla Lote" Color="Color.Primary" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudSwitch T="bool" @bind-Value="_controlaSerie" Label="Controla Nº Série" Color="Color.Primary" />
+            </MudItem>
+            @if (Id.HasValue)
+            {
+                <MudItem xs="12" md="6">
+                    <MudSwitch T="bool" @bind-Value="_ativo" Label="Produto Ativo" Color="Color.Primary" />
+                </MudItem>
+            }
+
+            <MudItem xs="12" Class="mt-2">
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary">Dados Fiscais</MudText>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_ncm" Label="NCM" MaxLength="10" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_cest" Label="CEST" MaxLength="10" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_cfop" Label="CFOP Padrão" MaxLength="10" />
+            </MudItem>
+        </MudGrid>
+
+        <div class="d-flex justify-end gap-3 mt-4">
+            <MudButton Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo("/cadastros/produtos"))">Cancelar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar">Salvar</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _carregando = false;
+    private string _codigo = string.Empty;
+    private string _nome = string.Empty;
+    private string _descricao = string.Empty;
+    private string _codigoBarras = string.Empty;
+    private int? _categoriaId;
+    private int? _unidadeMedidaId;
+    private decimal _precoVenda;
+    private decimal _precoCusto;
+    private decimal _estoqueMinimo;
+    private bool _controlaLote;
+    private bool _controlaSerie;
+    private string _ncm = string.Empty;
+    private string _cest = string.Empty;
+    private string _cfop = string.Empty;
+    private bool _ativo = true;
+
+    private List<CategoriaDto> _categorias = new();
+    private List<UnidadeMedidaDto> _unidades = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categorias = await Mediator.Send(new GetCategoriasQuery(TipoCategoria.Produto));
+        _unidades = await Mediator.Send(new GetUnidadesMedidaQuery(ApenasAtivas: true));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id.HasValue)
+        {
+            _carregando = true;
+            var result = await Mediator.Send(new GetProdutoByIdQuery(Id.Value));
+            if (result.Sucesso && result.Dados != null)
+            {
+                var p = result.Dados;
+                _codigo = p.Codigo;
+                _nome = p.Nome;
+                _descricao = p.Descricao ?? string.Empty;
+                _codigoBarras = p.CodigoBarras ?? string.Empty;
+                _categoriaId = p.CategoriaId;
+                _unidadeMedidaId = p.UnidadeMedidaId;
+                _precoVenda = p.PrecoVenda;
+                _precoCusto = p.PrecoCusto;
+                _estoqueMinimo = p.EstoqueMinimo;
+                _controlaLote = p.ControlaLote;
+                _controlaSerie = p.ControlaSerie;
+                _ncm = p.Ncm ?? string.Empty;
+                _cest = p.Cest ?? string.Empty;
+                _cfop = p.Cfop ?? string.Empty;
+                _ativo = p.Ativo;
+            }
+            _carregando = false;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        if (Id.HasValue)
+        {
+            var result = await Mediator.Send(new UpdateProdutoCommand(
+                Id.Value, _codigo, _nome, _descricao, _categoriaId, _unidadeMedidaId,
+                _precoVenda, _precoCusto, _estoqueMinimo, _controlaLote, _controlaSerie,
+                _ncm, _cest, _cfop, _codigoBarras, _ativo));
+            if (result.Sucesso) { Snackbar.Add("Produto atualizado.", Severity.Success); Nav.NavigateTo("/cadastros/produtos"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+        else
+        {
+            var result = await Mediator.Send(new CreateProdutoCommand(
+                _codigo, _nome, _descricao, _categoriaId, _unidadeMedidaId,
+                _precoVenda, _precoCusto, _estoqueMinimo, _controlaLote, _controlaSerie,
+                _ncm, _cest, _cfop, _codigoBarras));
+            if (result.Sucesso) { Snackbar.Add("Produto cadastrado.", Severity.Success); Nav.NavigateTo("/cadastros/produtos"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+    }
+}

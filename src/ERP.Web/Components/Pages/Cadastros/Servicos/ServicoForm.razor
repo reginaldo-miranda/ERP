@@ -1,0 +1,145 @@
+@page "/cadastros/servicos/novo"
+@page "/cadastros/servicos/{Id:int}"
+@using ERP.Application.Cadastros.Categorias.DTOs
+@using ERP.Application.Cadastros.Categorias.Queries
+@using ERP.Application.Cadastros.Servicos.Commands
+@using ERP.Application.Cadastros.Servicos.DTOs
+@using ERP.Application.Cadastros.Servicos.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>@(Id.HasValue ? "Editar Serviço" : "Novo Serviço")</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.Build" Class="mr-2" />
+    @(Id.HasValue ? "Editar Serviço" : "Novo Serviço")
+</MudText>
+
+@if (_carregando)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_codigo" Label="Código" Required="true" MaxLength="50" />
+            </MudItem>
+            <MudItem xs="12" md="8">
+                <MudTextField @bind-Value="_nome" Label="Nome do Serviço" Required="true" MaxLength="200" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_descricao" Label="Descrição" Lines="2" MaxLength="500" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudSelect T="int?" @bind-Value="_categoriaId" Label="Categoria">
+                    <MudSelectItem T="int?" Value="null">Nenhuma</MudSelectItem>
+                    @foreach (var c in _categorias)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_unidade" Label="Unidade (ex: Hora, Diária, Projeto)" MaxLength="30" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" @bind-Value="_precoBase" Label="Preço Base" Format="C2" Min="0" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal?" @bind-Value="_aliquotaIss" Label="Alíquota ISS (%)" Min="0" Max="100" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_codigoServicoCnae" Label="Código CNAE" MaxLength="20" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_codigoServiceLc116" Label="Item LC 116/03" MaxLength="20" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_observacoes" Label="Observações" MaxLength="500" />
+            </MudItem>
+            @if (Id.HasValue)
+            {
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="_ativo" Label="Serviço Ativo" Color="Color.Primary" />
+                </MudItem>
+            }
+        </MudGrid>
+
+        <div class="d-flex justify-end gap-3 mt-4">
+            <MudButton Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo("/cadastros/servicos"))">Cancelar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar">Salvar</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _carregando = false;
+    private string _codigo = string.Empty;
+    private string _nome = string.Empty;
+    private string _descricao = string.Empty;
+    private int? _categoriaId;
+    private string _unidade = string.Empty;
+    private decimal _precoBase;
+    private decimal? _aliquotaIss;
+    private string _codigoServicoCnae = string.Empty;
+    private string _codigoServiceLc116 = string.Empty;
+    private string _observacoes = string.Empty;
+    private bool _ativo = true;
+
+    private List<CategoriaDto> _categorias = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _categorias = await Mediator.Send(new GetCategoriasQuery(TipoCategoria.Servico));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id.HasValue)
+        {
+            _carregando = true;
+            var result = await Mediator.Send(new GetServicoByIdQuery(Id.Value));
+            if (result.Sucesso && result.Dados != null)
+            {
+                var s = result.Dados;
+                _codigo = s.Codigo;
+                _nome = s.Nome;
+                _descricao = s.Descricao ?? string.Empty;
+                _categoriaId = s.CategoriaId;
+                _unidade = s.Unidade ?? string.Empty;
+                _precoBase = s.PrecoBase;
+                _aliquotaIss = s.AliquotaIss;
+                _codigoServicoCnae = s.CodigoServicoCnae ?? string.Empty;
+                _ativo = s.Ativo;
+            }
+            _carregando = false;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        if (Id.HasValue)
+        {
+            var result = await Mediator.Send(new UpdateServicoCommand(
+                Id.Value, _codigo, _nome, _descricao, _categoriaId, _precoBase, _unidade,
+                _codigoServicoCnae, _codigoServiceLc116, _aliquotaIss, _observacoes, _ativo));
+            if (result.Sucesso) { Snackbar.Add("Serviço atualizado.", Severity.Success); Nav.NavigateTo("/cadastros/servicos"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+        else
+        {
+            var result = await Mediator.Send(new CreateServicoCommand(
+                _codigo, _nome, _descricao, _categoriaId, _precoBase, _unidade,
+                _codigoServicoCnae, _codigoServiceLc116, _aliquotaIss, _observacoes));
+            if (result.Sucesso) { Snackbar.Add("Serviço cadastrado.", Severity.Success); Nav.NavigateTo("/cadastros/servicos"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+    }
+}

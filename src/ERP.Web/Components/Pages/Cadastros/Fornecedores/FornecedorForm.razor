@@ -1,0 +1,131 @@
+@page "/cadastros/fornecedores/novo"
+@page "/cadastros/fornecedores/{Id:int}"
+@using ERP.Application.Cadastros.Fornecedores.Commands
+@using ERP.Application.Cadastros.Fornecedores.DTOs
+@using ERP.Application.Cadastros.Fornecedores.Queries
+@using ERP.Application.Common.Interfaces
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject ICepService CepService
+
+<PageTitle>@(Id.HasValue ? "Editar Fornecedor" : "Novo Fornecedor")</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.LocalShipping" Class="mr-2" />
+    @(Id.HasValue ? "Editar Fornecedor" : "Novo Fornecedor")
+</MudText>
+
+@if (_carregando)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_razaoSocial" Label="Razão Social" Required="true" MaxLength="200" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_nomeFantasia" Label="Nome Fantasia" MaxLength="200" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_cnpj" Label="CNPJ" Required="true" Disabled="@(Id.HasValue)" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_inscricaoEstadual" Label="Inscrição Estadual" MaxLength="30" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_email" Label="E-mail" InputType="InputType.Email" MaxLength="200" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudTextField @bind-Value="_telefone" Label="Telefone" MaxLength="20" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudTextField @bind-Value="_celular" Label="Celular" MaxLength="20" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudTextField @bind-Value="_contato" Label="Pessoa de Contato" MaxLength="100" />
+            </MudItem>
+            <MudItem xs="6" md="3">
+                <MudTextField @bind-Value="_site" Label="Site" MaxLength="200" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_observacoes" Label="Observações" Lines="3" MaxLength="500" />
+            </MudItem>
+            @if (Id.HasValue)
+            {
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="_ativo" Label="Fornecedor Ativo" Color="Color.Primary" />
+                </MudItem>
+            }
+        </MudGrid>
+
+        <div class="d-flex justify-end gap-3 mt-4">
+            <MudButton Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo("/cadastros/fornecedores"))">Cancelar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Salvar">Salvar</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool _carregando = false;
+    private string _razaoSocial = string.Empty;
+    private string _nomeFantasia = string.Empty;
+    private string _cnpj = string.Empty;
+    private string _inscricaoEstadual = string.Empty;
+    private string _email = string.Empty;
+    private string _telefone = string.Empty;
+    private string _celular = string.Empty;
+    private string _contato = string.Empty;
+    private string _site = string.Empty;
+    private string _observacoes = string.Empty;
+    private bool _ativo = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Id.HasValue)
+        {
+            _carregando = true;
+            var result = await Mediator.Send(new GetFornecedorByIdQuery(Id.Value));
+            if (result.Sucesso && result.Dados != null)
+            {
+                var f = result.Dados;
+                _razaoSocial = f.RazaoSocial;
+                _nomeFantasia = f.NomeFantasia ?? string.Empty;
+                _cnpj = f.Cnpj;
+                _inscricaoEstadual = f.InscricaoEstadual ?? string.Empty;
+                _email = f.Email ?? string.Empty;
+                _telefone = f.Telefone ?? string.Empty;
+                _celular = f.Celular ?? string.Empty;
+                _contato = f.Contato ?? string.Empty;
+                _site = f.Site ?? string.Empty;
+                _observacoes = f.Observacoes ?? string.Empty;
+                _ativo = f.Ativo;
+            }
+            _carregando = false;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        if (Id.HasValue)
+        {
+            var result = await Mediator.Send(new UpdateFornecedorCommand(
+                Id.Value, _razaoSocial, _nomeFantasia, _inscricaoEstadual, _email, _telefone, _celular, _contato, _site, _observacoes, _ativo));
+            if (result.Sucesso) { Snackbar.Add("Fornecedor atualizado.", Severity.Success); Nav.NavigateTo("/cadastros/fornecedores"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+        else
+        {
+            var result = await Mediator.Send(new CreateFornecedorCommand(
+                _razaoSocial, _nomeFantasia, _cnpj, _inscricaoEstadual, _email, _telefone, _celular, _contato, _site, _observacoes));
+            if (result.Sucesso) { Snackbar.Add("Fornecedor cadastrado com sucesso.", Severity.Success); Nav.NavigateTo("/cadastros/fornecedores"); }
+            else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+        }
+    }
+}

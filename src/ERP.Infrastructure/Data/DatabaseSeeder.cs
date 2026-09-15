@@ -139,5 +139,72 @@ public static class DatabaseSeeder
                 await context.SaveChangesAsync();
             }
         }
+
+        // 6. Seed de Unidades de Medida
+        if (!await context.UnidadesMedida.IgnoreQueryFilters().AnyAsync())
+        {
+            var unidades = new[]
+            {
+                ("UN", "Unidade"),
+                ("PC", "Peça"),
+                ("CX", "Caixa"),
+                ("KG", "Quilograma"),
+                ("G", "Grama"),
+                ("L", "Litro"),
+                ("ML", "Mililitro"),
+                ("M", "Metro"),
+                ("M2", "Metro Quadrado"),
+                ("M3", "Metro Cúbico"),
+                ("H", "Hora"),
+                ("DI", "Diária"),
+            };
+
+            foreach (var (sigla, descricao) in unidades)
+            {
+                context.UnidadesMedida.Add(new Domain.Core.Entities.Cadastros.UnidadeMedida
+                {
+                    Sigla = sigla,
+                    Descricao = descricao,
+                    EmpresaId = empresaPadrao.Id,
+                    Ativo = true,
+                    CriadoEm = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
+        }
+
+        // 7. Seed de Categorias
+        if (!await context.Categorias.IgnoreQueryFilters().AnyAsync())
+        {
+            var categoriasProdutos = new[] { "Eletrônicos", "Alimentos e Bebidas", "Vestuário", "Ferramentas", "Matéria Prima", "Embalagens" };
+            var categoriasServicos = new[] { "Manutenção", "Consultoria", "Instalação", "Treinamento", "Transporte" };
+
+            foreach (var nome in categoriasProdutos)
+            {
+                context.Categorias.Add(new Domain.Core.Entities.Cadastros.Categoria
+                {
+                    Nome = nome,
+                    Tipo = Domain.Core.Enums.TipoCategoria.Produto,
+                    Nivel = 1,
+                    EmpresaId = empresaPadrao.Id,
+                    Ativo = true,
+                    CriadoEm = DateTime.UtcNow
+                });
+            }
+
+            foreach (var nome in categoriasServicos)
+            {
+                context.Categorias.Add(new Domain.Core.Entities.Cadastros.Categoria
+                {
+                    Nome = nome,
+                    Tipo = Domain.Core.Enums.TipoCategoria.Servico,
+                    Nivel = 1,
+                    EmpresaId = empresaPadrao.Id,
+                    Ativo = true,
+                    CriadoEm = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
+        }
     }
 }

@@ -1,4 +1,5 @@
 using ERP.Domain.Core.Entities;
+using ERP.Domain.Core.Entities.Cadastros;
 using Microsoft.EntityFrameworkCore;
 
 namespace ERP.Application.Common.Interfaces;
@@ -8,6 +9,7 @@ namespace ERP.Application.Common.Interfaces;
 /// </summary>
 public interface IApplicationDbContext
 {
+    // Fase 1 - Base
     DbSet<Empresa> Empresas { get; }
     DbSet<UsuarioEmpresa> UsuarioEmpresas { get; }
     DbSet<Permissao> Permissoes { get; }
@@ -15,6 +17,15 @@ public interface IApplicationDbContext
     DbSet<AuditLog> AuditLogs { get; }
     DbSet<Notificacao> Notificacoes { get; }
     DbSet<Moeda> Moedas { get; }
+
+    // Fase 2 - Cadastros
+    DbSet<Cliente> Clientes { get; }
+    DbSet<Fornecedor> Fornecedores { get; }
+    DbSet<Produto> Produtos { get; }
+    DbSet<Servico> Servicos { get; }
+    DbSet<Categoria> Categorias { get; }
+    DbSet<UnidadeMedida> UnidadesMedida { get; }
+    DbSet<Endereco> Enderecos { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

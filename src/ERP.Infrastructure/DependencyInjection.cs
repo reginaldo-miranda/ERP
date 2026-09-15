@@ -76,6 +76,12 @@ public static class DependencyInjection
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
+        // Serviços externos — ViaCEP
+        services.AddHttpClient<ICepService, ViaCepService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
         return services;
     }
 }

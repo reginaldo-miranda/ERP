@@ -1,0 +1,79 @@
+@page "/cadastros/produtos"
+@using ERP.Application.Cadastros.Produtos.Commands
+@using ERP.Application.Cadastros.Produtos.DTOs
+@using ERP.Application.Cadastros.Produtos.Queries
+@using ERP.Application.Common.Models
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageTitle>Produtos</PageTitle>
+
+<MudText Typo="Typo.h5" Class="mb-4">
+    <MudIcon Icon="Icons.Material.Filled.Inventory2" Class="mr-2" />
+    Produtos
+</MudText>
+
+<MudPaper Class="pa-4">
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="_busca" Label="Buscar por nome, código ou código de barras"
+                          Adornment="Adornment.End" AdornmentIcon="Icons.Material.Filled.Search"
+                          OnAdornmentClick="Buscar" OnKeyUp="@(async (e) => { if (e.Key == "Enter") await Buscar(); })" />
+        </MudItem>
+        <MudItem xs="12" md="6" Class="d-flex align-end justify-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+                       OnClick="@(() => Nav.NavigateTo("/cadastros/produtos/novo"))">Novo Produto</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudDataGrid T="ProdutoListItemDto" Items="@_resultado?.Itens" Loading="@_carregando" Dense="true" Hover="true"
+                 RowClick="@(args => Nav.NavigateTo($"/cadastros/produtos/{args.Item.Id}"))">
+        <Columns>
+            <PropertyColumn Property="x => x.Codigo" Title="Código" />
+            <PropertyColumn Property="x => x.Nome" Title="Nome" />
+            <PropertyColumn Property="x => x.CategoriaNome" Title="Categoria" />
+            <PropertyColumn Property="x => x.UnidadeSigla" Title="UN" />
+            <TemplateColumn Title="Preço Venda">
+                <CellTemplate><MudText>@context.Item.PrecoVenda.ToString("C2")</MudText></CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Status">
+                <CellTemplate>
+                    <MudChip Size="Size.Small" Color="@(context.Item.Ativo ? Color.Success : Color.Default)">
+                        @(context.Item.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Ações">
+                <CellTemplate>
+                    <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => Nav.NavigateTo($"/cadastros/produtos/{context.Item.Id}"))" />
+                    <MudIconButton Icon="Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                   OnClick="@(async () => await Desativar(context.Item.Id))" />
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent><MudText>Nenhum produto encontrado.</MudText></NoRecordsContent>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    private PaginatedList<ProdutoListItemDto>? _resultado;
+    private bool _carregando = true;
+    private string _busca = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Buscar();
+    private async Task Buscar()
+    {
+        _carregando = true;
+        _resultado = await Mediator.Send(new GetProdutosQuery(_busca));
+        _carregando = false;
+    }
+    private async Task Desativar(int id)
+    {
+        var result = await Mediator.Send(new DeleteProdutoCommand(id));
+        if (result.Sucesso) { Snackbar.Add("Produto desativado.", Severity.Success); await Buscar(); }
+        else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+    }
+}
