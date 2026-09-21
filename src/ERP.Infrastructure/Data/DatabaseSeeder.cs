@@ -206,5 +206,11 @@ public static class DatabaseSeeder
             }
             await context.SaveChangesAsync();
         }
+
+        // 8. Seed do Módulo Financeiro (Bancos, Formas de Pagamento, Centros de Custo, Plano de Contas, Caixas)
+        await DbInitializerFinanceiro.SeedFinanceiroAsync(context);
+
+        // 9. Seed do Módulo de Estoque (Depósito Padrão e Saldos Iniciais)
+        await DbInitializerEstoque.SeedEstoqueAsync(context);
     }
 }

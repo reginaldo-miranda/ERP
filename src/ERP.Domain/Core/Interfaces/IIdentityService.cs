@@ -14,4 +14,9 @@ public interface IIdentityService
     Task<IList<string>> ObterPapeisAsync(string usuarioId);
     Task<bool> AlterarSenhaAsync(string usuarioId, string senhaAtual, string novaSenha);
     Task<(string? NomeCompleto, string? Email)> ObterDadosUsuarioAsync(string usuarioId);
+    Task<List<(string Id, string NomeCompleto, string Email, bool Ativo, DateTime CriadoEm, IList<string> Papeis)>> ObterTodosUsuariosAsync();
+    Task<bool> AtualizarUsuarioAsync(string usuarioId, string nomeCompleto, string email, bool ativo, IEnumerable<string> papeis);
+    Task<bool> AlternarStatusUsuarioAsync(string usuarioId);
+    Task<bool> ResetarSenhaAsync(string usuarioId, string novaSenha);
+    Task<List<string>> ObterTodosPapeisAsync();
 }

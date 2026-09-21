@@ -1,0 +1,209 @@
+@page "/admin/usuarios"
+@using ERP.Application.Usuarios.Commands.AlternarStatusUsuario
+@using ERP.Application.Usuarios.Commands.ResetarSenhaUsuario
+@using ERP.Application.Usuarios.DTOs
+@using ERP.Application.Usuarios.Queries.GetUsuarios
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Usuários & Permissões — ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" Class="mr-2" />
+            Gestão de Usuários & Permissões
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Controle os operadores do sistema, papéis de acesso e empresas autorizadas.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" 
+               Color="Color.Primary" 
+               StartIcon="@Icons.Material.Filled.PersonAdd" 
+               OnClick="AbrirNovoUsuario">
+        Novo Usuário
+    </MudButton>
+</div>
+
+<MudCard Elevation="2">
+    <MudCardContent Class="pa-0">
+        <MudTable Items="@_usuarios" 
+                  Dense="true" 
+                  Hover="true" 
+                  Loading="@_carregando" 
+                  Filter="new Func<UsuarioDetalhesDto,bool>(FiltroRapido)">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Usuários do Sistema (@_usuarios.Count)</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="_busca" 
+                              Placeholder="Buscar por nome ou e-mail..." 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search" 
+                              IconSize="Size.Medium" 
+                              Class="mt-0" 
+                              Clearable="true" />
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Usuário</MudTh>
+                <MudTh>Papéis</MudTh>
+                <MudTh>Empresas Vinculadas</MudTh>
+                <MudTh>Criado Em</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh Style="text-align: right;">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Usuário">
+                    <div>
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.NomeCompleto</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Email</MudText>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Papéis">
+                    @foreach (var papel in context.Papeis)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Class="mr-1">
+                            @papel
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Empresas">
+                    @if (context.Empresas.Any())
+                    {
+                        <MudTooltip Text="@string.Join(", ", context.Empresas.Select(e => e.NomeFantasia ?? e.RazaoSocial))">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">
+                                @context.Empresas.Count empresa(s)
+                            </MudChip>
+                        </MudTooltip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">Sem vínculo</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Criado Em">
+                    @context.CriadoEm.ToString("dd/MM/yyyy HH:mm")
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)">
+                        @(context.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações" Style="text-align: right;">
+                    <MudTooltip Text="Editar Usuário">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                       Color="Color.Primary" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => AbrirEditarUsuario(context))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Redefinir Senha">
+                        <MudIconButton Icon="@Icons.Material.Filled.LockReset" 
+                                       Color="Color.Warning" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => ResetarSenha(context))" />
+                    </MudTooltip>
+                    <MudTooltip Text="@(context.Ativo ? "Desativar Usuário" : "Reativar Usuário")">
+                        <MudIconButton Icon="@(context.Ativo ? Icons.Material.Filled.Block : Icons.Material.Filled.Check)" 
+                                       Color="@(context.Ativo ? Color.Error : Color.Success)" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => AlternarStatus(context))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager RowsPerPageString="Linhas por página:" InfoFormat="{first_item}-{last_item} de {all_items}" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<UsuarioDetalhesDto> _usuarios = new();
+    private bool _carregando = true;
+    private string _busca = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarUsuarios();
+    }
+
+    private async Task CarregarUsuarios()
+    {
+        _carregando = true;
+        try
+        {
+            _usuarios = await Mediator.Send(new GetUsuariosQuery());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar usuários: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private bool FiltroRapido(UsuarioDetalhesDto u)
+    {
+        if (string.IsNullOrWhiteSpace(_busca)) return true;
+        if (u.NomeCompleto.Contains(_busca, StringComparison.OrdinalIgnoreCase)) return true;
+        if (u.Email.Contains(_busca, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    private async Task AbrirNovoUsuario()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<UsuarioDialog>("Novo Usuário", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarUsuarios();
+        }
+    }
+
+    private async Task AbrirEditarUsuario(UsuarioDetalhesDto usuario)
+    {
+        var parameters = new DialogParameters<UsuarioDialog> { { x => x.Usuario, usuario } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<UsuarioDialog>("Editar Usuário", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarUsuarios();
+        }
+    }
+
+    private async Task AlternarStatus(UsuarioDetalhesDto usuario)
+    {
+        var result = await Mediator.Send(new AlternarStatusUsuarioCommand(usuario.Id));
+        if (result.Sucesso)
+        {
+            Snackbar.Add(usuario.Ativo ? "Usuário desativado com sucesso!" : "Usuário ativado com sucesso!", Severity.Success);
+            await CarregarUsuarios();
+        }
+        else
+        {
+            Snackbar.Add(result.Erros.FirstOrDefault() ?? "Erro ao alterar status do usuário.", Severity.Error);
+        }
+    }
+
+    private async Task ResetarSenha(UsuarioDetalhesDto usuario)
+    {
+        string? novaSenha = "NovaSenha@123";
+        var result = await Mediator.Send(new ResetarSenhaUsuarioCommand(usuario.Id, novaSenha));
+        if (result.Sucesso)
+        {
+            Snackbar.Add($"Senha redefinida com sucesso para '{novaSenha}'!", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add(result.Erros.FirstOrDefault() ?? "Erro ao redefinir senha.", Severity.Error);
+        }
+    }
+}

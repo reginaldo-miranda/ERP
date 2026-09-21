@@ -1,0 +1,276 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Empresas.Commands.AtualizarEmpresa
+@using ERP.Application.Empresas.Commands.CriarEmpresa
+@using ERP.Application.Empresas.DTOs
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject ICepService CepService
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@(IsEdicao ? Icons.Material.Filled.Edit : Icons.Material.Filled.AddBusiness)" Class="mr-2" />
+            @(IsEdicao ? "Editar Empresa" : "Nova Empresa")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+                <MudTabPanel Text="Dados Principais" Icon="@Icons.Material.Filled.Business">
+                    <MudGrid>
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="_model.RazaoSocial" Label="Razão Social *" Required="true" 
+                                          RequiredError="Razão Social é obrigatória" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="_model.Cnpj" Label="CNPJ (14 dígitos) *" Required="true" 
+                                          RequiredError="CNPJ é obrigatório" Variant="Variant.Outlined" MaxLength="18" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.NomeFantasia" Label="Nome Fantasia" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudTextField @bind-Value="_model.InscricaoEstadual" Label="Inscrição Estadual" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudTextField @bind-Value="_model.InscricaoMunicipal" Label="Inscrição Municipal" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.Email" Label="E-mail de Contato" Variant="Variant.Outlined" InputType="InputType.Email" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_model.Telefone" Label="Telefone" Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Endereço" Icon="@Icons.Material.Filled.Place">
+                    <MudGrid>
+                        <MudItem xs="12" md="4" Class="d-flex align-center">
+                            <MudTextField @bind-Value="_model.Cep" Label="CEP" Variant="Variant.Outlined" MaxLength="9" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Primary" OnClick="BuscarCep" 
+                                           Disabled="@_buscandoCep" Class="ml-2" />
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="_model.Logradouro" Label="Logradouro" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudTextField @bind-Value="_model.Numero" Label="Número" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="5">
+                            <MudTextField @bind-Value="_model.Complemento" Label="Complemento" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="_model.Bairro" Label="Bairro" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="_model.Cidade" Label="Cidade" Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="_model.Uf" Label="UF" Variant="Variant.Outlined" MaxLength="2" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Configurações Fiscais" Icon="@Icons.Material.Filled.Settings">
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_model.RegimeTributario" Label="Regime Tributário" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("SimplesNacional")">Simples Nacional</MudSelectItem>
+                                <MudSelectItem Value="@("LucroPresumido")">Lucro Presumido</MudSelectItem>
+                                <MudSelectItem Value="@("LucroReal")">Lucro Real</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_model.MetodoCusteio" Label="Método de Custeio" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@("CustoMedio")">Custo Médio Ponderado</MudSelectItem>
+                                <MudSelectItem Value="@("PEPS")">PEPS (Primeiro que Entra, Primeiro que Sai)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@_salvando">
+            @if (_salvando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public EmpresaDto? Empresa { get; set; }
+
+    private MudForm? _form;
+    private bool _isValid;
+    private bool _salvando;
+    private bool _buscandoCep;
+    private bool IsEdicao => Empresa != null && Empresa.Id > 0;
+
+    private EmpresaDto _model = new();
+
+    protected override void OnInitialized()
+    {
+        if (Empresa != null)
+        {
+            _model = new EmpresaDto
+            {
+                Id = Empresa.Id,
+                RazaoSocial = Empresa.RazaoSocial,
+                NomeFantasia = Empresa.NomeFantasia,
+                Cnpj = Empresa.Cnpj,
+                InscricaoEstadual = Empresa.InscricaoEstadual,
+                InscricaoMunicipal = Empresa.InscricaoMunicipal,
+                Email = Empresa.Email,
+                Telefone = Empresa.Telefone,
+                Logradouro = Empresa.Logradouro,
+                Numero = Empresa.Numero,
+                Complemento = Empresa.Complemento,
+                Bairro = Empresa.Bairro,
+                Cidade = Empresa.Cidade,
+                Uf = Empresa.Uf,
+                Cep = Empresa.Cep,
+                RegimeTributario = Empresa.RegimeTributario ?? "SimplesNacional",
+                MetodoCusteio = Empresa.MetodoCusteio ?? "CustoMedio",
+                Ativo = Empresa.Ativo
+            };
+        }
+        else
+        {
+            _model.RegimeTributario = "SimplesNacional";
+            _model.MetodoCusteio = "CustoMedio";
+            _model.Ativo = true;
+        }
+    }
+
+    private async Task BuscarCep()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Cep)) return;
+        _buscandoCep = true;
+        try
+        {
+            var end = await CepService.BuscarPorCepAsync(_model.Cep);
+            if (end != null)
+            {
+                _model.Logradouro = end.Logradouro;
+                _model.Bairro = end.Bairro;
+                _model.Cidade = end.Localidade;
+                _model.Uf = end.Uf;
+                Snackbar.Add("Endereço preenchido via CEP!", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("CEP não encontrado.", Severity.Warning);
+            }
+        }
+        catch
+        {
+            Snackbar.Add("Erro ao consultar CEP.", Severity.Error);
+        }
+        finally
+        {
+            _buscandoCep = false;
+        }
+    }
+
+    private async Task Salvar()
+    {
+        if (_form != null)
+        {
+            await _form.ValidateAsync();
+            if (!_isValid) return;
+        }
+
+        _salvando = true;
+        var cnpjLimpo = _model.Cnpj.Replace(".", "").Replace("/", "").Replace("-", "").Trim();
+
+        try
+        {
+            if (IsEdicao)
+            {
+                var command = new AtualizarEmpresaCommand(
+                    _model.Id,
+                    _model.RazaoSocial,
+                    cnpjLimpo,
+                    _model.NomeFantasia,
+                    _model.InscricaoEstadual,
+                    _model.InscricaoMunicipal,
+                    _model.Email,
+                    _model.Telefone,
+                    _model.Logradouro,
+                    _model.Numero,
+                    _model.Complemento,
+                    _model.Bairro,
+                    _model.Cidade,
+                    _model.Uf,
+                    _model.Cep,
+                    _model.RegimeTributario,
+                    _model.MetodoCusteio);
+
+                var result = await Mediator.Send(command);
+                if (result.Sucesso)
+                {
+                    Snackbar.Add("Empresa atualizada com sucesso!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(result.Dados));
+                }
+                else
+                {
+                    Snackbar.Add(result.Erros.FirstOrDefault() ?? "Erro ao atualizar empresa.", Severity.Error);
+                }
+            }
+            else
+            {
+                var command = new CriarEmpresaCommand(
+                    _model.RazaoSocial,
+                    cnpjLimpo,
+                    _model.NomeFantasia,
+                    _model.InscricaoEstadual,
+                    _model.InscricaoMunicipal,
+                    _model.Email,
+                    _model.Telefone,
+                    _model.Logradouro,
+                    _model.Numero,
+                    _model.Complemento,
+                    _model.Bairro,
+                    _model.Cidade,
+                    _model.Uf,
+                    _model.Cep,
+                    _model.RegimeTributario,
+                    _model.MetodoCusteio);
+
+                var result = await Mediator.Send(command);
+                if (result.Sucesso)
+                {
+                    Snackbar.Add("Empresa cadastrada com sucesso!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(result.Dados));
+                }
+                else
+                {
+                    Snackbar.Add(result.Erros.FirstOrDefault() ?? "Erro ao cadastrar empresa.", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

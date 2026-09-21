@@ -1,0 +1,369 @@
+@page "/financeiro/extrato-bancario"
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Extrato Bancário</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-2" />
+            Extrato Bancário
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Movimentações detalhadas com saldo acumulado por conta bancária.</MudText>
+    </div>
+</div>
+
+@* Filtros *@
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="4">
+            <MudSelect T="int?" Label="Conta Bancária *" @bind-Value="_contaBancariaId" Required="true"
+                       Placeholder="Selecione uma conta" Variant="Variant.Outlined">
+                <MudSelectItem T="int?" Value="@((int?)null)" Disabled="true">Selecione uma conta</MudSelectItem>
+                @foreach (var conta in _contasBancarias)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)conta.Id)">@conta.Descricao</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudDateRangePicker Label="Período" @bind-DateRange="_periodo" DateFormat="dd/MM/yyyy" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudSelect T="TipoOperacaoFinanceira?" Label="Tipo" @bind-Value="_tipo" Clearable="true" Variant="Variant.Outlined">
+                <MudSelectItem T="TipoOperacaoFinanceira?" Value="@((TipoOperacaoFinanceira?)null)">Todos</MudSelectItem>
+                <MudSelectItem T="TipoOperacaoFinanceira?" Value="TipoOperacaoFinanceira.Entrada">Entradas</MudSelectItem>
+                <MudSelectItem T="TipoOperacaoFinanceira?" Value="TipoOperacaoFinanceira.Saida">Saídas</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudSelect T="int?" Label="Plano de Contas" @bind-Value="_planoContaId" Clearable="true" Variant="Variant.Outlined">
+                <MudSelectItem T="int?" Value="@((int?)null)">Todos</MudSelectItem>
+                @foreach (var plano in _planosContas)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)plano.Id)">@plano.Codigo — @plano.Descricao</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudSelect T="int?" Label="Centro de Custo" @bind-Value="_centroCustoId" Clearable="true" Variant="Variant.Outlined">
+                <MudSelectItem T="int?" Value="@((int?)null)">Todos</MudSelectItem>
+                @foreach (var cc in _centrosCusto)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)cc.Id)">@cc.Codigo — @cc.Descricao</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4" Class="d-flex align-center justify-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       OnClick="CarregarDados" Disabled="@(_carregando || _contaBancariaId == null)"
+                       StartIcon="@Icons.Material.Filled.Search" Size="Size.Large" FullWidth="true">
+                Consultar
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_carregando)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_extrato != null)
+{
+    @* Cards de resumo *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4"
+                      Style="border-left-color: var(--mud-palette-info) !important;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Info" Class="font-weight-bold text-uppercase">Saldo Inicial</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Info" Class="font-weight-bold">
+                        @_extrato.SaldoInicial.ToString("C2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">em @_extrato.DataInicio.ToString("dd/MM/yyyy")</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Info" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4"
+                      Style="border-left-color: var(--mud-palette-success) !important;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Success" Class="font-weight-bold text-uppercase">Total Entradas</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Success" Class="font-weight-bold">
+                        @_extrato.TotalEntradas.ToString("C2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_extrato.Movimentacoes.Count(m => m.Tipo == TipoOperacaoFinanceira.Entrada) movimentação(ões)</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4"
+                      Style="border-left-color: var(--mud-palette-error) !important;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="font-weight-bold text-uppercase">Total Saídas</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Error" Class="font-weight-bold">
+                        @_extrato.TotalSaidas.ToString("C2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_extrato.Movimentacoes.Count(m => m.Tipo != TipoOperacaoFinanceira.Entrada) movimentação(ões)</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Color="Color.Error" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4"
+                      Style="@($"border-left-color: {(_extrato.SaldoFinal >= 0 ? "var(--mud-palette-success)" : "var(--mud-palette-error)")} !important;")">
+                <div>
+                    <MudText Typo="Typo.caption" Color="@(_extrato.SaldoFinal >= 0 ? Color.Success : Color.Error)" Class="font-weight-bold text-uppercase">Saldo Final</MudText>
+                    <MudText Typo="Typo.h5" Color="@(_extrato.SaldoFinal >= 0 ? Color.Success : Color.Error)" Class="font-weight-bold">
+                        @_extrato.SaldoFinal.ToString("C2")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">em @_extrato.DataFim.ToString("dd/MM/yyyy")</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet"
+                         Color="@(_extrato.SaldoFinal >= 0 ? Color.Success : Color.Error)"
+                         Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Tabela de movimentações *@
+    <MudPaper Elevation="1">
+        <MudTable Items="@ObterItensTabela()" Hover="true" Dense="true"
+                  RowClassFunc="@RowClassFunc" Elevation="0">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">
+                    <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+                    @_extrato.ContaBancariaDescricao — @_extrato.DataInicio.ToString("dd/MM/yyyy") a @_extrato.DataFim.ToString("dd/MM/yyyy")
+                </MudText>
+                <MudSpacer />
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@_extrato.Movimentacoes.Count movimentação(ões)</MudText>
+            </ToolBarContent>
+            <HeaderContent>
+                <MudTh>Data</MudTh>
+                <MudTh>Descrição</MudTh>
+                <MudTh>Tipo</MudTh>
+                <MudTh>Plano de Contas</MudTh>
+                <MudTh>Centro de Custo</MudTh>
+                <MudTh>Doc. Referência</MudTh>
+                <MudTh Style="text-align: right;">Entradas (R$)</MudTh>
+                <MudTh Style="text-align: right;">Saídas (R$)</MudTh>
+                <MudTh Style="text-align: right;">Saldo Acumulado</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @if (context.IsLinhaSaldoInicial)
+                {
+                    <MudTd colspan="8">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">
+                            Saldo anterior em @_extrato.DataInicio.ToString("dd/MM/yyyy")
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="text-align: right; font-weight: bold;">
+                        <MudText Color="@(_extrato.SaldoInicial >= 0 ? Color.Info : Color.Error)" Class="font-weight-bold">
+                            @_extrato.SaldoInicial.ToString("C2")
+                        </MudText>
+                    </MudTd>
+                }
+                else if (context.IsLinhaSaldoFinal)
+                {
+                    <MudTd colspan="8">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">
+                            Saldo final em @_extrato.DataFim.ToString("dd/MM/yyyy")
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="text-align: right; font-weight: bold;">
+                        <MudText Color="@(_extrato.SaldoFinal >= 0 ? Color.Success : Color.Error)" Class="font-weight-bold">
+                            @_extrato.SaldoFinal.ToString("C2")
+                        </MudText>
+                    </MudTd>
+                }
+                else if (context.Item != null)
+                {
+                    <MudTd DataLabel="Data">@context.Item.DataMovimentacao.ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd DataLabel="Descrição">@context.Item.Descricao</MudTd>
+                    <MudTd DataLabel="Tipo">
+                        @if (context.Item.Tipo == TipoOperacaoFinanceira.Entrada)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.ArrowUpward">Entrada</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.ArrowDownward">Saída</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Plano de Contas">@(context.Item.PlanoConta ?? "-")</MudTd>
+                    <MudTd DataLabel="Centro de Custo">@(context.Item.CentroCusto ?? "-")</MudTd>
+                    <MudTd DataLabel="Doc. Referência">@(context.Item.DocumentoReferencia ?? "-")</MudTd>
+                    <MudTd DataLabel="Entradas" Style="text-align: right;">
+                        @if (context.Item.Tipo == TipoOperacaoFinanceira.Entrada)
+                        {
+                            <MudText Color="Color.Success" Class="font-weight-medium">@context.Item.Valor.ToString("N2")</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Default">—</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Saídas" Style="text-align: right;">
+                        @if (context.Item.Tipo != TipoOperacaoFinanceira.Entrada)
+                        {
+                            <MudText Color="Color.Error" Class="font-weight-medium">@context.Item.Valor.ToString("N2")</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Default">—</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Saldo Acumulado" Style="text-align: right;">
+                        <MudText Color="@(context.Item.SaldoAcumulado >= 0 ? Color.Success : Color.Error)" Class="font-weight-bold">
+                            @context.Item.SaldoAcumulado.ToString("C2")
+                        </MudText>
+                    </MudTd>
+                }
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4" Color="Color.Secondary">Nenhuma movimentação encontrada para o período e filtros selecionados.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+}
+else if (!_carregando && _consultaRealizada)
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">
+        Nenhuma movimentação encontrada para os filtros selecionados.
+    </MudAlert>
+}
+else if (!_carregando && _contaBancariaId == null)
+{
+    <MudPaper Class="pa-8 d-flex flex-column align-center justify-center" Elevation="0" Style="min-height: 200px; border: 2px dashed var(--mud-palette-divider);">
+        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center">Selecione uma conta bancária e um período para consultar o extrato.</MudText>
+    </MudPaper>
+}
+
+@code {
+    private ExtratoBancarioDto? _extrato;
+    private bool _carregando;
+    private bool _consultaRealizada;
+
+    private int? _contaBancariaId;
+    private TipoOperacaoFinanceira? _tipo;
+    private int? _planoContaId;
+    private int? _centroCustoId;
+    private DateRange _periodo = new DateRange(
+        new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1),
+        new DateTime(DateTime.Now.Year, DateTime.Now.Month,
+            DateTime.DaysInMonth(DateTime.Now.Year, DateTime.Now.Month)));
+
+    private List<ContaBancariaDto> _contasBancarias = new();
+    private List<PlanoContaDto> _planosContas = new();
+    private List<CentroCustoDto> _centrosCusto = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            CarregarContasBancarias(),
+            CarregarPlanosContas(),
+            CarregarCentrosCusto()
+        );
+    }
+
+    private async Task CarregarContasBancarias()
+    {
+        try { _contasBancarias = await Mediator.Send(new GetContasBancariasQuery(true)); }
+        catch (Exception ex) { Snackbar.Add("Erro ao carregar contas bancárias: " + ex.Message, Severity.Error); }
+    }
+
+    private async Task CarregarPlanosContas()
+    {
+        try { _planosContas = await Mediator.Send(new GetPlanosContasQuery(SomenteAnaliticas: true)); }
+        catch (Exception ex) { Snackbar.Add("Erro ao carregar planos de contas: " + ex.Message, Severity.Error); }
+    }
+
+    private async Task CarregarCentrosCusto()
+    {
+        try { _centrosCusto = await Mediator.Send(new GetCentrosCustoQuery()); }
+        catch (Exception ex) { Snackbar.Add("Erro ao carregar centros de custo: " + ex.Message, Severity.Error); }
+    }
+
+    private async Task CarregarDados()
+    {
+        if (_contaBancariaId == null)
+        {
+            Snackbar.Add("Selecione uma conta bancária para consultar o extrato.", Severity.Warning);
+            return;
+        }
+
+        if (_periodo.Start == null || _periodo.End == null)
+        {
+            Snackbar.Add("Selecione o período para consultar o extrato.", Severity.Warning);
+            return;
+        }
+
+        _carregando = true;
+        _extrato = null;
+        _consultaRealizada = false;
+
+        try
+        {
+            var resultado = await Mediator.Send(new GetExtratoBancarioQuery(
+                ContaBancariaId: _contaBancariaId.Value,
+                DataInicio: _periodo.Start.Value.Date,
+                DataFim: _periodo.End.Value.Date,
+                Tipo: _tipo,
+                PlanoContaId: _planoContaId,
+                CentroCustoId: _centroCustoId
+            ));
+
+            _extrato = resultado;
+            _consultaRealizada = true;
+
+            if (_extrato.Movimentacoes.Count == 0)
+                Snackbar.Add("Nenhuma movimentação encontrada no período.", Severity.Info);
+            else
+                Snackbar.Add($"Extrato carregado: {_extrato.Movimentacoes.Count} movimentação(ões).", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar extrato: " + ex.Message, Severity.Error);
+            _consultaRealizada = true;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    // Linha virtual para representar uma linha da tabela (saldo inicial, movimentação ou saldo final)
+    private record LinhaTabela(ExtratoBancarioItemDto? Item, bool IsLinhaSaldoInicial = false, bool IsLinhaSaldoFinal = false);
+
+    private IEnumerable<LinhaTabela> ObterItensTabela()
+    {
+        if (_extrato == null) yield break;
+
+        yield return new LinhaTabela(null, IsLinhaSaldoInicial: true);
+
+        foreach (var item in _extrato.Movimentacoes)
+            yield return new LinhaTabela(item);
+
+        yield return new LinhaTabela(null, IsLinhaSaldoFinal: true);
+    }
+
+    private string RowClassFunc(LinhaTabela linha, int index)
+    {
+        if (linha.IsLinhaSaldoInicial || linha.IsLinhaSaldoFinal)
+            return "mud-background-gray font-weight-bold";
+
+        if (linha.Item?.Tipo == TipoOperacaoFinanceira.Entrada)
+            return "entrada-row";
+
+        return "saida-row";
+    }
+}

@@ -1,0 +1,272 @@
+@page "/financeiro/cadastros"
+@using ERP.Application.Financeiro.Cadastros.Commands
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Cadastros Financeiros</PageTitle>
+
+<div class="mb-4">
+    <MudText Typo="Typo.h5" Class="font-weight-bold">
+        <MudIcon Icon="Icons.Material.Filled.AccountBalance" Class="mr-2" />
+        Configurações & Cadastros Financeiros
+    </MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary">Gerencie contas bancárias, formas de pagamento, plano de contas e centros de custo.</MudText>
+</div>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    @* ABA 1: CONTAS BANCÁRIAS E CAIXAS *@
+    <MudTabPanel Text="Contas Bancárias & Caixas" Icon="@Icons.Material.Filled.AccountBalance">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">Contas e Caixas da Empresa</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add" OnClick="AbrirNovaContaBancariaDialog">
+                Nova Conta / Caixa
+            </MudButton>
+        </div>
+
+        <MudTable Items="@_contasBancarias" Dense="true" Hover="true" Striped="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Descrição</MudTh>
+                <MudTh>Tipo</MudTh>
+                <MudTh>Banco</MudTh>
+                <MudTh>Agência / Conta</MudTh>
+                <MudTh class="text-right">Saldo Inicial</MudTh>
+                <MudTh class="text-right">Saldo Atual</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Descrição" Class="font-weight-bold">@context.Descricao</MudTd>
+                <MudTd DataLabel="Tipo">@context.Tipo</MudTd>
+                <MudTd DataLabel="Banco">@(context.BancoNome ?? "Caixa / Interno")</MudTd>
+                <MudTd DataLabel="Agência / Conta">
+                    @if (!string.IsNullOrEmpty(context.Conta))
+                    {
+                        <span>Ag @context.Agencia - C/C @context.Conta</span>
+                    }
+                    else
+                    {
+                        <span>-</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Saldo Inicial" Class="text-right">@context.SaldoInicial.ToString("C2")</MudTd>
+                <MudTd DataLabel="Saldo Atual" Class="text-right font-weight-bold">
+                    <MudText Typo="Typo.body2" Color="@(context.SaldoAtual >= 0 ? Color.Success : Color.Error)">
+                        @context.SaldoAtual.ToString("C2")
+                    </MudText>
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativa ? Color.Success : Color.Default)">
+                        @(context.Ativa ? "Ativa" : "Inativa")
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+    @* ABA 2: FORMAS DE PAGAMENTO *@
+    <MudTabPanel Text="Formas de Pagamento" Icon="@Icons.Material.Filled.CreditCard">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">Formas de Pagamento Homologadas</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add" OnClick="AbrirNovaFormaPagamentoDialog">
+                Nova Forma de Pagamento
+            </MudButton>
+        </div>
+
+        <MudTable Items="@_formasPagamento" Dense="true" Hover="true" Striped="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Nome</MudTh>
+                <MudTh>Tipo do Meio</MudTh>
+                <MudTh class="text-center">Dias de Compensação</MudTh>
+                <MudTh class="text-right">Taxa (%)</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Nome" Class="font-weight-bold">@context.Nome</MudTd>
+                <MudTd DataLabel="Tipo">@context.Tipo</MudTd>
+                <MudTd DataLabel="Dias de Compensação" Class="text-center">@context.DiasCompensacao dia(s)</MudTd>
+                <MudTd DataLabel="Taxa (%)" Class="text-right">@context.TaxaPercentual.ToString("N2")%</MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativa ? Color.Success : Color.Default)">
+                        @(context.Ativa ? "Ativa" : "Inativa")
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+    @* ABA 3: PLANO DE CONTAS *@
+    <MudTabPanel Text="Plano de Contas" Icon="@Icons.Material.Filled.AccountTree">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">Plano de Contas Gerencial</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add" OnClick="AbrirNovoPlanoContaDialog">
+                Nova Conta Contábil
+            </MudButton>
+        </div>
+
+        <MudTable Items="@_planosContas" Dense="true" Hover="true" Striped="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Código</MudTh>
+                <MudTh>Descrição</MudTh>
+                <MudTh>Natureza</MudTh>
+                <MudTh>Tipo</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Código" Class="font-weight-bold">@context.Codigo</MudTd>
+                <MudTd DataLabel="Descrição" Style="@(context.Sintetica ? "font-weight: bold;" : "padding-left: 24px;")">
+                    @context.Descricao
+                </MudTd>
+                <MudTd DataLabel="Natureza">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Tipo == TipoPlanoConta.Receita ? Color.Success : Color.Error)">
+                        @context.Tipo
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Tipo">
+                    @(context.Sintetica ? "Grupo Sintético" : "Analítica (Aceita Lançamento)")
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)">
+                        @(context.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+    @* ABA 4: CENTROS DE CUSTO *@
+    <MudTabPanel Text="Centros de Custo" Icon="@Icons.Material.Filled.BusinessCenter">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">Centros de Custo & Departamentos</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add" OnClick="AbrirNovoCentroCustoDialog">
+                Novo Centro de Custo
+            </MudButton>
+        </div>
+
+        <MudTable Items="@_centrosCusto" Dense="true" Hover="true" Striped="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Código</MudTh>
+                <MudTh>Descrição</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Código" Class="font-weight-bold">@context.Codigo</MudTd>
+                <MudTd DataLabel="Descrição">@context.Descricao</MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)">
+                        @(context.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private List<ContaBancariaDto> _contasBancarias = new();
+    private List<FormaPagamentoDto> _formasPagamento = new();
+    private List<PlanoContaDto> _planosContas = new();
+    private List<CentroCustoDto> _centrosCusto = new();
+    private List<BancoDto> _bancos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDadosAsync();
+    }
+
+    private async Task CarregarDadosAsync()
+    {
+        _contasBancarias = await Mediator.Send(new GetContasBancariasQuery(SomenteAtivas: false));
+        _formasPagamento = await Mediator.Send(new GetFormasPagamentoQuery(SomenteAtivas: false));
+        _planosContas = await Mediator.Send(new GetPlanosContasQuery(SomenteAtivos: false));
+        _centrosCusto = await Mediator.Send(new GetCentrosCustoQuery(SomenteAtivos: false));
+        _bancos = await Mediator.Send(new GetBancosQuery());
+    }
+
+    private async Task AbrirNovaContaBancariaDialog()
+    {
+        var dialog = await DialogService.ShowAsync<ContaBancariaDialog>("Nova Conta Bancária / Caixa", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CreateContaBancariaCommand cmd)
+        {
+            var res = await Mediator.Send(cmd);
+            if (res.Sucesso)
+            {
+                Snackbar.Add("Conta bancária / caixa cadastrada com sucesso!", Severity.Success);
+                await CarregarDadosAsync();
+            }
+            else
+            {
+                foreach (var erro in res.Erros)
+                    Snackbar.Add(erro, Severity.Error);
+            }
+        }
+    }
+
+    private async Task AbrirNovaFormaPagamentoDialog()
+    {
+        var dialog = await DialogService.ShowAsync<FormaPagamentoDialog>("Nova Forma de Pagamento", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CreateFormaPagamentoCommand cmd)
+        {
+            var res = await Mediator.Send(cmd);
+            if (res.Sucesso)
+            {
+                Snackbar.Add("Forma de pagamento cadastrada com sucesso!", Severity.Success);
+                await CarregarDadosAsync();
+            }
+            else
+            {
+                foreach (var erro in res.Erros)
+                    Snackbar.Add(erro, Severity.Error);
+            }
+        }
+    }
+
+    private async Task AbrirNovoPlanoContaDialog()
+    {
+        var dialog = await DialogService.ShowAsync<PlanoContaDialog>("Nova Conta Contábil", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CreatePlanoContaCommand cmd)
+        {
+            var res = await Mediator.Send(cmd);
+            if (res.Sucesso)
+            {
+                Snackbar.Add("Conta contábil cadastrada com sucesso!", Severity.Success);
+                await CarregarDadosAsync();
+            }
+            else
+            {
+                foreach (var erro in res.Erros)
+                    Snackbar.Add(erro, Severity.Error);
+            }
+        }
+    }
+
+    private async Task AbrirNovoCentroCustoDialog()
+    {
+        var dialog = await DialogService.ShowAsync<CentroCustoDialog>("Novo Centro de Custo", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CreateCentroCustoCommand cmd)
+        {
+            var res = await Mediator.Send(cmd);
+            if (res.Sucesso)
+            {
+                Snackbar.Add("Centro de custo cadastrado com sucesso!", Severity.Success);
+                await CarregarDadosAsync();
+            }
+            else
+            {
+                foreach (var erro in res.Erros)
+                    Snackbar.Add(erro, Severity.Error);
+            }
+        }
+    }
+}

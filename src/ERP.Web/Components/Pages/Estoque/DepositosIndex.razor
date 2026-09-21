@@ -1,0 +1,133 @@
+@page "/estoque/depositos"
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Depósitos & Armazéns - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Warehouse" Class="mr-2" />
+            Depósitos & Armazéns
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gestão dos locais físicos de estocagem de produtos da empresa.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoDeposito">
+        Novo Depósito
+    </MudButton>
+</div>
+
+<MudCard Elevation="2">
+    <MudCardContent Class="pa-0">
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (!_depositos.Any())
+        {
+            <div class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Warehouse" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum depósito cadastrado</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Cadastre o primeiro depósito para gerenciar o estoque físico.</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoDeposito">
+                    Cadastrar Depósito
+                </MudButton>
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_depositos" Hover="true" Striped="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Nome</MudTh>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Localização / Endereço</MudTh>
+                    <MudTh>Responsável</MudTh>
+                    <MudTh class="text-center">Padrão</MudTh>
+                    <MudTh class="text-center">Status</MudTh>
+                    <MudTh class="text-right">Ações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Nome" Class="font-weight-bold">@context.Nome</MudTd>
+                    <MudTd DataLabel="Código">@(context.Codigo ?? "-")</MudTd>
+                    <MudTd DataLabel="Endereço">@(context.Endereco ?? "-")</MudTd>
+                    <MudTd DataLabel="Responsável">@(context.Responsavel ?? "-")</MudTd>
+                    <MudTd DataLabel="Padrão" Class="text-center">
+                        @if (context.Padrao)
+                        {
+                            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Filled">Padrão</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Status" Class="text-center">
+                        <MudChip T="string" Color="@(context.Ativo ? Color.Success : Color.Default)" Size="Size.Small" Variant="Variant.Outlined">
+                            @(context.Ativo ? "Ativo" : "Inativo")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Ações" Class="text-right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditarDeposito(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<DepositoDto> _depositos = new();
+    private bool _carregando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDepositos();
+    }
+
+    private async Task CarregarDepositos()
+    {
+        _carregando = true;
+        try
+        {
+            _depositos = await Mediator.Send(new GetDepositosQuery(false));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar depósitos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task NovoDeposito()
+    {
+        var parameters = new DialogParameters();
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepositoDialog>("Novo Depósito", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDepositos();
+        }
+    }
+
+    private async Task EditarDeposito(DepositoDto deposito)
+    {
+        var parameters = new DialogParameters { ["Deposito"] = deposito };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<DepositoDialog>("Editar Depósito", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDepositos();
+        }
+    }
+}

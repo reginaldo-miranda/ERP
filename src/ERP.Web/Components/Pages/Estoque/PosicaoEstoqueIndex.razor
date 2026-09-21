@@ -1,0 +1,239 @@
+@page "/estoque/posicao"
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Posição de Estoque - ERP</PageTitle>
+
+<div class="d-flex flex-wrap justify-space-between align-center mb-4 gap-2">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Storage" Class="mr-2" />
+            Posição de Estoque
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Consulta de saldos em tempo real, custos médios e alertas de estoque mínimo por depósito.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Warehouse" Href="/estoque/depositos">
+            Gerenciar Depósitos
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapVert" OnClick="@(() => AbrirDialogMovimentacao())">
+            Nova Movimentação
+        </MudButton>
+    </div>
+</div>
+
+@* CARDS DE RESUMO *@
+<MudGrid Class="mb-4" Spacing="2">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE PRODUTOS</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">@_posicoes.Count</MudText>
+            </div>
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">QUANTIDADE TOTAL</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">@_posicoes.Sum(p => p.Quantidade).ToString("N0")</MudText>
+            </div>
+            <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.FormatListNumbered" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR TOTAL ESTOCADO</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_posicoes.Sum(p => p.ValorTotalEstoque).ToString("C2")</MudText>
+            </div>
+            <MudAvatar Color="Color.Success" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">ABAIXO DO MÍNIMO</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="@(_posicoes.Count(p => p.AbaixoEstoqueMinimo) > 0 ? Color.Error : Color.Default)">
+                    @_posicoes.Count(p => p.AbaixoEstoqueMinimo)
+                </MudText>
+            </div>
+            <MudAvatar Color="@(_posicoes.Count(p => p.AbaixoEstoqueMinimo) > 0 ? Color.Error : Color.Default)" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* FILTROS *@
+<MudCard Class="mb-4" Elevation="1">
+    <MudCardContent Class="py-2">
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="5">
+                <MudTextField @bind-Value="_termoBusca" Placeholder="Buscar por nome, código ou código de barras..." Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Immediate="true"
+                              OnKeyUp="@(async e => { if (e.Key == "Enter") await CarregarPosicao(); })"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int?" Value="_depositoFiltroId" Label="Filtrar por Depósito" Clearable="true"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" AnchorOrigin="Origin.BottomCenter"
+                           ValueChanged="@(async (int? v) => { _depositoFiltroId = v; await CarregarPosicao(); })">
+                    @foreach (var dep in _depositos)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)dep.Id)">@dep.Nome @(dep.Padrao ? "(Padrão)" : "")</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3" Class="d-flex align-center justify-space-between">
+                <MudCheckBox T="bool" Value="_somenteAbaixoMinimo" Label="Abaixo do Mínimo" Color="Color.Error"
+                             ValueChanged="@(async (bool v) => { _somenteAbaixoMinimo = v; await CarregarPosicao(); })" />
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" OnClick="CarregarPosicao">Filtrar</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+@* TABELA DE POSIÇÃO *@
+<MudCard Elevation="2">
+    <MudCardContent Class="pa-0">
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (!_posicoes.Any())
+        {
+            <div class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum registro de estoque encontrado</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Cadastre produtos e realize a primeira movimentação de estoque.</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapVert" OnClick="@(() => AbrirDialogMovimentacao())">
+                    Registrar Movimentação
+                </MudButton>
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_posicoes" Hover="true" Striped="true" Elevation="0" Dense="true">
+                <HeaderContent>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Produto</MudTh>
+                    <MudTh>Depósito</MudTh>
+                    <MudTh class="text-right">Saldo Atual</MudTh>
+                    <MudTh class="text-right">Estoque Mínimo</MudTh>
+                    <MudTh class="text-right">Custo Médio</MudTh>
+                    <MudTh class="text-right">Valor Total</MudTh>
+                    <MudTh class="text-center">Status</MudTh>
+                    <MudTh class="text-right">Ação</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Código" Class="font-weight-bold">@context.ProdutoCodigo</MudTd>
+                    <MudTd DataLabel="Produto">
+                        <MudText Typo="Typo.body2" Class="font-weight-medium">@context.ProdutoNome</MudText>
+                        @if (!string.IsNullOrEmpty(context.UnidadeMedida))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Unidade: @context.UnidadeMedida</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Depósito">@context.DepositoNome</MudTd>
+                    <MudTd DataLabel="Saldo Atual" Class="text-right font-weight-bold">
+                        <MudText Typo="Typo.body2" Color="@(context.Quantidade <= 0 ? Color.Error : Color.Default)">
+                            @context.Quantidade.ToString("N2")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Estoque Mínimo" Class="text-right">@context.EstoqueMinimo.ToString("N2")</MudTd>
+                    <MudTd DataLabel="Custo Médio" Class="text-right">@context.CustoMedio.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Valor Total" Class="text-right font-weight-bold">@context.ValorTotalEstoque.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Status" Class="text-center">
+                        @if (context.Quantidade <= 0)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Sem Estoque</MudChip>
+                        }
+                        else if (context.AbaixoEstoqueMinimo)
+                        {
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">Abaixo do Mínimo</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Outlined">Normal</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Ação" Class="text-right">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                   OnClick="@(() => AbrirDialogMovimentacao(context.ProdutoId, context.DepositoId))">
+                            Movimentar
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<PosicaoEstoqueDto> _posicoes = new();
+    private List<DepositoDto> _depositos = new();
+    private bool _carregando = true;
+
+    private string? _termoBusca;
+    private int? _depositoFiltroId;
+    private bool _somenteAbaixoMinimo = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _depositos = await Mediator.Send(new GetDepositosQuery(true));
+        await CarregarPosicao();
+    }
+
+    private async Task CarregarPosicao()
+    {
+        _carregando = true;
+        try
+        {
+            _posicoes = await Mediator.Send(new GetPosicaoEstoqueQuery(_depositoFiltroId, _termoBusca, _somenteAbaixoMinimo ? true : null));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao consultar posição de estoque: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task AbrirDialogMovimentacao(int? produtoId = null, int? depositoId = null)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ProdutoIdPadrao"] = produtoId,
+            ["DepositoIdPadrao"] = depositoId
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<MovimentacaoEstoqueDialog>("Registrar Movimentação de Estoque", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarPosicao();
+        }
+    }
+}

@@ -1,0 +1,159 @@
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using MediatR
+@inject IMediator Mediator
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@(IsPagar ? Icons.Material.Filled.MoneyOff : Icons.Material.Filled.AccountBalanceWallet)" Class="mr-2" />
+            @(IsPagar ? "Baixar / Pagar Conta" : "Baixar / Receber Conta")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Class="mb-3" Dense="true">
+            Título: <b>@DescricaoTitulo</b><br />
+            Saldo em Aberto: <b>@SaldoRestante.ToString("C2")</b>
+        </MudAlert>
+
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudDatePicker Label="Data da Liquidação" @bind-Date="_dataBaixa" Required="true" Editable="true" DateFormat="dd/MM/yyyy" />
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudSelect T="int" Label="Conta Bancária / Caixa" @bind-Value="_contaBancariaId" Required="true">
+                    @foreach (var c in _contasBancarias)
+                    {
+                        <MudSelectItem Value="@c.Id">@c.Descricao (Saldo: @c.SaldoAtual.ToString("C2"))</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudSelect T="int" Label="Forma de Pagamento" @bind-Value="_formaPagamentoId" Required="true">
+                    @foreach (var f in _formasPagamento)
+                    {
+                        <MudSelectItem Value="@f.Id">@f.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudNumericField T="decimal" Label="Valor Principal a Abater" @bind-Value="_valorPrincipal"
+                                 Min="0.01m" Max="@SaldoRestante" Format="N2" Culture="@(new System.Globalization.CultureInfo("pt-BR"))"
+                                 HelperText="Valor descontado da dívida" />
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" Label="Juros (+)" @bind-Value="_valorJuros" Min="0" Format="N2"
+                                 Culture="@(new System.Globalization.CultureInfo("pt-BR"))" />
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" Label="Multa (+)" @bind-Value="_valorMulta" Min="0" Format="N2"
+                                 Culture="@(new System.Globalization.CultureInfo("pt-BR"))" />
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudNumericField T="decimal" Label="Desconto (-)" @bind-Value="_valorDesconto" Min="0" Format="N2"
+                                 Culture="@(new System.Globalization.CultureInfo("pt-BR"))" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Elevation="0" Class="pa-3 rounded mud-theme-primary" Style="background-color: var(--mud-palette-background-grey);">
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Total Efetivo a @(IsPagar ? "Debitar" : "Creditar"):</MudText>
+                        <MudText Typo="Typo.h5" Color="@(IsPagar ? Color.Error : Color.Success)" Class="font-weight-bold">
+                            @ValorTotalEfetivo.ToString("C2")
+                        </MudText>
+                    </div>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudTextField T="string" Label="Observações da Baixa" @bind-Value="_observacoes" Lines="2" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="@(IsPagar ? Color.Error : Color.Success)" Variant="Variant.Filled" OnClick="Confirmar" Disabled="@(!PodeConfirmar)">
+            @(IsPagar ? "Confirmar Pagamento" : "Confirmar Recebimento")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] public bool IsPagar { get; set; } = true;
+    [Parameter] public string DescricaoTitulo { get; set; } = string.Empty;
+    [Parameter] public decimal SaldoRestante { get; set; }
+    [Parameter] public int? ContaBancariaPadraoId { get; set; }
+    [Parameter] public int? FormaPagamentoPadraoId { get; set; }
+
+    private DateTime? _dataBaixa = DateTime.Today;
+    private int _contaBancariaId;
+    private int _formaPagamentoId;
+    private decimal _valorPrincipal;
+    private decimal _valorJuros;
+    private decimal _valorMulta;
+    private decimal _valorDesconto;
+    private string? _observacoes;
+
+    private List<ContaBancariaDto> _contasBancarias = new();
+    private List<FormaPagamentoDto> _formasPagamento = new();
+
+    private decimal ValorTotalEfetivo => Math.Max(0, _valorPrincipal + _valorJuros + _valorMulta - _valorDesconto);
+    private bool PodeConfirmar => _contaBancariaId > 0 && _formaPagamentoId > 0 && _valorPrincipal > 0 && _valorPrincipal <= SaldoRestante;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _valorPrincipal = SaldoRestante;
+        _contasBancarias = await Mediator.Send(new GetContasBancariasQuery(SomenteAtivas: true));
+        _formasPagamento = await Mediator.Send(new GetFormasPagamentoQuery(SomenteAtivas: true));
+
+        if (ContaBancariaPadraoId.HasValue && _contasBancarias.Any(c => c.Id == ContaBancariaPadraoId.Value))
+            _contaBancariaId = ContaBancariaPadraoId.Value;
+        else if (_contasBancarias.Any())
+            _contaBancariaId = _contasBancarias.First().Id;
+
+        if (FormaPagamentoPadraoId.HasValue && _formasPagamento.Any(f => f.Id == FormaPagamentoPadraoId.Value))
+            _formaPagamentoId = FormaPagamentoPadraoId.Value;
+        else if (_formasPagamento.Any())
+            _formaPagamentoId = _formasPagamento.First().Id;
+    }
+
+    private void Confirmar()
+    {
+        if (!PodeConfirmar) return;
+
+        var dados = new DadosBaixa(
+            _contaBancariaId,
+            _formaPagamentoId,
+            _dataBaixa ?? DateTime.Today,
+            _valorPrincipal,
+            _valorJuros,
+            _valorMulta,
+            _valorDesconto,
+            _observacoes
+        );
+
+        MudDialog.Close(DialogResult.Ok(dados));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    public record DadosBaixa(
+        int ContaBancariaId,
+        int FormaPagamentoId,
+        DateTime DataBaixa,
+        decimal ValorPrincipal,
+        decimal ValorJuros,
+        decimal ValorMulta,
+        decimal ValorDesconto,
+        string? Observacoes
+    );
+}

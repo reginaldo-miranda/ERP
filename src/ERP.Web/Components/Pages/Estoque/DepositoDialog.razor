@@ -1,0 +1,105 @@
+@using ERP.Application.Estoque.Commands
+@using ERP.Application.Estoque.DTOs
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_nome" Label="Nome do Depósito *" Required="true" RequiredError="O nome é obrigatório" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_codigo" Label="Código / Sigla" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_endereco" Label="Endereço / Localização física" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_responsavel" Label="Responsável pelo Depósito" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="4" Class="d-flex align-center">
+                    <MudCheckBox @bind-Value="_padrao" Label="Depósito Padrão" Color="Color.Primary" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!_isValid || _salvando)">
+            @if (_salvando)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar Depósito</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public DepositoDto? Deposito { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _salvando = false;
+
+    private string _nome = string.Empty;
+    private string? _codigo;
+    private string? _endereco;
+    private string? _responsavel;
+    private bool _padrao;
+
+    protected override void OnInitialized()
+    {
+        if (Deposito != null)
+        {
+            _nome = Deposito.Nome;
+            _codigo = Deposito.Codigo;
+            _endereco = Deposito.Endereco;
+            _responsavel = Deposito.Responsavel;
+            _padrao = Deposito.Padrao;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid) return;
+
+        _salvando = true;
+        try
+        {
+            var dto = new CriarDepositoDto(_nome, _codigo, _endereco, _responsavel, _padrao);
+
+            if (Deposito == null)
+            {
+                await Mediator.Send(new CriarDepositoCommand(dto));
+                Snackbar.Add("Depósito cadastrado com sucesso!", Severity.Success);
+            }
+            else
+            {
+                await Mediator.Send(new AtualizarDepositoCommand(Deposito.Id, dto));
+                Snackbar.Add("Depósito atualizado com sucesso!", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

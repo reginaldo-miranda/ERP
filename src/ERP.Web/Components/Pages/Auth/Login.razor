@@ -1,0 +1,167 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@using ERP.Application.Auth.Commands.Login
+@using ERP.Web.Services
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject CustomAuthStateProvider AuthState
+
+<PageTitle>Login — ERP Multi-Empresa</PageTitle>
+
+<div class="d-flex justify-center align-center min-vh-100 pa-4" style="min-height: 85vh;">
+    <MudCard Elevation="4" Style="width: 100%; max-width: 440px; border-radius: 12px;">
+        <MudCardHeader Class="d-flex flex-column align-center pb-2">
+            <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" />
+            </MudAvatar>
+            <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Primary">ERP Multi-Empresa</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Acesse seu painel administrativo</MudText>
+        </MudCardHeader>
+
+        <MudCardContent Class="pt-2">
+            @if (!string.IsNullOrEmpty(_erroMensagem))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4" Dense="true" ShowCloseIcon="true" CloseIconClicked="@(() => _erroMensagem = null)">
+                    @_erroMensagem
+                </MudAlert>
+            }
+
+            <MudForm @ref="_form" @bind-IsValid="@_isValid">
+                <MudTextField @bind-Value="_email" 
+                              Label="E-mail" 
+                              Variant="Variant.Outlined" 
+                              Required="true" 
+                              RequiredError="O e-mail é obrigatório"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Email" 
+                              Class="mb-4" />
+
+                <MudTextField @bind-Value="_senha" 
+                              Label="Senha" 
+                              Variant="Variant.Outlined" 
+                              Required="true" 
+                              RequiredError="A senha é obrigatória"
+                              InputType="@_senhaInputType"
+                              Adornment="Adornment.End" 
+                              AdornmentIcon="@_senhaIcone" 
+                              OnAdornmentClick="AlternarVisibilidadeSenha"
+                              Class="mb-4"
+                              OnKeyUp="@(async (e) => { if (e.Key == "Enter") await RealizarLogin(); })" />
+
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           FullWidth="true" 
+                           Size="Size.Large" 
+                           Disabled="@_carregando"
+                           OnClick="RealizarLogin" 
+                           Class="mt-2 py-3 font-weight-bold">
+                    @if (_carregando)
+                    {
+                        <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                        <MudText Class="ms-2">Autenticando...</MudText>
+                    }
+                    else
+                    {
+                        <span>Entrar no Sistema</span>
+                    }
+                </MudButton>
+            </MudForm>
+
+            <MudDivider Class="my-5" />
+
+            <MudPaper Outlined="true" Class="pa-3 rounded-lg" Style="background-color: var(--mud-palette-background-grey);">
+                <MudText Typo="Typo.caption" Class="font-weight-bold" Color="Color.Primary">Acesso Rápido de Teste:</MudText>
+                <div class="d-flex justify-space-between align-center mt-1">
+                    <div>
+                        <MudText Typo="Typo.caption" Class="d-block"><b>Email:</b> admin@erp.com</MudText>
+                        <MudText Typo="Typo.caption" Class="d-block"><b>Senha:</b> Admin@123</MudText>
+                    </div>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Secondary" 
+                               Size="Size.Small" 
+                               OnClick="PreencherAdmin">
+                        Preencher
+                    </MudButton>
+                </div>
+            </MudPaper>
+        </MudCardContent>
+    </MudCard>
+</div>
+
+@code {
+    private MudForm? _form;
+    private bool _isValid;
+    private bool _carregando;
+    private string _email = "admin@erp.com";
+    private string _senha = "Admin@123";
+    private string? _erroMensagem;
+
+    private bool _mostrarSenha;
+    private InputType _senhaInputType = InputType.Password;
+    private string _senhaIcone = Icons.Material.Filled.VisibilityOff;
+
+    private void AlternarVisibilidadeSenha()
+    {
+        if (_mostrarSenha)
+        {
+            _mostrarSenha = false;
+            _senhaIcone = Icons.Material.Filled.VisibilityOff;
+            _senhaInputType = InputType.Password;
+        }
+        else
+        {
+            _mostrarSenha = true;
+            _senhaIcone = Icons.Material.Filled.Visibility;
+            _senhaInputType = InputType.Text;
+        }
+    }
+
+    private void PreencherAdmin()
+    {
+        _email = "admin@erp.com";
+        _senha = "Admin@123";
+        _erroMensagem = null;
+    }
+
+    private async Task RealizarLogin()
+    {
+        if (_form != null)
+        {
+            await _form.ValidateAsync();
+            if (!_isValid) return;
+        }
+
+        _carregando = true;
+        _erroMensagem = null;
+
+        try
+        {
+            var command = new LoginCommand(_email, _senha);
+            var result = await Mediator.Send(command);
+
+            if (result.Sucesso && result.Dados?.Usuario != null)
+            {
+                await AuthState.LoginAsync(result.Dados.Usuario);
+                Snackbar.Add($"Login realizado com sucesso! Bem-vindo(a), {result.Dados.Usuario.NomeCompleto}!", Severity.Success);
+                Nav.NavigateTo("/");
+            }
+            else
+            {
+                _erroMensagem = result.Erros?.FirstOrDefault() ?? "Email ou senha inválidos.";
+                Snackbar.Add(_erroMensagem, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _erroMensagem = $"Erro inesperado: {ex.Message}";
+            Snackbar.Add(_erroMensagem, Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+}

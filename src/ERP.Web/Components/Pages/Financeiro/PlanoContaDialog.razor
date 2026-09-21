@@ -1,0 +1,81 @@
+@using ERP.Application.Financeiro.Cadastros.Commands
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="Icons.Material.Filled.AccountTree" Class="mr-2" />
+            Nova Conta Contábil / Plano de Contas
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField T="string" Label="Código Contábil" @bind-Value="_codigo" Required="true" Placeholder="Ex: 1.1.03 ou 2.2.05" />
+            </MudItem>
+
+            <MudItem xs="12" md="8">
+                <MudTextField T="string" Label="Descrição da Conta" @bind-Value="_descricao" Required="true" Placeholder="Ex: Venda de Cursos, Manutenção de Veículos" />
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudSelect T="TipoPlanoConta" Label="Natureza" @bind-Value="_tipo">
+                    <MudSelectItem Value="TipoPlanoConta.Receita">Receita</MudSelectItem>
+                    <MudSelectItem Value="TipoPlanoConta.Despesa">Despesa</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudCheckBox T="bool" @bind-Value="_sintetica" Label="Conta Sintética (Grupo/Totalizador)" Color="Color.Primary" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudSelect T="int?" Label="Conta Pai (Grupo Superior)" @bind-Value="_planoContaPaiId" Clearable="true">
+                    @foreach (var p in _planosSinteticos)
+                    {
+                        <MudSelectItem Value="@((int?)p.Id)">@p.Codigo - @p.Descricao</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!PodeSalvar)">
+            Salvar Conta
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _codigo = string.Empty;
+    private string _descricao = string.Empty;
+    private TipoPlanoConta _tipo = TipoPlanoConta.Despesa;
+    private bool _sintetica = false;
+    private int? _planoContaPaiId;
+
+    private List<PlanoContaDto> _planosSinteticos = new();
+    private bool PodeSalvar => !string.IsNullOrWhiteSpace(_codigo) && !string.IsNullOrWhiteSpace(_descricao);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var todos = await Mediator.Send(new GetPlanosContasQuery(SomenteAtivos: true));
+        _planosSinteticos = todos.Where(p => p.Sintetica).ToList();
+    }
+
+    private void Salvar()
+    {
+        if (!PodeSalvar) return;
+        var cmd = new CreatePlanoContaCommand(_codigo, _descricao, _tipo, _sintetica, _planoContaPaiId);
+        MudDialog.Close(DialogResult.Ok(cmd));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

@@ -19,6 +19,28 @@ services:
       timeout: 5s
       retries: 5
 
+  erp-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: erp-web
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:5000
+      - DOTNET_USE_POLLING_FILE_WATCHER=1
+      - ConnectionStrings__DefaultConnection=Host=erp-db;Port=5432;Database=erp_db;Username=erp_user;Password=erp_P@ssw0rd_2026
+    ports:
+      - "5219:5000"
+    volumes:
+      - .:/app
+      - nuget_cache:/root/.nuget/packages
+    depends_on:
+      erp-db:
+        condition: service_healthy
+
 volumes:
   erp_postgres_data:
+    driver: local
+  nuget_cache:
     driver: local

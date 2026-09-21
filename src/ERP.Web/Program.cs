@@ -3,6 +3,8 @@ using ERP.Infrastructure;
 using ERP.Infrastructure.Data;
 using ERP.Infrastructure.Identity;
 using ERP.Web.Components;
+using ERP.Web.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using MudBlazor.Services;
 
@@ -23,6 +25,11 @@ builder.Services.AddSwaggerGen();
 // Services do Blazor
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Autenticação no Blazor Server
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, ERP.Web.Services.CustomAuthStateProvider>();
+builder.Services.AddScoped<ERP.Web.Services.CustomAuthStateProvider>(sp => (ERP.Web.Services.CustomAuthStateProvider)sp.GetRequiredService<AuthenticationStateProvider>());
 
 var app = builder.Build();
 
@@ -50,6 +57,7 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
 else
 {
@@ -57,7 +65,6 @@ else
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 

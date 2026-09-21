@@ -1,0 +1,46 @@
+@using ERP.Application.Financeiro.Cadastros.Commands
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="Icons.Material.Filled.BusinessCenter" Class="mr-2" />
+            Novo Centro de Custo
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudTextField T="string" Label="Código" @bind-Value="_codigo" Required="true" Placeholder="Ex: 04 ou 01.02" />
+            </MudItem>
+
+            <MudItem xs="12" md="8">
+                <MudTextField T="string" Label="Descrição do Centro de Custo" @bind-Value="_descricao" Required="true" Placeholder="Ex: Marketing Digital, Logística" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!PodeSalvar)">
+            Salvar Centro de Custo
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _codigo = string.Empty;
+    private string _descricao = string.Empty;
+
+    private bool PodeSalvar => !string.IsNullOrWhiteSpace(_codigo) && !string.IsNullOrWhiteSpace(_descricao);
+
+    private void Salvar()
+    {
+        if (!PodeSalvar) return;
+        var cmd = new CreateCentroCustoCommand(_codigo, _descricao);
+        MudDialog.Close(DialogResult.Ok(cmd));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

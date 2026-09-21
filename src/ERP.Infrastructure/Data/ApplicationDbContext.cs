@@ -43,6 +43,23 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<UnidadeMedida> UnidadesMedida => Set<UnidadeMedida>();
     public DbSet<Endereco> Enderecos => Set<Endereco>();
 
+    // Fase 3 - Financeiro
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.Banco> Bancos => Set<ERP.Domain.Core.Entities.Financeiro.Banco>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.ContaBancaria> ContasBancarias => Set<ERP.Domain.Core.Entities.Financeiro.ContaBancaria>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.FormaPagamento> FormasPagamento => Set<ERP.Domain.Core.Entities.Financeiro.FormaPagamento>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.PlanoConta> PlanosContas => Set<ERP.Domain.Core.Entities.Financeiro.PlanoConta>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.CentroCusto> CentrosCusto => Set<ERP.Domain.Core.Entities.Financeiro.CentroCusto>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.ContaPagar> ContasPagar => Set<ERP.Domain.Core.Entities.Financeiro.ContaPagar>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.ContaReceber> ContasReceber => Set<ERP.Domain.Core.Entities.Financeiro.ContaReceber>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.BaixaContaPagar> BaixasContasPagar => Set<ERP.Domain.Core.Entities.Financeiro.BaixaContaPagar>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.BaixaContaReceber> BaixasContasReceber => Set<ERP.Domain.Core.Entities.Financeiro.BaixaContaReceber>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.MovimentacaoFinanceira> MovimentacoesFinanceiras => Set<ERP.Domain.Core.Entities.Financeiro.MovimentacaoFinanceira>();
+
+    // Fase 4 - Estoque
+    public DbSet<ERP.Domain.Core.Entities.Estoque.Deposito> Depositos => Set<ERP.Domain.Core.Entities.Estoque.Deposito>();
+    public DbSet<ERP.Domain.Core.Entities.Estoque.EstoqueProduto> EstoqueProdutos => Set<ERP.Domain.Core.Entities.Estoque.EstoqueProduto>();
+    public DbSet<ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque> MovimentacoesEstoque => Set<ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -112,6 +129,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
     private void ConfigureMultiTenancyFilter<TEntity>(ModelBuilder builder) where TEntity : BaseEmpresaEntity
     {
-        builder.Entity<TEntity>().HasQueryFilter(e => !_currentEmpresaService.EmpresaId.HasValue || e.EmpresaId == _currentEmpresaService.EmpresaId.Value);
+        builder.Entity<TEntity>().HasQueryFilter(e => _currentEmpresaService.EmpresaId == null || e.EmpresaId == _currentEmpresaService.EmpresaId);
     }
 }

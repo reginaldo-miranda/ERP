@@ -1,5 +1,6 @@
 using ERP.Domain.Core.Interfaces;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace ERP.Infrastructure.Identity;
 
@@ -100,5 +101,62 @@ public class IdentityService : IIdentityService
         if (user == null) return (null, null);
 
         return (user.NomeCompleto, user.Email);
+    }
+
+    public async Task<List<(string Id, string NomeCompleto, string Email, bool Ativo, DateTime CriadoEm, IList<string> Papeis)>> ObterTodosUsuariosAsync()
+    {
+        var users = await _userManager.Users.OrderBy(u => u.NomeCompleto).ToListAsync();
+        var result = new List<(string Id, string NomeCompleto, string Email, bool Ativo, DateTime CriadoEm, IList<string> Papeis)>();
+        foreach (var u in users)
+        {
+            var roles = await _userManager.GetRolesAsync(u);
+            result.Add((u.Id, u.NomeCompleto, u.Email ?? "", u.Ativo, u.CriadoEm, roles));
+        }
+        return result;
+    }
+
+    public async Task<bool> AtualizarUsuarioAsync(string usuarioId, string nomeCompleto, string email, bool ativo, IEnumerable<string> papeis)
+    {
+        var user = await _userManager.FindByIdAsync(usuarioId);
+        if (user == null) return false;
+
+        user.NomeCompleto = nomeCompleto;
+        user.Email = email;
+        user.UserName = email;
+        user.Ativo = ativo;
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded) return false;
+
+        var currentRoles = await _userManager.GetRolesAsync(user);
+        await _userManager.RemoveFromRolesAsync(user, currentRoles);
+        await _userManager.AddToRolesAsync(user, papeis);
+
+        return true;
+    }
+
+    public async Task<bool> AlternarStatusUsuarioAsync(string usuarioId)
+    {
+        var user = await _userManager.FindByIdAsync(usuarioId);
+        if (user == null) return false;
+
+        user.Ativo = !user.Ativo;
+        var result = await _userManager.UpdateAsync(user);
+        return result.Succeeded;
+    }
+
+    public async Task<bool> ResetarSenhaAsync(string usuarioId, string novaSenha)
+    {
+        var user = await _userManager.FindByIdAsync(usuarioId);
+        if (user == null) return false;
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, novaSenha);
+        return result.Succeeded;
+    }
+
+    public async Task<List<string>> ObterTodosPapeisAsync()
+    {
+        return await _roleManager.Roles.Select(r => r.Name!).ToListAsync();
     }
 }

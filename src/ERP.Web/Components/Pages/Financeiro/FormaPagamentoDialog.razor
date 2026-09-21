@@ -1,0 +1,68 @@
+@using ERP.Application.Financeiro.Cadastros.Commands
+@using ERP.Domain.Core.Enums
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="Icons.Material.Filled.CreditCard" Class="mr-2" />
+            Nova Forma de Pagamento
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudTextField T="string" Label="Nome da Forma" @bind-Value="_nome" Required="true" Placeholder="Ex: Boleto 30 Dias, Pix Santander, etc." />
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudSelect T="TipoFormaPagamento" Label="Tipo de Meio" @bind-Value="_tipo">
+                    <MudSelectItem Value="TipoFormaPagamento.Dinheiro">Dinheiro</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.Pix">Pix</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.Boleto">Boleto Bancário</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.CartaoCredito">Cartão de Crédito</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.CartaoDebito">Cartão de Débito</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.Transferencia">Transferência / TED</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.Cheque">Cheque</MudSelectItem>
+                    <MudSelectItem Value="TipoFormaPagamento.Outro">Outro</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudNumericField T="int" Label="Dias para Compensação" @bind-Value="_diasCompensacao" Min="0" Max="365"
+                                 HelperText="0 para imediato (ex: Pix/Dinheiro)" />
+            </MudItem>
+
+            <MudItem xs="12" md="6">
+                <MudNumericField T="decimal" Label="Taxa de Intermediação (%)" @bind-Value="_taxaPercentual" Min="0" Max="100"
+                                 Format="N2" Culture="@(new System.Globalization.CultureInfo("pt-BR"))" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!PodeSalvar)">
+            Salvar Forma
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string _nome = string.Empty;
+    private TipoFormaPagamento _tipo = TipoFormaPagamento.Pix;
+    private int _diasCompensacao = 0;
+    private decimal _taxaPercentual = 0;
+
+    private bool PodeSalvar => !string.IsNullOrWhiteSpace(_nome);
+
+    private void Salvar()
+    {
+        if (!PodeSalvar) return;
+        var cmd = new CreateFormaPagamentoCommand(_nome, _tipo, _diasCompensacao, _taxaPercentual);
+        MudDialog.Close(DialogResult.Ok(cmd));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

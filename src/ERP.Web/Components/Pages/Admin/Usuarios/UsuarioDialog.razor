@@ -1,0 +1,227 @@
+@using ERP.Application.Empresas.DTOs
+@using ERP.Application.Empresas.Queries.GetEmpresas
+@using ERP.Application.Usuarios.Commands.AtualizarUsuario
+@using ERP.Application.Usuarios.Commands.CriarUsuario
+@using ERP.Application.Usuarios.DTOs
+@using ERP.Application.Usuarios.Queries.GetPapeis
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@(IsEdicao ? Icons.Material.Filled.ManageAccounts : Icons.Material.Filled.PersonAdd)" Class="mr-2" />
+            @(IsEdicao ? "Editar Usuário" : "Novo Usuário")
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="@_isValid">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_nomeCompleto" Label="Nome Completo *" Required="true" 
+                                  RequiredError="Nome completo é obrigatório" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_email" Label="E-mail de Acesso *" Required="true" 
+                                  RequiredError="E-mail é obrigatório" Variant="Variant.Outlined" InputType="InputType.Email" />
+                </MudItem>
+
+                @if (!IsEdicao)
+                {
+                    <MudItem xs="12" md="12">
+                        <MudTextField @bind-Value="_senha" Label="Senha Inicial *" Required="true" 
+                                      RequiredError="A senha inicial é obrigatória" Variant="Variant.Outlined" 
+                                      InputType="InputType.Password" HelperText="Mínimo de 6 caracteres, com números e símbolos." />
+                    </MudItem>
+                }
+
+                <MudItem xs="12" md="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1 font-weight-bold">Papéis / Níveis de Acesso:</MudText>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var papel in _todosPapeis)
+                        {
+                            var selecionado = _papeisSelecionados.Contains(papel);
+                            <MudChip T="string" Color="@(selecionado ? Color.Primary : Color.Default)" 
+                                     Variant="@(selecionado ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => AlternarPapel(papel))">
+                                @papel
+                            </MudChip>
+                        }
+                    </div>
+                </MudItem>
+
+                <MudItem xs="12" md="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1 font-weight-bold">Empresas com Acesso Permitido:</MudText>
+                    <div class="d-flex flex-column gap-1">
+                        @foreach (var emp in _todasEmpresas)
+                        {
+                            var temAcesso = _empresasSelecionadasIds.Contains(emp.Id);
+                            <MudCheckBox T="bool" Value="@temAcesso" Color="Color.Primary" 
+                                         ValueChanged="@((val) => AlternarEmpresa(emp.Id, val))" Dense="true">
+                                <b>@emp.RazaoSocial</b> @(string.IsNullOrEmpty(emp.NomeFantasia) ? "" : $"({emp.NomeFantasia})") - CNPJ: @emp.Cnpj
+                            </MudCheckBox>
+                        }
+                    </div>
+                </MudItem>
+
+                @if (IsEdicao)
+                {
+                    <MudItem xs="12">
+                        <MudSwitch @bind-Value="_ativo" Color="Color.Success" Label="Usuário Ativo" />
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@_salvando">
+            @if (_salvando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public UsuarioDetalhesDto? Usuario { get; set; }
+
+    private MudForm? _form;
+    private bool _isValid;
+    private bool _salvando;
+    private bool IsEdicao => Usuario != null && !string.IsNullOrEmpty(Usuario.Id);
+
+    private string _nomeCompleto = string.Empty;
+    private string _email = string.Empty;
+    private string _senha = string.Empty;
+    private bool _ativo = true;
+
+    private List<string> _todosPapeis = new();
+    private HashSet<string> _papeisSelecionados = new();
+
+    private List<EmpresaDto> _todasEmpresas = new();
+    private HashSet<int> _empresasSelecionadasIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _todosPapeis = await Mediator.Send(new GetPapeisQuery());
+            _todasEmpresas = await Mediator.Send(new GetEmpresasQuery(ApenasAtivas: true));
+        }
+        catch
+        {
+            _todosPapeis = new List<string> { "Administrador", "Operador" };
+        }
+
+        if (Usuario != null)
+        {
+            _nomeCompleto = Usuario.NomeCompleto;
+            _email = Usuario.Email;
+            _ativo = Usuario.Ativo;
+            _papeisSelecionados = new HashSet<string>(Usuario.Papeis);
+            _empresasSelecionadasIds = new HashSet<int>(Usuario.Empresas.Select(e => e.Id));
+        }
+        else
+        {
+            if (_todosPapeis.Any()) _papeisSelecionados.Add(_todosPapeis.First());
+            if (_todasEmpresas.Any()) _empresasSelecionadasIds.Add(_todasEmpresas.First().Id);
+        }
+    }
+
+    private void AlternarPapel(string papel)
+    {
+        if (_papeisSelecionados.Contains(papel))
+            _papeisSelecionados.Remove(papel);
+        else
+            _papeisSelecionados.Add(papel);
+    }
+
+    private void AlternarEmpresa(int empresaId, bool selecionado)
+    {
+        if (selecionado)
+            _empresasSelecionadasIds.Add(empresaId);
+        else
+            _empresasSelecionadasIds.Remove(empresaId);
+    }
+
+    private async Task Salvar()
+    {
+        if (_form != null)
+        {
+            await _form.ValidateAsync();
+            if (!_isValid) return;
+        }
+
+        if (!_empresasSelecionadasIds.Any())
+        {
+            Snackbar.Add("Selecione pelo menos uma empresa para o usuário.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+
+        try
+        {
+            if (IsEdicao)
+            {
+                var command = new AtualizarUsuarioCommand(
+                    Usuario!.Id,
+                    _nomeCompleto,
+                    _email,
+                    _ativo,
+                    _papeisSelecionados.ToList(),
+                    _empresasSelecionadasIds.ToList());
+
+                var result = await Mediator.Send(command);
+                if (result.Sucesso)
+                {
+                    Snackbar.Add("Usuário atualizado com sucesso!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Erros.FirstOrDefault() ?? "Erro ao atualizar usuário.", Severity.Error);
+                }
+            }
+            else
+            {
+                var command = new CriarUsuarioCompletoCommand(
+                    _nomeCompleto,
+                    _email,
+                    _senha,
+                    _papeisSelecionados.ToList(),
+                    _empresasSelecionadasIds.ToList());
+
+                var result = await Mediator.Send(command);
+                if (result.Sucesso)
+                {
+                    Snackbar.Add("Usuário criado com sucesso!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(true));
+                }
+                else
+                {
+                    Snackbar.Add(result.Erros.FirstOrDefault() ?? "Erro ao criar usuário.", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

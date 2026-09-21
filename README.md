@@ -35,27 +35,28 @@ ERP.sln
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
-### 1. Subir o banco de dados
+### 1. Subir a aplicação e o banco com Docker (Recomendado)
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+> As migrações do banco e os dados iniciais (Admin, Empresa Padrão e Cadastros) são aplicados automaticamente no startup.
 
-### 2. Aplicar migrations
+- **Web (Blazor)**: `http://localhost:5219` ou `http://<SEU_IP_LOCAL>:5219`
+- **API Swagger**: `http://localhost:5219/swagger`
 
+### 2. Rodar localmente com .NET SDK (Opcional)
+
+Suba o PostgreSQL:
 ```bash
-cd src/ERP.Web
-dotnet ef database update --project ../ERP.Infrastructure
+docker compose up -d erp-db
 ```
-
-### 3. Rodar a aplicação
-
+Execute a aplicação:
 ```bash
 cd src/ERP.Web
 dotnet run
 ```
-
-Acesse: `https://localhost:5001`
+Acesse: `http://localhost:5219`
 
 ### Usuário padrão
 

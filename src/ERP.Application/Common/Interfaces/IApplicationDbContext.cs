@@ -27,5 +27,22 @@ public interface IApplicationDbContext
     DbSet<UnidadeMedida> UnidadesMedida { get; }
     DbSet<Endereco> Enderecos { get; }
 
+    // Fase 3 - Financeiro
+    DbSet<ERP.Domain.Core.Entities.Financeiro.Banco> Bancos { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.ContaBancaria> ContasBancarias { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.FormaPagamento> FormasPagamento { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.PlanoConta> PlanosContas { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.CentroCusto> CentrosCusto { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.ContaPagar> ContasPagar { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.ContaReceber> ContasReceber { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.BaixaContaPagar> BaixasContasPagar { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.BaixaContaReceber> BaixasContasReceber { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.MovimentacaoFinanceira> MovimentacoesFinanceiras { get; }
+
+    // Fase 4 - Estoque
+    DbSet<ERP.Domain.Core.Entities.Estoque.Deposito> Depositos { get; }
+    DbSet<ERP.Domain.Core.Entities.Estoque.EstoqueProduto> EstoqueProdutos { get; }
+    DbSet<ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque> MovimentacoesEstoque { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

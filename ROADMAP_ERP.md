@@ -42,18 +42,18 @@ o sistema de permissões, a auditoria automática e o layout base do Blazor.
 ### 📦 Entregáveis
 
 - [x] Solution .NET com Clean Architecture (4 projetos)
-- [ ] Banco PostgreSQL com Docker Compose
-- [ ] Entity Framework Core configurado com Npgsql
-- [ ] ASP.NET Identity + JWT (login, registro, refresh token)
-- [ ] Sistema de permissões granulares (Módulo.Ação)
-- [ ] Multi-tenancy com filtro global por `EmpresaId`
-- [ ] Interceptor de auditoria automática
-- [ ] Layout base do Blazor com MudBlazor
-- [ ] TopBar com seletor de empresa e sino de notificações
-- [ ] NavMenu dinâmico baseado em permissões
-- [ ] Tela de Login
+- [x] Banco PostgreSQL com Docker Compose
+- [x] Entity Framework Core configurado com Npgsql
+- [x] ASP.NET Identity + JWT (login, registro, refresh token)
+- [x] Sistema de permissões granulares (Módulo.Ação)
+- [x] Multi-tenancy com filtro global por `EmpresaId`
+- [x] Interceptor de auditoria automática
+- [x] Layout base do Blazor com MudBlazor
+- [x] TopBar com seletor de empresa e sino de notificações
+- [x] NavMenu dinâmico baseado em permissões
+- [x] Tela de Login
+- [x] Configuração de Docker Compose (app + PostgreSQL)
 - [ ] Middleware de tratamento de erros global
-- [ ] Configuração de Docker Compose (app + PostgreSQL)
 - [ ] GitHub Actions para build e testes
 
 ### 🗄️ Tabelas
@@ -122,16 +122,16 @@ clientes, fornecedores, produtos, serviços, categorias e unidades de medida.
 
 ### 📦 Entregáveis
 
-- [ ] CRUD completo de Clientes (PF e PJ)
-- [ ] CRUD completo de Fornecedores
-- [ ] CRUD completo de Produtos (com suporte a lote, série, multi-depósito)
-- [ ] CRUD completo de Serviços
-- [ ] CRUD de Categorias (hierárquica, árvore)
-- [ ] CRUD de Unidades de Medida
-- [ ] Busca e filtros avançados em todos os cadastros
+- [x] CRUD completo de Clientes (PF e PJ)
+- [x] CRUD completo de Fornecedores
+- [x] CRUD completo de Produtos (com suporte a lote, série, multi-depósito)
+- [x] CRUD completo de Serviços
+- [x] CRUD de Categorias (hierárquica, árvore)
+- [x] CRUD de Unidades de Medida
+- [x] Busca e filtros avançados em todos os cadastros
 - [ ] Importação de dados via CSV/Excel (opcional)
-- [ ] Validação de CPF/CNPJ
-- [ ] Busca de CEP via API (ViaCEP)
+- [x] Validação de CPF/CNPJ
+- [x] Busca de CEP via API (ViaCEP)
 
 ### 🗄️ Tabelas
 
@@ -208,16 +208,17 @@ movimentações de caixa e banco, formas de pagamento e conciliação bancária.
 
 ### 📦 Entregáveis
 
-- [ ] Contas a Pagar (CRUD + baixa + parcelas)
-- [ ] Contas a Receber (CRUD + baixa + parcelas)
-- [ ] Cadastro de Bancos e Contas Bancárias
-- [ ] Cadastro de Formas de Pagamento
-- [ ] Movimentação de Caixa/Banco (entradas e saídas)
-- [ ] Fluxo de Caixa (projeção e realizado)
-- [ ] Importação de extrato OFX/CSV
-- [ ] Conciliação bancária assistida (match automático por valor/data)
-- [ ] Relatório de contas vencidas/a vencer
-- [ ] Notificações de contas a vencer
+- [x] **Fase 3A**: Contas a Pagar (CRUD + baixa parcial/total + juros/multa/desconto + parcelas com rateio de centavos)
+- [x] **Fase 3A**: Contas a Receber (CRUD + baixa parcial/total + juros/multa/desconto + parcelas com rateio de centavos)
+- [x] **Fase 3A**: Cadastro de Bancos (com lista padrão FEBRABAN) e Contas Bancárias / Caixas
+- [x] **Fase 3A**: Cadastro de Formas de Pagamento
+- [x] **Fase 3A**: Cadastro de Planos de Contas (Sintético/Analítico, Receitas/Despesas) e Centros de Custo
+- [x] **Fase 3A**: Movimentação de Caixa/Banco com atualização automática de saldo em tempo real
+- [ ] **Fase 3B**: Fluxo de Caixa (projeção e realizado)
+- [ ] **Fase 3B**: Extrato Bancário detalhado com filtros por período e conta
+- [ ] **Fase 3B**: Importação de extrato OFX/CSV
+- [ ] **Fase 3B**: Conciliação bancária assistida (match automático por valor/data)
+- [ ] **Fase 3B**: Relatório de contas vencidas/a vencer e notificações
 
 ### 🗄️ Tabelas
 

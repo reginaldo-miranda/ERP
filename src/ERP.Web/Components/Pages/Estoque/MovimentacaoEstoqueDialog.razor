@@ -1,0 +1,167 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Estoque.Commands
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IApplicationDbContext DbContext
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_isValid">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="6">
+                    <MudSelect T="int" @bind-Value="_produtoId" Label="Produto *" Required="true" RequiredError="Selecione um produto" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var prod in _produtos)
+                        {
+                            <MudSelectItem Value="@prod.Id">@prod.Codigo - @prod.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect T="int" @bind-Value="_depositoId" Label="Depósito *" Required="true" RequiredError="Selecione o depósito" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                        @foreach (var dep in _depositos)
+                        {
+                            <MudSelectItem Value="@dep.Id">@dep.Nome @(dep.Padrao ? "(Padrão)" : "")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect T="TipoMovimentacaoEstoque" @bind-Value="_tipo" Label="Tipo de Movimentação *" Required="true" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                        <MudSelectItem Value="TipoMovimentacaoEstoque.Entrada">Entrada (Compra / Recebimento)</MudSelectItem>
+                        <MudSelectItem Value="TipoMovimentacaoEstoque.Saida">Saída (Venda / Consumo)</MudSelectItem>
+                        <MudSelectItem Value="TipoMovimentacaoEstoque.AjustePositivo">Ajuste Positivo (Inventário)</MudSelectItem>
+                        <MudSelectItem Value="TipoMovimentacaoEstoque.AjusteNegativo">Ajuste Negativo (Perda / Avaria)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="decimal" @bind-Value="_quantidade" Label="Quantidade *" Min="0.0001m" Required="true" RequiredError="Informe a quantidade" Variant="Variant.Outlined" Format="N2" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudNumericField T="decimal" @bind-Value="_custoUnitario" Label="Custo Unitário (R$)" Min="0" Variant="Variant.Outlined" Format="N2" HelperText="Se vazio na saída, usa o custo médio atual" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="_documentoOrigem" Label="Nº Documento / NF / Motivo" Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_observacao" Label="Observações adicionais" Variant="Variant.Outlined" Lines="2" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(!_isValid || _quantidade <= 0 || _salvando)">
+            @if (_salvando)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">Gravando...</span>
+            }
+            else
+            {
+                <span>Confirmar Movimentação</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int? ProdutoIdPadrao { get; set; }
+    [Parameter] public int? DepositoIdPadrao { get; set; }
+
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _salvando = false;
+
+    private int _produtoId;
+    private int _depositoId;
+    private TipoMovimentacaoEstoque _tipo = TipoMovimentacaoEstoque.Entrada;
+    private decimal _quantidade = 1;
+    private decimal _custoUnitario = 0;
+    private string? _documentoOrigem;
+    private string? _observacao;
+
+    private List<Produto> _produtos = new();
+    private List<DepositoDto> _depositos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _produtos = await DbContext.Produtos.AsNoTracking().Where(p => p.Ativo).OrderBy(p => p.Nome).ToListAsync();
+        _depositos = await Mediator.Send(new GetDepositosQuery(true));
+
+        if (ProdutoIdPadrao.HasValue && ProdutoIdPadrao.Value > 0)
+        {
+            _produtoId = ProdutoIdPadrao.Value;
+        }
+        else if (_produtos.Any())
+        {
+            _produtoId = _produtos.First().Id;
+        }
+
+        if (DepositoIdPadrao.HasValue && DepositoIdPadrao.Value > 0)
+        {
+            _depositoId = DepositoIdPadrao.Value;
+        }
+        else
+        {
+            var padrao = _depositos.FirstOrDefault(d => d.Padrao) ?? _depositos.FirstOrDefault();
+            if (padrao != null) _depositoId = padrao.Id;
+        }
+
+        AtualizarCustoSugerido();
+    }
+
+    private void AtualizarCustoSugerido()
+    {
+        var prod = _produtos.FirstOrDefault(p => p.Id == _produtoId);
+        if (prod != null && prod.PrecoCusto > 0 && _custoUnitario == 0)
+        {
+            _custoUnitario = prod.PrecoCusto;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        await _form.ValidateAsync();
+        if (!_isValid || _quantidade <= 0) return;
+
+        _salvando = true;
+        try
+        {
+            var dto = new RegistrarMovimentacaoDto(
+                _produtoId,
+                _depositoId,
+                _tipo,
+                _quantidade,
+                _custoUnitario,
+                _documentoOrigem,
+                _observacao
+            );
+
+            await Mediator.Send(new RegistrarMovimentacaoEstoqueCommand(dto));
+            Snackbar.Add("Movimentação de estoque realizada com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao movimentar estoque: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

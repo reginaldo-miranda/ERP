@@ -1,0 +1,334 @@
+@page "/financeiro/contas-receber"
+@using ERP.Application.Cadastros.Clientes.DTOs
+@using ERP.Application.Cadastros.Clientes.Queries
+@using ERP.Application.Common.Models
+@using ERP.Application.Financeiro.ContasReceber.Commands
+@using ERP.Application.Financeiro.ContasReceber.DTOs
+@using ERP.Application.Financeiro.ContasReceber.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Contas a Receber</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="Icons.Material.Filled.AccountBalanceWallet" Class="mr-2" />
+            Contas a Receber
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Gestão de recebíveis, vendas a prazo, liquidações e cobranças de clientes.</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="Icons.Material.Filled.Add" OnClick="AbrirNovoTituloDialog">
+        Nova Conta a Receber
+    </MudButton>
+</div>
+
+@* Cards de Resumo Financeiro *@
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-error) !important;">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="font-weight-bold text-uppercase">Em Atraso / Vencidos</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Error" Class="font-weight-bold">@(_resumo?.TotalVencido.ToString("C2") ?? "R$ 0,00")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@(_resumo?.QuantidadeVencidos ?? 0) recebimento(s) em atraso</MudText>
+            </div>
+            <MudIcon Icon="Icons.Material.Filled.ReportProblem" Color="Color.Error" Size="Size.Large" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Warning" Class="font-weight-bold text-uppercase">A Receber</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Warning" Class="font-weight-bold">@(_resumo?.TotalAVencer.ToString("C2") ?? "R$ 0,00")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@(_resumo?.QuantidadeAVencer ?? 0) título(s) futuro(s)</MudText>
+            </div>
+            <MudIcon Icon="Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Success" Class="font-weight-bold text-uppercase">Recebido no Mês</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Success" Class="font-weight-bold">@(_resumo?.TotalRecebidoNoMes.ToString("C2") ?? "R$ 0,00")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@(_resumo?.QuantidadeRecebidosNoMes ?? 0) entradas realizadas</MudText>
+            </div>
+            <MudIcon Icon="Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Info" Class="font-weight-bold text-uppercase">Total a Receber</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Info" Class="font-weight-bold">@(_resumo?.TotalAberto.ToString("C2") ?? "R$ 0,00")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Saldo devedor total</MudText>
+            </div>
+            <MudIcon Icon="Icons.Material.Filled.AccountBalance" Color="Color.Info" Size="Size.Large" />
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* Filtros e Tabela *@
+<MudPaper Class="pa-4">
+    <MudGrid Class="mb-3">
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="_busca" Label="Buscar por descrição ou nº doc" Adornment="Adornment.End"
+                          AdornmentIcon="Icons.Material.Filled.Search" OnAdornmentClick="BuscarAsync"
+                          OnKeyUp="@(async (e) => { if (e.Key == "Enter") await BuscarAsync(); })" />
+        </MudItem>
+
+        <MudItem xs="6" md="3">
+            <MudSelect T="int?" @bind-Value="_clienteId" Label="Cliente" Clearable="true">
+                <MudSelectItem T="int?" Value="null">Todos os Clientes</MudSelectItem>
+                @foreach (var c in _clientes)
+                {
+                    <MudSelectItem T="int?" Value="@c.Id">@c.Nome</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="6" md="2">
+            <MudSelect T="StatusContaFinanceira?" @bind-Value="_statusFiltro" Label="Status">
+                <MudSelectItem T="StatusContaFinanceira?" Value="null">Todos os Status</MudSelectItem>
+                <MudSelectItem T="StatusContaFinanceira?" Value="StatusContaFinanceira.Pendente">Pendente</MudSelectItem>
+                <MudSelectItem T="StatusContaFinanceira?" Value="StatusContaFinanceira.ParcialmentePaga">Parcialmente Recebida</MudSelectItem>
+                <MudSelectItem T="StatusContaFinanceira?" Value="StatusContaFinanceira.Paga">Recebida / Paga</MudSelectItem>
+                <MudSelectItem T="StatusContaFinanceira?" Value="StatusContaFinanceira.Cancelada">Cancelada</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="6" md="2">
+            <MudDatePicker Label="Vencimento De" @bind-Date="_vencimentoInicio" Editable="true" DateFormat="dd/MM/yyyy" Clearable="true" />
+        </MudItem>
+
+        <MudItem xs="6" md="2">
+            <MudDatePicker Label="Vencimento Até" @bind-Date="_vencimentoFim" Editable="true" DateFormat="dd/MM/yyyy" Clearable="true" />
+        </MudItem>
+
+        <MudItem xs="12" Class="d-flex justify-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="LimparFiltrosAsync" Class="mr-2">Limpar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="Icons.Material.Filled.FilterAlt" OnClick="BuscarAsync">Filtrar</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable Items="@_resultado?.Itens" Loading="@_carregando" Dense="true" Hover="true" Striped="true" Elevation="0">
+        <HeaderContent>
+            <MudTh>Vencimento</MudTh>
+            <MudTh>Descrição</MudTh>
+            <MudTh>Cliente</MudTh>
+            <MudTh>Parcela</MudTh>
+            <MudTh class="text-right">Valor Original</MudTh>
+            <MudTh class="text-right">Valor Recebido</MudTh>
+            <MudTh class="text-right">Saldo Restante</MudTh>
+            <MudTh class="text-center">Status</MudTh>
+            <MudTh class="text-center">Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Vencimento">
+                <MudText Typo="Typo.body2" Color="@(context.Vencida ? Color.Error : Color.Default)" Class="@(context.Vencida ? "font-weight-bold" : "")">
+                    @context.DataVencimento.ToString("dd/MM/yyyy")
+                    @if (context.Vencida)
+                    {
+                        <MudIcon Icon="Icons.Material.Filled.ErrorOutline" Size="Size.Small" Color="Color.Error" Class="ml-1 vertical-align-middle" />
+                    }
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Descrição">
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Descricao</MudText>
+                @if (!string.IsNullOrEmpty(context.NumeroDocumento))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Doc: @context.NumeroDocumento</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Cliente">@(context.ClienteNome ?? "-")</MudTd>
+            <MudTd DataLabel="Parcela">
+                @if (context.TotalParcelas > 1)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default">
+                        @context.NumeroParcela / @context.TotalParcelas
+                    </MudChip>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Única</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Valor Original" Class="text-right">@context.ValorOriginal.ToString("C2")</MudTd>
+            <MudTd DataLabel="Valor Recebido" Class="text-right">@context.ValorRecebido.ToString("C2")</MudTd>
+            <MudTd DataLabel="Saldo Restante" Class="text-right font-weight-bold">
+                <MudText Typo="Typo.body2" Color="@(context.SaldoRestante > 0 ? Color.Info : Color.Success)">
+                    @context.SaldoRestante.ToString("C2")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Status" Class="text-center">
+                @switch (context.Status)
+                {
+                    case StatusContaFinanceira.Pendente:
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Vencida ? Color.Error : Color.Warning)" Variant="Variant.Filled">
+                            @(context.Vencida ? "Vencida" : "Pendente")
+                        </MudChip>
+                        break;
+                    case StatusContaFinanceira.ParcialmentePaga:
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">Parcial</MudChip>
+                        break;
+                    case StatusContaFinanceira.Paga:
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Recebida</MudChip>
+                        break;
+                    case StatusContaFinanceira.Cancelada:
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Cancelada</MudChip>
+                        break;
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações" Class="text-center">
+                @if (context.Status != StatusContaFinanceira.Paga && context.Status != StatusContaFinanceira.Cancelada)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" StartIcon="Icons.Material.Filled.PriceCheck"
+                               OnClick="@(() => AbrirBaixaDialog(context))" Class="mr-1">
+                        Receber
+                    </MudButton>
+                }
+                @if (context.Status != StatusContaFinanceira.Cancelada && context.ValorRecebido == 0)
+                {
+                    <MudTooltip Text="Cancelar Conta">
+                        <MudIconButton Icon="Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small"
+                                       OnClick="@(() => CancelarContaAsync(context.Id))" />
+                    </MudTooltip>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4 text-center" Color="Color.Secondary">Nenhuma conta a receber encontrada com os filtros selecionados.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private string? _busca;
+    private int? _clienteId;
+    private StatusContaFinanceira? _statusFiltro;
+    private DateTime? _vencimentoInicio;
+    private DateTime? _vencimentoFim;
+    private bool _carregando = false;
+
+    private PaginatedList<ContaReceberListItemDto>? _resultado;
+    private ResumoContasReceberDto? _resumo;
+    private List<ClienteListItemDto> _clientes = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cliRes = await Mediator.Send(new GetClientesQuery(Ativo: true, TamanhoPagina: 200));
+        _clientes = cliRes.Itens.ToList();
+
+        await CarregarDadosAsync();
+    }
+
+    private async Task CarregarDadosAsync()
+    {
+        _carregando = true;
+        try
+        {
+            _resumo = await Mediator.Send(new GetResumoContasReceberQuery());
+            _resultado = await Mediator.Send(new GetContasReceberQuery(
+                _busca, _clienteId, _statusFiltro, _vencimentoInicio, _vencimentoFim, 1, 50
+            ));
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task BuscarAsync() => await CarregarDadosAsync();
+
+    private async Task LimparFiltrosAsync()
+    {
+        _busca = null;
+        _clienteId = null;
+        _statusFiltro = null;
+        _vencimentoInicio = null;
+        _vencimentoFim = null;
+        await CarregarDadosAsync();
+    }
+
+    private async Task AbrirNovoTituloDialog()
+    {
+        var dialog = await DialogService.ShowAsync<ContaReceberDialog>("Nova Conta a Receber", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CreateContaReceberCommand cmd)
+        {
+            var res = await Mediator.Send(cmd);
+            if (res.Sucesso)
+            {
+                var qtd = res.Dados?.Count ?? 1;
+                Snackbar.Add(qtd > 1 ? $"{qtd} parcelas a receber criadas com sucesso!" : "Conta a receber registrada com sucesso!", Severity.Success);
+                await CarregarDadosAsync();
+            }
+            else
+            {
+                foreach (var erro in res.Erros)
+                    Snackbar.Add(erro, Severity.Error);
+            }
+        }
+    }
+
+    private async Task AbrirBaixaDialog(ContaReceberListItemDto item)
+    {
+        var parameters = new DialogParameters<BaixaTituloDialog>
+        {
+            { x => x.IsPagar, false },
+            { x => x.DescricaoTitulo, item.Descricao },
+            { x => x.SaldoRestante, item.SaldoRestante }
+        };
+
+        var dialog = await DialogService.ShowAsync<BaixaTituloDialog>("Recebimento de Título", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is BaixaTituloDialog.DadosBaixa dados)
+        {
+            var cmd = new BaixarContaReceberCommand(
+                item.Id,
+                dados.ContaBancariaId,
+                dados.FormaPagamentoId,
+                dados.DataBaixa,
+                dados.ValorPrincipal,
+                dados.ValorJuros,
+                dados.ValorMulta,
+                dados.ValorDesconto,
+                dados.Observacoes
+            );
+
+            var res = await Mediator.Send(cmd);
+            if (res.Sucesso)
+            {
+                Snackbar.Add($"Recebimento de {dados.ValorPrincipal:C2} registrado com sucesso!", Severity.Success);
+                await CarregarDadosAsync();
+            }
+            else
+            {
+                foreach (var erro in res.Erros)
+                    Snackbar.Add(erro, Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelarContaAsync(int id)
+    {
+        var res = await Mediator.Send(new CancelarContaReceberCommand(id));
+        if (res.Sucesso)
+        {
+            Snackbar.Add("Conta a receber cancelada com sucesso!", Severity.Success);
+            await CarregarDadosAsync();
+        }
+        else
+        {
+            foreach (var erro in res.Erros)
+                Snackbar.Add(erro, Severity.Error);
+        }
+    }
+}

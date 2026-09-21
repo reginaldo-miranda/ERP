@@ -1,0 +1,307 @@
+@page "/financeiro/fluxo-caixa"
+@using ERP.Application.Financeiro.FluxoCaixa.DTOs
+@using ERP.Application.Financeiro.FluxoCaixa.Queries
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Fluxo de Caixa</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-2" />
+            Fluxo de Caixa
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Visão consolidada de entradas, saídas e projeções financeiras.</MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FileDownload" Color="Color.Success" OnClick="ExportarCsv" Disabled="@(_carregando || _resultado == null)">CSV</MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Error" OnClick="ExportarPdf" Disabled="@(_carregando || _resultado == null)">PDF</MudButton>
+    </div>
+</div>
+
+@* Filtros *@
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudDateRangePicker Label="Período" @bind-DateRange="_periodo" DateFormat="dd/MM/yyyy" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="int?" Label="Conta Bancária" @bind-Value="_contaBancariaId" Clearable="true">
+                <MudSelectItem T="int?" Value="@((int?)null)">Todas (Consolidado)</MudSelectItem>
+                @foreach (var conta in _contasBancarias)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)conta.Id)">@conta.Descricao</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="TipoAgrupamentoFluxoCaixa" Label="Agrupamento" @bind-Value="_agrupamento">
+                <MudSelectItem Value="TipoAgrupamentoFluxoCaixa.Diario">Diário</MudSelectItem>
+                <MudSelectItem Value="TipoAgrupamentoFluxoCaixa.Semanal">Semanal</MudSelectItem>
+                <MudSelectItem Value="TipoAgrupamentoFluxoCaixa.Mensal">Mensal</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3" Class="d-flex align-center gap-2">
+            <MudCheckBox T="bool" @bind-Value="_incluirProjetado" Label="Incluir Projetado" Color="Color.Primary" />
+            <MudSpacer />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CarregarDados" Disabled="@_carregando" StartIcon="@Icons.Material.Filled.Search">
+                Consultar
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_carregando)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_resultado != null)
+{
+    @* Cards de Resumo *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Success" Class="font-weight-bold text-uppercase">Total Entradas</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Success" Class="font-weight-bold">@_resultado.Resumo.TotalEntradas.ToString("C2")</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-error) !important;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Error" Class="font-weight-bold text-uppercase">Total Saídas</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Error" Class="font-weight-bold">@_resultado.Resumo.TotalSaidas.ToString("C2")</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Color="Color.Error" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="@($"border-left-color: {(_resultado.Resumo.SaldoPeriodo >= 0 ? "var(--mud-palette-success)" : "var(--mud-palette-error)")} !important;")">
+                <div>
+                    <MudText Typo="Typo.caption" Color="@(_resultado.Resumo.SaldoPeriodo >= 0 ? Color.Success : Color.Error)" Class="font-weight-bold text-uppercase">Saldo do Período</MudText>
+                    <MudText Typo="Typo.h5" Color="@(_resultado.Resumo.SaldoPeriodo >= 0 ? Color.Success : Color.Error)" Class="font-weight-bold">@_resultado.Resumo.SaldoPeriodo.ToString("C2")</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="@(_resultado.Resumo.SaldoPeriodo >= 0 ? Color.Success : Color.Error)" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex justify-space-between align-center border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Warning" Class="font-weight-bold text-uppercase">Saldo Projetado</MudText>
+                    <MudText Typo="Typo.h5" Color="Color.Warning" Class="font-weight-bold">@_resultado.Resumo.SaldoProjetado.ToString("C2")</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Timeline" Color="Color.Warning" Size="Size.Large" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Gráficos *@
+    @if (_chartLabels.Length > 0)
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-4">Entradas vs Saídas</MudText>
+                    <MudChart ChartType="ChartType.Bar" ChartSeries="@_chartSeriesBarras" XAxisLabels="@_chartLabels" Width="100%" Height="300px" />
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-4">Saldo Acumulado</MudText>
+                    <MudChart ChartType="ChartType.Line" ChartSeries="@_chartSeriesLinha" XAxisLabels="@_chartLabels" Width="100%" Height="300px" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+
+    @* Tabela Detalhada *@
+    <MudTable Items="@ObterItensFlat()" Hover="true" Dense="true" Elevation="1" RowClassFunc="RowStyleFunc">
+        <HeaderContent>
+            <MudTh>Data</MudTh>
+            <MudTh>Categoria</MudTh>
+            <MudTh>Descrição</MudTh>
+            <MudTh>Tipo</MudTh>
+            <MudTh Style="text-align: right;">Entradas</MudTh>
+            <MudTh Style="text-align: right;">Saídas</MudTh>
+            <MudTh Style="text-align: right;">Saldo Acumulado</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Data">@context.Data.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd DataLabel="Categoria">@(context.Categoria ?? "-")</MudTd>
+            <MudTd DataLabel="Descrição">@context.Descricao</MudTd>
+            <MudTd DataLabel="Tipo">
+                @if (context.Tipo == "Projetado")
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">Projetado</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Realizado</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Entradas" Style="text-align: right; color: var(--mud-palette-success);">
+                @(context.Entrada > 0 ? context.Entrada.ToString("C2") : "-")
+            </MudTd>
+            <MudTd DataLabel="Saídas" Style="text-align: right; color: var(--mud-palette-error);">
+                @(context.Saida > 0 ? context.Saida.ToString("C2") : "-")
+            </MudTd>
+            <MudTd DataLabel="Saldo Acumulado" Style="@($"text-align: right; color: {(context.SaldoAcumulado >= 0 ? "var(--mud-palette-success)" : "var(--mud-palette-error)")};")">
+                @context.SaldoAcumulado.ToString("C2")
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private FluxoCaixaResultDto? _resultado;
+    private bool _carregando;
+    private DateRange _periodo = new DateRange(
+        new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1),
+        new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.DaysInMonth(DateTime.Now.Year, DateTime.Now.Month)));
+    private int? _contaBancariaId;
+    private TipoAgrupamentoFluxoCaixa _agrupamento = TipoAgrupamentoFluxoCaixa.Diario;
+    private bool _incluirProjetado = true;
+    private List<ContaBancariaDto> _contasBancarias = new();
+
+    private List<ChartSeries> _chartSeriesBarras = new();
+    private List<ChartSeries> _chartSeriesLinha = new();
+    private string[] _chartLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarContasBancarias();
+        await CarregarDados();
+    }
+
+    private async Task CarregarContasBancarias()
+    {
+        try
+        {
+            _contasBancarias = await Mediator.Send(new GetContasBancariasQuery(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar contas bancárias: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task CarregarDados()
+    {
+        if (_periodo.Start == null || _periodo.End == null)
+            return;
+
+        _carregando = true;
+        try
+        {
+            _resultado = await Mediator.Send(new GetFluxoCaixaQuery(
+                DataInicio: _periodo.Start.Value.Date,
+                DataFim: _periodo.End.Value.Date,
+                ContaBancariaId: _contaBancariaId,
+                Agrupamento: _agrupamento,
+                IncluirProjetado: _incluirProjetado
+            ));
+
+            if (_resultado?.Grafico != null)
+            {
+                _chartLabels = _resultado.Grafico.Labels.ToArray();
+                _chartSeriesBarras = new List<ChartSeries>
+                {
+                    new() { Name = "Entradas", Data = _resultado.Grafico.SerieEntradas.ToArray() },
+                    new() { Name = "Saídas", Data = _resultado.Grafico.SerieSaidas.ToArray() }
+                };
+                _chartSeriesLinha = new List<ChartSeries>
+                {
+                    new() { Name = "Saldo Acumulado", Data = _resultado.Grafico.SerieSaldoAcumulado.ToArray() }
+                };
+            }
+
+            Snackbar.Add("Fluxo de caixa carregado com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar fluxo de caixa: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task ExportarCsv()
+    {
+        if (_periodo.Start == null || _periodo.End == null) return;
+
+        try
+        {
+            var bytes = await Mediator.Send(new ExportFluxoCaixaCsvQuery(
+                DataInicio: _periodo.Start.Value.Date,
+                DataFim: _periodo.End.Value.Date,
+                ContaBancariaId: _contaBancariaId,
+                Agrupamento: _agrupamento,
+                IncluirProjetado: _incluirProjetado
+            ));
+
+            var nomeArquivo = $"fluxo-caixa-{_periodo.Start.Value:yyyyMMdd}-{_periodo.End.Value:yyyyMMdd}.csv";
+            await BaixarArquivo(bytes, nomeArquivo, "text/csv");
+            Snackbar.Add("Exportação CSV concluída com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao exportar CSV: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task ExportarPdf()
+    {
+        if (_periodo.Start == null || _periodo.End == null) return;
+
+        try
+        {
+            var bytes = await Mediator.Send(new ExportFluxoCaixaPdfQuery(
+                DataInicio: _periodo.Start.Value.Date,
+                DataFim: _periodo.End.Value.Date,
+                ContaBancariaId: _contaBancariaId,
+                Agrupamento: _agrupamento,
+                IncluirProjetado: _incluirProjetado
+            ));
+
+            var nomeArquivo = $"fluxo-caixa-{_periodo.Start.Value:yyyyMMdd}-{_periodo.End.Value:yyyyMMdd}.pdf";
+            await BaixarArquivo(bytes, nomeArquivo, "application/pdf");
+            Snackbar.Add("Exportação PDF concluída com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao exportar PDF: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task BaixarArquivo(byte[] conteudo, string nomeArquivo, string contentType)
+    {
+        var base64 = Convert.ToBase64String(conteudo);
+        await JS.InvokeVoidAsync("downloadFileFromBase64", base64, nomeArquivo, contentType);
+    }
+
+    private IEnumerable<FluxoCaixaItemDto> ObterItensFlat()
+    {
+        if (_resultado?.Periodos == null)
+            return Enumerable.Empty<FluxoCaixaItemDto>();
+
+        return _resultado.Periodos.SelectMany(p => p.Itens);
+    }
+
+    private string RowStyleFunc(FluxoCaixaItemDto item, int index)
+    {
+        if (item.Tipo == "Projetado")
+            return "background-color: var(--mud-palette-background-grey);";
+        return string.Empty;
+    }
+}

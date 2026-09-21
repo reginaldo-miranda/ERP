@@ -1,0 +1,146 @@
+@page "/estoque/movimentacoes"
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Histórico de Movimentações de Estoque - ERP</PageTitle>
+
+<div class="d-flex flex-wrap justify-space-between align-center mb-4 gap-2">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.TransferWithinAStation" Class="mr-2" />
+            Histórico de Movimentações de Estoque
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Registro cronológico de todas as entradas, saídas e ajustes realizados no estoque.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Storage" Href="/estoque/posicao">
+            Ver Saldo de Estoque
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovaMovimentacao">
+            Registrar Movimentação
+        </MudButton>
+    </div>
+</div>
+
+<MudCard Elevation="2">
+    <MudCardContent Class="pa-0">
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (!_movimentacoes.Any())
+        {
+            <div class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhuma movimentação registrada</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Realize a primeira movimentação de estoque para começar a registrar o histórico.</MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovaMovimentacao">
+                    Registrar Movimentação
+                </MudButton>
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_movimentacoes" Hover="true" Striped="true" Elevation="0" Dense="true">
+                <HeaderContent>
+                    <MudTh>Data / Hora</MudTh>
+                    <MudTh>Tipo</MudTh>
+                    <MudTh>Produto</MudTh>
+                    <MudTh>Depósito</MudTh>
+                    <MudTh class="text-right">Qtd.</MudTh>
+                    <MudTh class="text-right">Custo Unitário</MudTh>
+                    <MudTh class="text-right">Custo Total</MudTh>
+                    <MudTh>Documento / Motivo</MudTh>
+                    <MudTh>Observações</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Data / Hora">@context.DataMovimentacao.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Tipo">
+                        @switch (context.Tipo)
+                        {
+                            case TipoMovimentacaoEstoque.Entrada:
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.ArrowDownward">Entrada</MudChip>
+                                break;
+                            case TipoMovimentacaoEstoque.Saida:
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.ArrowUpward">Saída</MudChip>
+                                break;
+                            case TipoMovimentacaoEstoque.AjustePositivo:
+                                <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add">Ajuste (+)</MudChip>
+                                break;
+                            case TipoMovimentacaoEstoque.AjusteNegativo:
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Remove">Ajuste (-)</MudChip>
+                                break;
+                            case TipoMovimentacaoEstoque.Transferencia:
+                                <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.SwapHoriz">Transferência</MudChip>
+                                break;
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Produto" Class="font-weight-medium">
+                        [@context.ProdutoCodigo] @context.ProdutoNome
+                    </MudTd>
+                    <MudTd DataLabel="Depósito">@context.DepositoOrigemNome</MudTd>
+                    <MudTd DataLabel="Qtd." Class="text-right font-weight-bold">
+                        <MudText Typo="Typo.body2" Color="@(context.Tipo == TipoMovimentacaoEstoque.Entrada || context.Tipo == TipoMovimentacaoEstoque.AjustePositivo ? Color.Success : Color.Error)">
+                            @(context.Tipo == TipoMovimentacaoEstoque.Entrada || context.Tipo == TipoMovimentacaoEstoque.AjustePositivo ? "+" : "-")@context.Quantidade.ToString("N2")
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Custo Unitário" Class="text-right">@context.CustoUnitario.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Custo Total" Class="text-right font-weight-bold">@context.CustoTotal.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Documento">@(context.DocumentoOrigem ?? "-")</MudTd>
+                    <MudTd DataLabel="Observações">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@(context.Observacao ?? "-")</MudText>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<MovimentacaoEstoqueDto> _movimentacoes = new();
+    private bool _carregando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarMovimentacoes();
+    }
+
+    private async Task CarregarMovimentacoes()
+    {
+        _carregando = true;
+        try
+        {
+            _movimentacoes = await Mediator.Send(new GetMovimentacoesEstoqueQuery());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar histórico: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task AbrirNovaMovimentacao()
+    {
+        var parameters = new DialogParameters();
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<MovimentacaoEstoqueDialog>("Registrar Movimentação de Estoque", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarMovimentacoes();
+        }
+    }
+}
