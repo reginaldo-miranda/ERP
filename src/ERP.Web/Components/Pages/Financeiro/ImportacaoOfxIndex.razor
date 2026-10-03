@@ -1,0 +1,178 @@
+@page "/financeiro/importacao-ofx"
+@using ERP.Application.Financeiro.Conciliacao.Commands
+@using ERP.Application.Financeiro.Conciliacao.DTOs
+@using ERP.Application.Financeiro.Conciliacao.Queries
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<PageTitle>Importação OFX</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Class="mr-2" />
+            Importação OFX
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Importação de extratos bancários para conciliação.</MudText>
+    </div>
+</div>
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudText Typo="Typo.h6" Class="mb-4">Nova Importação</MudText>
+            <MudSelect T="int?" Label="Conta Bancária" @bind-Value="_contaBancariaId" Clearable="true" Required="true" Class="mb-4">
+                @foreach (var conta in _contasBancarias)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)conta.Id)">@conta.Descricao</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudFileUpload T="IBrowserFile" Accept=".ofx" FilesChanged="OnUploadFile" Disabled="@(_uploading || _contaBancariaId == null)">
+                <ActivatorContent>
+                    <MudButton HtmlTag="label"
+                               Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.CloudUpload"
+                               Disabled="@(_uploading || _contaBancariaId == null)">
+                        Selecionar Arquivo OFX
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+
+            @if (_uploading)
+            {
+                <div class="mt-4">
+                    <MudText Typo="Typo.body2">Importando...</MudText>
+                    <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudPaper Class="pa-4" Elevation="1">
+    <MudText Typo="Typo.h6" Class="mb-4">Extratos Importados</MudText>
+    <MudTable Items="@_extratos" Hover="true" Loading="@_carregando" LoadingProgressColor="Color.Primary" Breakpoint="Breakpoint.Sm">
+        <HeaderContent>
+            <MudTh>Data Importação</MudTh>
+            <MudTh>Nome Arquivo</MudTh>
+            <MudTh>Período do Extrato</MudTh>
+            <MudTh>Total Registros</MudTh>
+            <MudTh>Créditos</MudTh>
+            <MudTh>Débitos</MudTh>
+            <MudTh>Status (Pen/Con/Ign)</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Data Importação">@context.DataImportacao.ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd DataLabel="Nome Arquivo">@context.NomeArquivo</MudTd>
+            <MudTd DataLabel="Período do Extrato">@context.DataInicioExtrato.ToString("dd/MM/yyyy") a @context.DataFimExtrato.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd DataLabel="Total Registros">@context.TotalRegistros</MudTd>
+            <MudTd DataLabel="Créditos">
+                <MudText Color="Color.Success">@context.TotalCreditos.ToString("C2")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Débitos">
+                <MudText Color="Color.Error">@context.TotalDebitos.ToString("C2")</MudText>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">@context.TotalPendentes Pen</MudChip>
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">@context.TotalConciliados Con</MudChip>
+                <MudChip T="string" Color="Color.Default" Size="Size.Small">@context.TotalIgnorados Ign</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Ações" Style="text-align:right">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/financeiro/conciliacao/{context.Id}"))">Conciliar</MudButton>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private bool _uploading;
+    private bool _carregando;
+    private int? _contaBancariaId;
+    private List<ContaBancariaDto> _contasBancarias = new();
+    private List<ExtratoImportadoDto> _extratos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarContasBancarias();
+        await CarregarExtratos();
+    }
+
+    private async Task CarregarContasBancarias()
+    {
+        try
+        {
+            _contasBancarias = await Mediator.Send(new GetContasBancariasQuery());
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao carregar contas bancárias.", Severity.Error);
+        }
+    }
+
+    private async Task CarregarExtratos()
+    {
+        try
+        {
+            _carregando = true;
+            _extratos = await Mediator.Send(new GetExtratosImportadosQuery(_contaBancariaId));
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao carregar extratos importados.", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnUploadFile(IBrowserFile file)
+    {
+        if (_contaBancariaId == null) 
+        { 
+            Snackbar.Add("Selecione a Conta Bancária primeiro.", Severity.Warning); 
+            return; 
+        }
+
+        if (file == null) return;
+
+        _uploading = true;
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            ms.Position = 0;
+            
+            var result = await Mediator.Send(new ImportarExtratoOfxCommand(_contaBancariaId.Value, ms, file.Name));
+            
+            if (result.Sucesso && result.Dados != null) 
+            { 
+                Snackbar.Add($"Arquivo OFX importado! {result.Dados.TransacoesNovas} novas, {result.Dados.TransacoesDuplicadas} duplicadas.", Severity.Success); 
+                await CarregarExtratos(); 
+            }
+            else 
+            { 
+                Snackbar.Add($"Erro na importação: {string.Join(", ", result.Erros)}", Severity.Error); 
+            }
+        }
+        catch (Exception) 
+        { 
+            Snackbar.Add("Ocorreu um erro inesperado ao importar o arquivo.", Severity.Error); 
+        }
+        finally 
+        { 
+            _uploading = false; 
+        }
+    }
+}

@@ -214,11 +214,11 @@ movimentações de caixa e banco, formas de pagamento e conciliação bancária.
 - [x] **Fase 3A**: Cadastro de Formas de Pagamento
 - [x] **Fase 3A**: Cadastro de Planos de Contas (Sintético/Analítico, Receitas/Despesas) e Centros de Custo
 - [x] **Fase 3A**: Movimentação de Caixa/Banco com atualização automática de saldo em tempo real
-- [ ] **Fase 3B**: Fluxo de Caixa (projeção e realizado)
-- [ ] **Fase 3B**: Extrato Bancário detalhado com filtros por período e conta
-- [ ] **Fase 3B**: Importação de extrato OFX/CSV
-- [ ] **Fase 3B**: Conciliação bancária assistida (match automático por valor/data)
-- [ ] **Fase 3B**: Relatório de contas vencidas/a vencer e notificações
+- [x] **Fase 3B**: Fluxo de Caixa (projeção e realizado)
+- [x] **Fase 3B**: Extrato Bancário detalhado com filtros por período e conta
+- [x] **Fase 3B**: Importação de extrato OFX/CSV
+- [x] **Fase 3B**: Conciliação bancária assistida (match automático por valor/data)
+- [x] **Fase 3B**: Relatório de contas vencidas/a vencer e notificações
 
 ### 🗄️ Tabelas
 

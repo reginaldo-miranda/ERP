@@ -39,6 +39,10 @@ public interface IApplicationDbContext
     DbSet<ERP.Domain.Core.Entities.Financeiro.BaixaContaReceber> BaixasContasReceber { get; }
     DbSet<ERP.Domain.Core.Entities.Financeiro.MovimentacaoFinanceira> MovimentacoesFinanceiras { get; }
 
+    // Fase 3B - Conciliação Bancária
+    DbSet<ERP.Domain.Core.Entities.Financeiro.ExtratoImportado> ExtratosImportados { get; }
+    DbSet<ERP.Domain.Core.Entities.Financeiro.ExtratoImportadoItem> ExtratosImportadosItens { get; }
+
     // Fase 4 - Estoque
     DbSet<ERP.Domain.Core.Entities.Estoque.Deposito> Depositos { get; }
     DbSet<ERP.Domain.Core.Entities.Estoque.EstoqueProduto> EstoqueProdutos { get; }

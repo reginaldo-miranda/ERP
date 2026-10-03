@@ -55,6 +55,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Financeiro.BaixaContaReceber> BaixasContasReceber => Set<ERP.Domain.Core.Entities.Financeiro.BaixaContaReceber>();
     public DbSet<ERP.Domain.Core.Entities.Financeiro.MovimentacaoFinanceira> MovimentacoesFinanceiras => Set<ERP.Domain.Core.Entities.Financeiro.MovimentacaoFinanceira>();
 
+    // Fase 3B - Conciliação Bancária
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.ExtratoImportado> ExtratosImportados => Set<ERP.Domain.Core.Entities.Financeiro.ExtratoImportado>();
+    public DbSet<ERP.Domain.Core.Entities.Financeiro.ExtratoImportadoItem> ExtratosImportadosItens => Set<ERP.Domain.Core.Entities.Financeiro.ExtratoImportadoItem>();
+
     // Fase 4 - Estoque
     public DbSet<ERP.Domain.Core.Entities.Estoque.Deposito> Depositos => Set<ERP.Domain.Core.Entities.Estoque.Deposito>();
     public DbSet<ERP.Domain.Core.Entities.Estoque.EstoqueProduto> EstoqueProdutos => Set<ERP.Domain.Core.Entities.Estoque.EstoqueProduto>();

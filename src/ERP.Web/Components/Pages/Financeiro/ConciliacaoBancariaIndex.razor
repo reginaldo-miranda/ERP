@@ -1,0 +1,388 @@
+@page "/financeiro/conciliacao/{ExtratoImportadoId:int}"
+@using ERP.Application.Financeiro.Conciliacao.Commands
+@using ERP.Application.Financeiro.Conciliacao.DTOs
+@using ERP.Application.Financeiro.Conciliacao.Queries
+@using ERP.Application.Financeiro.Cadastros.DTOs
+@using ERP.Application.Financeiro.Cadastros.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+
+<PageTitle>Conciliação Bancária</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.CompareArrows" Class="mr-2" />
+            Conciliação Bancária
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Analise as sugestões e concilie os lançamentos do extrato.</MudText>
+    </div>
+    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => NavigationManager.NavigateTo("/financeiro/importacao-ofx"))">
+        Voltar
+    </MudButton>
+</div>
+
+@if (_carregando)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+else
+{
+    @* Summary Cards *@
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center">
+                <MudText Typo="Typo.h4" Color="Color.Default">@_totalItens</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Total de Itens</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center border-b-4" Style="border-bottom-color: var(--mud-palette-warning) !important;">
+                <MudText Typo="Typo.h4" Color="Color.Warning">@_pendentes</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Pendentes</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center border-b-4" Style="border-bottom-color: var(--mud-palette-success) !important;">
+                <MudText Typo="Typo.h4" Color="Color.Success">@_conciliados</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Conciliados</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center border-b-4" Style="border-bottom-color: var(--mud-palette-default) !important;">
+                <MudText Typo="Typo.h4" Color="Color.Default">@_ignorados</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Ignorados</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Tabs *@
+    <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" @bind-ActivePanelIndex="_activeTabIndex">
+        <MudTabPanel Text="Todos" />
+        <MudTabPanel Text="Pendentes" />
+        <MudTabPanel Text="Conciliados" />
+        <MudTabPanel Text="Ignorados" />
+    </MudTabs>
+
+    @* Items List *@
+    <div class="mt-4">
+        @foreach (var item in ItensFiltrados)
+        {
+            <MudPaper Class="pa-4 mb-4" Elevation="2">
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2">Item do Extrato</MudText>
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.body2"><strong>Data:</strong> @item.Data.ToString("dd/MM/yyyy")</MudText>
+                                <MudText Typo="Typo.body2"><strong>Descrição:</strong> @item.Descricao</MudText>
+                                <MudText Typo="Typo.body2">
+                                    <strong>Valor:</strong>
+                                    <span style="color: @(item.Valor >= 0 ? "var(--mud-palette-success)" : "var(--mud-palette-error)")">
+                                        @item.Valor.ToString("C2")
+                                    </span>
+                                </MudText>
+                            </div>
+                            <MudChip T="string" Color="@GetStatusColor(item.Status)" Size="Size.Small">@item.Status.ToString()</MudChip>
+                        </div>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        @if (item.Status == StatusConciliacao.Pendente)
+                        {
+                            @if (item.MelhorSugestao != null)
+                            {
+                                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">
+                                    Sugestão (@(item.MelhorSugestao.TipoOrigem == "Movimentacao" ? "Movimentação Caixa/Banco" : item.MelhorSugestao.TipoOrigem == "ContaPagar" ? "Conta a Pagar" : "Conta a Receber"))
+                                </MudText>
+                                <div class="d-flex justify-space-between align-center mb-2">
+                                    <div>
+                                        <MudText Typo="Typo.body2"><strong>Data:</strong> @item.MelhorSugestao.Data.ToString("dd/MM/yyyy")</MudText>
+                                        <MudText Typo="Typo.body2"><strong>Descrição:</strong> @item.MelhorSugestao.Descricao</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            <strong>Valor:</strong> @item.MelhorSugestao.Valor.ToString("C2")
+                                        </MudText>
+                                    </div>
+                                    <div class="text-center" style="width: 100px;">
+                                        <MudChip T="string" Color="@GetScoreColor(item.MelhorSugestao.Score)" Size="Size.Small">
+                                            @item.MelhorSugestao.Score%
+                                        </MudChip>
+                                        <MudProgressLinear Color="@GetScoreColor(item.MelhorSugestao.Score)" Value="@item.MelhorSugestao.Score" Class="mt-1" />
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 justify-end mt-2">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" OnClick="@(() => ConciliarComSugestao(item.Id, item.MelhorSugestao))">Conciliar</MudButton>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" OnClick="@(() => Ignorar(item.Id))">Ignorar</MudButton>
+                                    <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirDialogoCriar(item.Id))">Criar Movimentação</MudButton>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-column h-100 justify-center align-center">
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Nenhuma sugestão encontrada</MudText>
+                                    <div class="d-flex gap-2">
+                                        <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Small" OnClick="@(() => AbrirDialogoCriar(item.Id))">Criar Movimentação</MudButton>
+                                        <MudButton Variant="Variant.Filled" Color="Color.Default" Size="Size.Small" OnClick="@(() => Ignorar(item.Id))">Ignorar</MudButton>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else if (item.Status == StatusConciliacao.Conciliado)
+                        {
+                            <div class="d-flex justify-space-between align-center h-100">
+                                <MudText Typo="Typo.body2" Color="Color.Success">
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Class="mr-1" />
+                                    Conciliado em @(item.DataConciliacao?.ToString("dd/MM/yyyy HH:mm") ?? "-")
+                                </MudText>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small" OnClick="@(() => Desfazer(item.Id))">
+                                    Desfazer
+                                </MudButton>
+                            </div>
+                        }
+                        else if (item.Status == StatusConciliacao.Ignorado)
+                        {
+                            <div class="d-flex justify-space-between align-center h-100">
+                                <MudText Typo="Typo.body2" Color="Color.Default">
+                                    <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" Class="mr-1" />
+                                    Lançamento ignorado
+                                </MudText>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Small" OnClick="@(() => Desfazer(item.Id))">
+                                    Reativar
+                                </MudButton>
+                            </div>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+        
+        @if (!ItensFiltrados.Any())
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">Nenhum item encontrado para este filtro.</MudAlert>
+        }
+    </div>
+}
+
+@* Dialog Template for Criar Movimentação *@
+<MudDialog @bind-Visible="_dialogVisible" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.AddCard" Class="mr-2" /> Criar Movimentação
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudSelect T="int?" Label="Plano de Conta" @bind-Value="_novoPlanoContaId" Required="true" Class="mb-4">
+            @foreach (var plano in _planosConta)
+            {
+                <MudSelectItem T="int?" Value="@((int?)plano.Id)">@plano.Descricao</MudSelectItem>
+            }
+        </MudSelect>
+        <MudSelect T="int?" Label="Centro de Custo" @bind-Value="_novoCentroCustoId" Clearable="true">
+            @foreach (var centro in _centrosCusto)
+            {
+                <MudSelectItem T="int?" Value="@((int?)centro.Id)">@centro.Descricao</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _dialogVisible = false)">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="CriarMovimentacao">Salvar e Conciliar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public int ExtratoImportadoId { get; set; }
+
+    private bool _carregando = true;
+    private List<ItemConciliacaoDto> _itens = new();
+    
+    private int _totalItens => _itens.Count;
+    private int _pendentes => _itens.Count(x => x.Status == StatusConciliacao.Pendente);
+    private int _conciliados => _itens.Count(x => x.Status == StatusConciliacao.Conciliado);
+    private int _ignorados => _itens.Count(x => x.Status == StatusConciliacao.Ignorado);
+
+    private int _activeTabIndex = 0;
+
+    private IEnumerable<ItemConciliacaoDto> ItensFiltrados => _activeTabIndex switch
+    {
+        1 => _itens.Where(x => x.Status == StatusConciliacao.Pendente),
+        2 => _itens.Where(x => x.Status == StatusConciliacao.Conciliado),
+        3 => _itens.Where(x => x.Status == StatusConciliacao.Ignorado),
+        _ => _itens
+    };
+
+    // Dialog state
+    private bool _dialogVisible;
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    private int? _itemParaCriarId;
+    private int? _novoPlanoContaId;
+    private int? _novoCentroCustoId;
+    private List<PlanoContaDto> _planosConta = new();
+    private List<CentroCustoDto> _centrosCusto = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarCadastros();
+        await CarregarSugestoes();
+    }
+
+    private async Task CarregarCadastros()
+    {
+        try
+        {
+            _planosConta = await Mediator.Send(new GetPlanosContasQuery(null, true, true));
+            _centrosCusto = await Mediator.Send(new GetCentrosCustoQuery(true));
+        }
+        catch (Exception)
+        {
+            // Silencioso se cadastros opcionais vazios
+        }
+    }
+
+    private async Task CarregarSugestoes()
+    {
+        try
+        {
+            _carregando = true;
+            _itens = await Mediator.Send(new GetSugestoesConciliacaoQuery(ExtratoImportadoId));
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao carregar sugestões de conciliação.", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task ConciliarComSugestao(int itemExtratoId, SugestaoMatchDto sugestao)
+    {
+        try
+        {
+            var command = new ConciliarItemCommand(
+                ExtratoImportadoItemId: itemExtratoId,
+                MovimentacaoFinanceiraId: sugestao.MovimentacaoId,
+                ContaPagarId: sugestao.ContaPagarId,
+                ContaReceberId: sugestao.ContaReceberId
+            );
+
+            var result = await Mediator.Send(command);
+            if (result.Sucesso)
+            {
+                Snackbar.Add("Item conciliado com sucesso.", Severity.Success);
+                await CarregarSugestoes();
+            }
+            else
+            {
+                Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro inesperado ao conciliar.", Severity.Error);
+        }
+    }
+
+    private async Task Ignorar(int itemExtratoId)
+    {
+        try
+        {
+            var result = await Mediator.Send(new IgnorarItemExtratoCommand(itemExtratoId));
+            if (result.Sucesso)
+            {
+                Snackbar.Add("Item ignorado.", Severity.Info);
+                await CarregarSugestoes();
+            }
+            else
+            {
+                Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao ignorar item.", Severity.Error);
+        }
+    }
+
+    private async Task Desfazer(int itemExtratoId)
+    {
+        try
+        {
+            var result = await Mediator.Send(new DesfazerConciliacaoCommand(itemExtratoId));
+            if (result.Sucesso)
+            {
+                Snackbar.Add("Conciliação desfeita com sucesso.", Severity.Warning);
+                await CarregarSugestoes();
+            }
+            else
+            {
+                Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao desfazer conciliação.", Severity.Error);
+        }
+    }
+
+    private void AbrirDialogoCriar(int itemExtratoId)
+    {
+        _itemParaCriarId = itemExtratoId;
+        _novoPlanoContaId = null;
+        _novoCentroCustoId = null;
+        _dialogVisible = true;
+    }
+
+    private async Task CriarMovimentacao()
+    {
+        if (_novoPlanoContaId == null || _itemParaCriarId == null)
+        {
+            Snackbar.Add("Selecione um plano de conta.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var result = await Mediator.Send(new CriarMovimentacaoDeExtratoCommand(
+                ExtratoImportadoItemId: _itemParaCriarId.Value, 
+                PlanoContaId: _novoPlanoContaId.Value, 
+                CentroCustoId: _novoCentroCustoId
+            ));
+
+            if (result.Sucesso)
+            {
+                Snackbar.Add("Movimentação criada e conciliada com sucesso.", Severity.Success);
+                _dialogVisible = false;
+                await CarregarSugestoes();
+            }
+            else
+            {
+                Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
+            }
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Erro ao criar movimentação.", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(StatusConciliacao status) => status switch
+    {
+        StatusConciliacao.Conciliado => Color.Success,
+        StatusConciliacao.Pendente => Color.Warning,
+        StatusConciliacao.Ignorado => Color.Default,
+        _ => Color.Default
+    };
+
+    private Color GetScoreColor(int score)
+    {
+        if (score >= 75) return Color.Success;
+        if (score >= 50) return Color.Warning;
+        return Color.Error;
+    }
+}

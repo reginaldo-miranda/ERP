@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentEmpresaService, CurrentEmpresaService>();
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IOfxParserService, OfxParserService>();
 
         // Serviços externos — ViaCEP
         services.AddHttpClient<ICepService, ViaCepService>(client =>

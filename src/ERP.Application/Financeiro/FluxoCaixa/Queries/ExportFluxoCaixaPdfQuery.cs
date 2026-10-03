@@ -4,6 +4,7 @@ using MediatR;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Unit = QuestPDF.Infrastructure.Unit;
 using System;
 using System.Globalization;
 using System.Threading;

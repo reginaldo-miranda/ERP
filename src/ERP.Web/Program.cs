@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Adicionar Serviços das Camadas Clean Architecture
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddHostedService<ERP.Infrastructure.Services.VencimentoNotificacaoService>();
 
 // MudBlazor Services
 builder.Services.AddMudServices();

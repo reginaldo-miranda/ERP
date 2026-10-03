@@ -1,0 +1,163 @@
+@page "/financeiro/relatorio-vencimentos"
+@using ERP.Application.Financeiro.Relatorios.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h5" Class="mb-4">Relatório de Contas Vencidas e A Vencer</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (_relatorio != null)
+{
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Style="border-left: 4px solid var(--mud-palette-error);">
+                <MudText Typo="Typo.subtitle2" Color="Color.Error">Vencidas</MudText>
+                <MudText Typo="Typo.h5">@_relatorio.Resumo.TotalVencidas</MudText>
+                <MudText Typo="Typo.body2">R$ @_relatorio.Resumo.ValorTotalVencido.ToString("N2")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Style="border-left: 4px solid var(--mud-palette-warning);">
+                <MudText Typo="Typo.subtitle2" Color="Color.Warning">A vencer em 7 dias</MudText>
+                <MudText Typo="Typo.h5">@_relatorio.Resumo.TotalAVencer7Dias</MudText>
+                <MudText Typo="Typo.body2">R$ @_relatorio.Resumo.ValorAVencer7Dias.ToString("N2")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Style="border-left: 4px solid #ffca28;">
+                <MudText Typo="Typo.subtitle2" Style="color: #ffca28;">A vencer em 15 dias</MudText>
+                <MudText Typo="Typo.h5">@_relatorio.Resumo.TotalAVencer15Dias</MudText>
+                <MudText Typo="Typo.body2">R$ @_relatorio.Resumo.ValorAVencer15Dias.ToString("N2")</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4" Style="border-left: 4px solid var(--mud-palette-info);">
+                <MudText Typo="Typo.subtitle2" Color="Color.Info">A vencer em 30 dias</MudText>
+                <MudText Typo="Typo.h5">@_relatorio.Resumo.TotalAVencer30Dias</MudText>
+                <MudText Typo="Typo.body2">R$ @_relatorio.Resumo.ValorAVencer30Dias.ToString("N2")</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-2">
+        <MudItem xs="12" sm="6">
+            <MudPaper Class="pa-4" Style="border-left: 4px solid var(--mud-palette-error);">
+                <MudText Typo="Typo.subtitle2" Color="Color.Error">Contas a Pagar Vencidas</MudText>
+                <MudText Typo="Typo.h6">R$ @_relatorio.Resumo.ValorContasPagarVencidas.ToString("N2")</MudText>
+                <MudText Typo="Typo.body2">@_relatorio.Resumo.TotalContasPagarVencidas contas</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6">
+            <MudPaper Class="pa-4" Style="border-left: 4px solid var(--mud-palette-error);">
+                <MudText Typo="Typo.subtitle2" Color="Color.Error">Contas a Receber Vencidas</MudText>
+                <MudText Typo="Typo.h6">R$ @_relatorio.Resumo.ValorContasReceberVencidas.ToString("N2")</MudText>
+                <MudText Typo="Typo.body2">@_relatorio.Resumo.TotalContasReceberVencidas contas</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudPaper Class="pa-4 mt-4">
+        <MudSelect T="string?" Label="Filtrar por Tipo" Value="@_tipoFiltro" ValueChanged="OnFiltroChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-4" Style="max-width: 300px;">
+            <MudSelectItem T="string?" Value="@null">Todos</MudSelectItem>
+            <MudSelectItem T="string?" Value="@("Pagar")">Contas a Pagar</MudSelectItem>
+            <MudSelectItem T="string?" Value="@("Receber")">Contas a Receber</MudSelectItem>
+        </MudSelect>
+
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2">
+            <MudTabPanel Text="Vencidas" BadgeData="@_relatorio.ContasVencidas.Count" BadgeColor="Color.Error">
+                @RenderTable(_relatorio.ContasVencidas, true)
+            </MudTabPanel>
+            <MudTabPanel Text="Próximos 7 dias" BadgeData="@_relatorio.ContasAVencer7Dias.Count" BadgeColor="Color.Warning">
+                @RenderTable(_relatorio.ContasAVencer7Dias, false)
+            </MudTabPanel>
+            <MudTabPanel Text="Próximos 15 dias" BadgeData="@_relatorio.ContasAVencer15Dias.Count">
+                @RenderTable(_relatorio.ContasAVencer15Dias, false)
+            </MudTabPanel>
+            <MudTabPanel Text="Próximos 30 dias" BadgeData="@_relatorio.ContasAVencer30Dias.Count" BadgeColor="Color.Info">
+                @RenderTable(_relatorio.ContasAVencer30Dias, false)
+            </MudTabPanel>
+        </MudTabs>
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private RelatorioVencimentosDto? _relatorio;
+    private string? _tipoFiltro = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            _relatorio = await Mediator.Send(new GetRelatorioVencimentosQuery(_tipoFiltro));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar o relatório: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnFiltroChanged(string? novoFiltro)
+    {
+        _tipoFiltro = novoFiltro;
+        await LoadDataAsync();
+    }
+
+    private RenderFragment RenderTable(List<ContaVencidaDto> contas, bool mostrarAtraso) => __builder =>
+    {
+        <MudTable Items="@contas" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+            <HeaderContent>
+                <MudTh>Tipo</MudTh>
+                <MudTh>Descrição</MudTh>
+                <MudTh>Pessoa</MudTh>
+                <MudTh>Valor Original</MudTh>
+                <MudTh>Saldo Restante</MudTh>
+                <MudTh>Vencimento</MudTh>
+                @if (mostrarAtraso)
+                {
+                    <MudTh>Atraso</MudTh>
+                }
+                <MudTh>Plano de Contas</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Tipo">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Tipo == "Pagar" ? Color.Error : Color.Success)">
+                        @context.Tipo
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Descrição">@context.Descricao</MudTd>
+                <MudTd DataLabel="Pessoa">@context.Pessoa</MudTd>
+                <MudTd DataLabel="Valor Original">R$ @context.ValorOriginal.ToString("N2")</MudTd>
+                <MudTd DataLabel="Saldo Restante"><strong>R$ @context.SaldoRestante.ToString("N2")</strong></MudTd>
+                <MudTd DataLabel="Vencimento">@context.DataVencimento.ToString("dd/MM/yyyy")</MudTd>
+                @if (mostrarAtraso)
+                {
+                    <MudTd DataLabel="Atraso">
+                        <MudBadge Content="@context.DiasAtraso" Color="Color.Error" Overlap="false" Class="mx-4">
+                            dias
+                        </MudBadge>
+                    </MudTd>
+                }
+                <MudTd DataLabel="Plano de Contas">@context.PlanoConta</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText>Nenhuma conta encontrada nesta categoria.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    };
+}

@@ -111,13 +111,13 @@
             <MudItem xs="12" md="6">
                 <MudPaper Class="pa-4" Elevation="1">
                     <MudText Typo="Typo.h6" Class="mb-4">Entradas vs Saídas</MudText>
-                    <MudChart ChartType="ChartType.Bar" ChartSeries="@_chartSeriesBarras" XAxisLabels="@_chartLabels" Width="100%" Height="300px" />
+                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="@_chartSeriesBarras" XAxisLabels="@_chartLabels" Width="100%" Height="300px" />
                 </MudPaper>
             </MudItem>
             <MudItem xs="12" md="6">
                 <MudPaper Class="pa-4" Elevation="1">
                     <MudText Typo="Typo.h6" Class="mb-4">Saldo Acumulado</MudText>
-                    <MudChart ChartType="ChartType.Line" ChartSeries="@_chartSeriesLinha" XAxisLabels="@_chartLabels" Width="100%" Height="300px" />
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="@_chartSeriesLinha" XAxisLabels="@_chartLabels" Width="100%" Height="300px" />
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -172,8 +172,8 @@
     private bool _incluirProjetado = true;
     private List<ContaBancariaDto> _contasBancarias = new();
 
-    private List<ChartSeries> _chartSeriesBarras = new();
-    private List<ChartSeries> _chartSeriesLinha = new();
+    private List<ChartSeries<double>> _chartSeriesBarras = new();
+    private List<ChartSeries<double>> _chartSeriesLinha = new();
     private string[] _chartLabels = Array.Empty<string>();
 
     protected override async Task OnInitializedAsync()
@@ -213,12 +213,12 @@
             if (_resultado?.Grafico != null)
             {
                 _chartLabels = _resultado.Grafico.Labels.ToArray();
-                _chartSeriesBarras = new List<ChartSeries>
+                _chartSeriesBarras = new List<ChartSeries<double>>
                 {
                     new() { Name = "Entradas", Data = _resultado.Grafico.SerieEntradas.ToArray() },
                     new() { Name = "Saídas", Data = _resultado.Grafico.SerieSaidas.ToArray() }
                 };
-                _chartSeriesLinha = new List<ChartSeries>
+                _chartSeriesLinha = new List<ChartSeries<double>>
                 {
                     new() { Name = "Saldo Acumulado", Data = _resultado.Grafico.SerieSaldoAcumulado.ToArray() }
                 };
