@@ -68,6 +68,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Estoque.Inventario> Inventarios => Set<ERP.Domain.Core.Entities.Estoque.Inventario>();
     public DbSet<ERP.Domain.Core.Entities.Estoque.InventarioItem> InventarioItens => Set<ERP.Domain.Core.Entities.Estoque.InventarioItem>();
 
+    // Fase 5 - Vendas
+    public DbSet<ERP.Domain.Core.Entities.Vendas.Orcamento> Orcamentos => Set<ERP.Domain.Core.Entities.Vendas.Orcamento>();
+    public DbSet<ERP.Domain.Core.Entities.Vendas.OrcamentoItem> OrcamentoItens => Set<ERP.Domain.Core.Entities.Vendas.OrcamentoItem>();
+    public DbSet<ERP.Domain.Core.Entities.Vendas.PedidoVenda> PedidosVenda => Set<ERP.Domain.Core.Entities.Vendas.PedidoVenda>();
+    public DbSet<ERP.Domain.Core.Entities.Vendas.PedidoVendaItem> PedidoVendaItens => Set<ERP.Domain.Core.Entities.Vendas.PedidoVendaItem>();
+    public DbSet<ERP.Domain.Core.Entities.Vendas.Faturamento> Faturamentos => Set<ERP.Domain.Core.Entities.Vendas.Faturamento>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
