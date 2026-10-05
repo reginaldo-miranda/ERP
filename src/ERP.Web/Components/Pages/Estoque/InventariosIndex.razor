@@ -1,0 +1,211 @@
+@page "/estoque/inventarios"
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Inventário Físico - ERP</PageTitle>
+
+<div class="d-flex flex-wrap justify-space-between align-center mb-4 gap-2">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.FactCheck" Class="mr-2" />
+            Inventário Físico &amp; Conciliação
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Contagem assistida de produtos em depósito com apuração de divergências e ajustes automáticos de estoque.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarInventarios">
+            Atualizar
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoInventarioDialog">
+            Novo Inventário
+        </MudButton>
+    </div>
+</div>
+
+@* CARDS DE RESUMO *@
+<MudGrid Class="mb-4" Spacing="2">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE PROCESSOS</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">@_inventarios.Count</MudText>
+            </div>
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Assignment" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">INVENTÁRIOS ABERTOS</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="@(_inventarios.Count(i => i.Status == StatusInventario.Aberto) > 0 ? Color.Warning : Color.Default)">
+                    @_inventarios.Count(i => i.Status == StatusInventario.Aberto)
+                </MudText>
+            </div>
+            <MudAvatar Color="@(_inventarios.Count(i => i.Status == StatusInventario.Aberto) > 0 ? Color.Warning : Color.Default)" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.PendingActions" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">FINALIZADOS COM SUCESSO</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">
+                    @_inventarios.Count(i => i.Status == StatusInventario.Finalizado)
+                </MudText>
+            </div>
+            <MudAvatar Color="Color.Success" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">DIVERGÊNCIA LÍQUIDA ACUMULADA</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">
+                    @_inventarios.Where(i => i.Status == StatusInventario.Finalizado).Sum(i => i.TotalDivergenciaFinanceira).ToString("C2")
+                </MudText>
+            </div>
+            <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Balance" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@* TABELA *@
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else
+{
+    <MudTable Items="@_inventarios" Dense="true" Hover="true" Striped="true" Elevation="1">
+        <HeaderContent>
+            <MudTh>Protocolo</MudTh>
+            <MudTh>Depósito</MudTh>
+            <MudTh>Responsável</MudTh>
+            <MudTh>Abertura</MudTh>
+            <MudTh>Fechamento</MudTh>
+            <MudTh Style="text-align: center;">Itens</MudTh>
+            <MudTh Style="text-align: right;">Divergência Total</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh Style="text-align: center;">Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Protocolo">
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Protocolo</MudText>
+            </MudTd>
+            <MudTd DataLabel="Depósito">@context.DepositoNome</MudTd>
+            <MudTd DataLabel="Responsável">@context.Responsavel</MudTd>
+            <MudTd DataLabel="Abertura">@context.DataAbertura.ToString("dd/MM/yyyy HH:mm")</MudTd>
+            <MudTd DataLabel="Fechamento">
+                @(context.DataFechamento.HasValue ? context.DataFechamento.Value.ToString("dd/MM/yyyy HH:mm") : "-")
+            </MudTd>
+            <MudTd DataLabel="Itens" Style="text-align: center;">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.TotalItens itens</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Divergência" Style="text-align: right;">
+                <MudText Typo="Typo.body2" Class="font-weight-bold"
+                         Color="@(context.TotalDivergenciaFinanceira > 0 ? Color.Info : context.TotalDivergenciaFinanceira < 0 ? Color.Error : Color.Default)">
+                    @context.TotalDivergenciaFinanceira.ToString("C2")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                @switch (context.Status)
+                {
+                    case StatusInventario.Aberto:
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Icon="@Icons.Material.Filled.Pending">Em Contagem</MudChip>
+                        break;
+                    case StatusInventario.Finalizado:
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.CheckCircle">Finalizado</MudChip>
+                        break;
+                    case StatusInventario.Cancelado:
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small" Icon="@Icons.Material.Filled.Cancel">Cancelado</MudChip>
+                        break;
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações" Style="text-align: center;">
+                @if (context.Status == StatusInventario.Aberto)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.EditNote"
+                               Href="@($"/estoque/inventario/{context.Id}")">
+                        Continuar Contagem
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Default"
+                               StartIcon="@Icons.Material.Filled.Visibility"
+                               Href="@($"/estoque/inventario/{context.Id}")">
+                        Ver Detalhes
+                    </MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <div class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.FactCheck" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.body1" Color="Color.Secondary">Nenhum inventário físico realizado até o momento.</MudText>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Class="mt-2" OnClick="AbrirNovoInventarioDialog">
+                    Iniciar primeiro inventário agora
+                </MudButton>
+            </div>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private bool _carregando = true;
+    private List<InventarioDto> _inventarios = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarInventarios();
+    }
+
+    private async Task CarregarInventarios()
+    {
+        _carregando = true;
+        try
+        {
+            _inventarios = await Mediator.Send(new GetInventariosQuery());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar inventários: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task AbrirNovoInventarioDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<IniciarInventarioDialog>("Novo Inventário", options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await CarregarInventarios();
+        }
+    }
+}

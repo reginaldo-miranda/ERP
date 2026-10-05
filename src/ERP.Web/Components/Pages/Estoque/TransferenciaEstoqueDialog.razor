@@ -1,0 +1,290 @@
+@using ERP.Application.Estoque.Commands
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.SwapHoriz" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Transferência entre Depósitos</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            Transfere saldo de um produto diretamente da origem para o destino em uma operação imediata.
+        </MudText>
+
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-4">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                @* Depósito de Origem *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="Depósito de Origem *" @bind-Value="_depositoOrigemId"
+                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                               SelectedValuesChanged="@(async () => await OnOrigemAlterada())">
+                        @foreach (var dep in _depositos)
+                        {
+                            <MudSelectItem Value="@dep.Id">@dep.Nome @(dep.Padrao ? "(Padrão)" : "")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @* Depósito de Destino *@
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="Depósito de Destino *" @bind-Value="_depositoDestinoId"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var dep in _depositos.Where(d => d.Id != _depositoOrigemId))
+                        {
+                            <MudSelectItem Value="@dep.Id">@dep.Nome @(dep.Padrao ? "(Padrão)" : "")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @* Produto com Saldo na Origem *@
+                <MudItem xs="12">
+                    <MudSelect T="int" Label="Produto *" @bind-Value="_produtoId"
+                               Variant="Variant.Outlined" Margin="Margin.Dense"
+                               SelectedValuesChanged="@(async () => await OnProdutoAlterado())">
+                        @foreach (var p in _produtosDisponiveis)
+                        {
+                            <MudSelectItem Value="@p.ProdutoId">
+                                @p.ProdutoCodigo - @p.ProdutoNome (Disponível: @p.Quantidade.ToString("N2") @p.UnidadeMedida)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                @* Se produto tem lotes disponíveis *@
+                @if (_lotesDisponiveis.Any())
+                {
+                    <MudItem xs="12">
+                        <MudSelect T="int?" Label="Lote *" @bind-Value="_loteId"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var lote in _lotesDisponiveis)
+                            {
+                                <MudSelectItem T="int?" Value="@lote.Id">
+                                    Lote: @lote.CodigoLote (Validade: @lote.DataValidade.ToString("dd/MM/yyyy") | Saldo: @lote.QuantidadeAtual.ToString("N2"))
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+
+                @* Se produto tem números de série disponíveis *@
+                @if (_seriaisDisponiveis.Any())
+                {
+                    <MudItem xs="12">
+                        <MudSelect T="int?" Label="Número de Série *" @bind-Value="_numeroSerieId"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var serial in _seriaisDisponiveis)
+                            {
+                                <MudSelectItem T="int?" Value="@serial.Id">
+                                    Nº Série: @serial.Numero
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                }
+
+                @* Quantidade *@
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" Label="Quantidade a Transferir *" @bind-Value="_quantidade"
+                                     Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.0001m" Max="@_saldoMaximo"
+                                     HelperText="@($"Máximo disponível: {_saldoMaximo:N2}")" />
+                </MudItem>
+
+                @* Documento Origem *@
+                <MudItem xs="12" sm="6">
+                    <MudTextField Label="Documento / Ref." @bind-Value="_documentoOrigem"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Ex: TRANSF-001" />
+                </MudItem>
+
+                @* Observação *@
+                <MudItem xs="12">
+                    <MudTextField Label="Observação" @bind-Value="_observacao"
+                                  Variant="Variant.Outlined" Lines="2" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar"
+                   Disabled="@(_salvando || _produtoId == 0 || _depositoOrigemId == 0 || _depositoDestinoId == 0 || _quantidade <= 0)">
+            @if (_salvando)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Transferindo...</MudText>
+            }
+            else
+            {
+                <span>Confirmar Transferência</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? ProdutoIdPreSelecionado { get; set; }
+
+    [Parameter]
+    public int? DepositoOrigemPreSelecionado { get; set; }
+
+    private bool _carregando = true;
+    private bool _salvando = false;
+
+    private List<DepositoDto> _depositos = new();
+    private List<PosicaoEstoqueDto> _produtosDisponiveis = new();
+    private List<LoteDto> _lotesDisponiveis = new();
+    private List<NumeroSerieDto> _seriaisDisponiveis = new();
+
+    private int _depositoOrigemId;
+    private int _depositoDestinoId;
+    private int _produtoId;
+    private decimal _quantidade = 1;
+    private decimal _saldoMaximo = 0;
+    private int? _loteId;
+    private int? _numeroSerieId;
+    private string? _documentoOrigem;
+    private string? _observacao;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _carregando = true;
+        try
+        {
+            _depositos = await Mediator.Send(new GetDepositosQuery(SomenteAtivos: true));
+
+            if (DepositoOrigemPreSelecionado.HasValue && DepositoOrigemPreSelecionado.Value > 0)
+            {
+                _depositoOrigemId = DepositoOrigemPreSelecionado.Value;
+            }
+            else
+            {
+                var padrao = _depositos.FirstOrDefault(d => d.Padrao) ?? _depositos.FirstOrDefault();
+                if (padrao != null) _depositoOrigemId = padrao.Id;
+            }
+
+            var outro = _depositos.FirstOrDefault(d => d.Id != _depositoOrigemId);
+            if (outro != null) _depositoDestinoId = outro.Id;
+
+            await CarregarProdutosOrigem();
+
+            if (ProdutoIdPreSelecionado.HasValue && ProdutoIdPreSelecionado.Value > 0)
+            {
+                _produtoId = ProdutoIdPreSelecionado.Value;
+                await OnProdutoAlterado();
+            }
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnOrigemAlterada()
+    {
+        if (_depositoDestinoId == _depositoOrigemId)
+        {
+            var outro = _depositos.FirstOrDefault(d => d.Id != _depositoOrigemId);
+            _depositoDestinoId = outro?.Id ?? 0;
+        }
+        await CarregarProdutosOrigem();
+        await OnProdutoAlterado();
+    }
+
+    private async Task CarregarProdutosOrigem()
+    {
+        if (_depositoOrigemId > 0)
+        {
+            var posicoes = await Mediator.Send(new GetPosicaoEstoqueQuery(DepositoId: _depositoOrigemId));
+            _produtosDisponiveis = posicoes.Where(p => p.Quantidade > 0).ToList();
+        }
+        else
+        {
+            _produtosDisponiveis.Clear();
+        }
+    }
+
+    private async Task OnProdutoAlterado()
+    {
+        _loteId = null;
+        _numeroSerieId = null;
+
+        var selecionado = _produtosDisponiveis.FirstOrDefault(p => p.ProdutoId == _produtoId);
+        _saldoMaximo = selecionado?.Quantidade ?? 0;
+        if (_quantidade > _saldoMaximo) _quantidade = _saldoMaximo;
+        if (_quantidade <= 0 && _saldoMaximo > 0) _quantidade = 1;
+
+        if (_produtoId > 0 && _depositoOrigemId > 0)
+        {
+            var lotes = await Mediator.Send(new GetLotesQuery(ProdutoId: _produtoId, DepositoId: _depositoOrigemId));
+            _lotesDisponiveis = lotes.Where(l => l.QuantidadeAtual > 0).ToList();
+
+            var seriais = await Mediator.Send(new GetNumerosSerieQuery(ProdutoId: _produtoId, DepositoId: _depositoOrigemId, Status: ERP.Domain.Core.Enums.StatusNumeroSerie.Disponivel));
+            _seriaisDisponiveis = seriais;
+        }
+        else
+        {
+            _lotesDisponiveis.Clear();
+            _seriaisDisponiveis.Clear();
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (_depositoOrigemId == _depositoDestinoId)
+        {
+            Snackbar.Add("O depósito de destino deve ser diferente do depósito de origem.", Severity.Warning);
+            return;
+        }
+
+        if (_quantidade <= 0 || _quantidade > _saldoMaximo)
+        {
+            Snackbar.Add($"A quantidade deve ser entre 0.0001 e {_saldoMaximo:N2}.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            var dto = new TransferirEstoqueDto(
+                _produtoId,
+                _depositoOrigemId,
+                _depositoDestinoId,
+                _quantidade,
+                _loteId,
+                _numeroSerieId,
+                _documentoOrigem,
+                _observacao
+            );
+
+            await Mediator.Send(new TransferirEstoqueCommand(dto));
+            Snackbar.Add("Transferência de estoque concluída com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao transferir: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

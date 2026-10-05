@@ -44,7 +44,19 @@ public class MovimentacaoEstoqueConfiguration : IEntityTypeConfiguration<Movimen
             .HasForeignKey(m => m.DepositoDestinoId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(m => m.Lote)
+            .WithMany()
+            .HasForeignKey(m => m.LoteId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(m => m.NumeroSerie)
+            .WithMany()
+            .HasForeignKey(m => m.NumeroSerieId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(m => new { m.EmpresaId, m.DataMovimentacao });
         builder.HasIndex(m => new { m.EmpresaId, m.ProdutoId });
+        builder.HasIndex(m => m.LoteId);
+        builder.HasIndex(m => m.NumeroSerieId);
     }
 }

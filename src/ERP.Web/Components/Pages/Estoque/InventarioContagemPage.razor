@@ -1,0 +1,374 @@
+@page "/estoque/inventario/{Id:int}"
+@using ERP.Application.Estoque.Commands
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Contagem de Inventário @_inventario?.Protocolo - ERP</PageTitle>
+
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-12">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+    </div>
+}
+else if (_inventario == null)
+{
+    <MudAlert Severity="Severity.Error">Inventário não encontrado.</MudAlert>
+}
+else
+{
+    <div class="d-flex flex-wrap justify-space-between align-center mb-4 gap-2">
+        <div>
+            <div class="d-flex align-center gap-2">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/estoque/inventarios" Size="Size.Small" />
+                <MudText Typo="Typo.h5" Class="font-weight-bold">
+                    Inventário @_inventario.Protocolo
+                </MudText>
+                @switch (_inventario.Status)
+                {
+                    case StatusInventario.Aberto:
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small">Em Andamento</MudChip>
+                        break;
+                    case StatusInventario.Finalizado:
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small">Finalizado</MudChip>
+                        break;
+                    case StatusInventario.Cancelado:
+                        <MudChip T="string" Color="Color.Default" Size="Size.Small">Cancelado</MudChip>
+                        break;
+                }
+            </div>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                Depósito: <strong>@_inventario.DepositoNome</strong> | Responsável: <strong>@_inventario.Responsavel</strong> | Aberto em: @_inventario.DataAbertura.ToString("dd/MM/yyyy HH:mm")
+            </MudText>
+        </div>
+
+        <div class="d-flex gap-2">
+            @if (_inventario.Status == StatusInventario.Aberto)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Close"
+                           OnClick="CancelarInventario" Disabled="_salvando">
+                    Cancelar
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                           OnClick="SalvarContagem" Disabled="_salvando">
+                    Salvar Progresso
+                </MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.DoneAll"
+                           OnClick="FinalizarInventario" Disabled="_salvando">
+                    Finalizar e Ajustar Estoque
+                </MudButton>
+            }
+        </div>
+    </div>
+
+    @* CARDS DE RESUMO DA CONTAGEM *@
+    <MudGrid Class="mb-4" Spacing="2">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ITENS NO INVENTÁRIO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_itens.Count</MudText>
+                </div>
+                <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.ListAlt" />
+                </MudAvatar>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ITENS COM DIVERGÊNCIA</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="@(TotalItensComDivergencia > 0 ? Color.Warning : Color.Success)">
+                        @TotalItensComDivergencia
+                    </MudText>
+                </div>
+                <MudAvatar Color="@(TotalItensComDivergencia > 0 ? Color.Warning : Color.Success)" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.Difference" />
+                </MudAvatar>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">SOBRAS DE ESTOQUE (+)</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">
+                        @TotalSobrasFinanceiro.ToString("C2")
+                    </MudText>
+                </div>
+                <MudAvatar Color="Color.Info" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp" />
+                </MudAvatar>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">FALTAS DE ESTOQUE (-)</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Error">
+                        @TotalFaltasFinanceiro.ToString("C2")
+                    </MudText>
+                </div>
+                <MudAvatar Color="Color.Error" Variant="Variant.Filled">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingDown" />
+                </MudAvatar>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* TABELA ASSISTIDA DE CONFERÊNCIA *@
+    <MudTable Items="@_itens" Dense="true" Hover="true" Striped="true" Elevation="1">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Conferência dos Produtos</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="_busca" Placeholder="Buscar produto por código ou nome..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Class="mt-0" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Código</MudTh>
+            <MudTh>Produto</MudTh>
+            <MudTh Style="text-align: right;">Saldo Sistema</MudTh>
+            <MudTh Style="text-align: right; width: 180px;">Qtd Contada (Física)</MudTh>
+            <MudTh Style="text-align: right;">Diferença</MudTh>
+            <MudTh Style="text-align: right;">Custo Unit.</MudTh>
+            <MudTh Style="text-align: right;">Impacto (R$)</MudTh>
+            <MudTh>Observação</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Código">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.ProdutoCodigo</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Produto">
+                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ProdutoNome</MudText>
+                @if (!string.IsNullOrWhiteSpace(context.CodigoLote))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Primary">Lote: @context.CodigoLote</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Saldo Sistema" Style="text-align: right;">
+                <MudText Typo="Typo.body2">@context.QuantidadeSistema.ToString("N2") @context.UnidadeMedida</MudText>
+            </MudTd>
+            <MudTd DataLabel="Qtd Contada" Style="text-align: right;">
+                @if (_inventario.Status == StatusInventario.Aberto)
+                {
+                    <MudNumericField T="decimal" Value="@context.QuantidadeContada"
+                                     ValueChanged="@((decimal v) => OnQuantidadeAlterada(context, v))"
+                                     Min="0m" Variant="Variant.Outlined" Margin="Margin.Dense" Class="font-weight-bold" />
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Class="font-weight-bold">@context.QuantidadeContada.ToString("N2") @context.UnidadeMedida</MudText>
+                }
+            </MudTd>
+            <MudTd DataLabel="Diferença" Style="text-align: right;">
+                @{
+                    decimal diff = context.QuantidadeContada - context.QuantidadeSistema;
+                }
+                @if (diff == 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default">OK (0.00)</MudChip>
+                }
+                else if (diff > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Add">
+                        +@diff.ToString("N2") (Sobra)
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Remove">
+                        @diff.ToString("N2") (Falta)
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Custo Unit." Style="text-align: right;">
+                @context.CustoUnitario.ToString("C2")
+            </MudTd>
+            <MudTd DataLabel="Impacto" Style="text-align: right;" Class="font-weight-bold">
+                @{
+                    decimal impacto = (context.QuantidadeContada - context.QuantidadeSistema) * context.CustoUnitario;
+                }
+                <MudText Typo="Typo.body2" Class="font-weight-bold"
+                         Color="@(impacto > 0 ? Color.Info : impacto < 0 ? Color.Error : Color.Default)">
+                    @impacto.ToString("C2")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Observação">
+                @if (_inventario.Status == StatusInventario.Aberto)
+                {
+                    <MudTextField Value="@context.Observacao" ValueChanged="@((string? v) => OnObservacaoAlterada(context, v))"
+                                  Placeholder="Opcional..." Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+                else
+                {
+                    <span>@context.Observacao</span>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private bool _carregando = true;
+    private bool _salvando = false;
+    private InventarioDto? _inventario;
+    private List<InventarioItemDto> _itens = new();
+    private string _busca = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        _carregando = true;
+        try
+        {
+            _inventario = await Mediator.Send(new GetInventarioPorIdQuery(Id));
+            if (_inventario != null)
+            {
+                _itens = await Mediator.Send(new GetInventarioItensQuery(Id));
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados do inventário: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void OnQuantidadeAlterada(InventarioItemDto item, decimal novaQuantidade)
+    {
+        int index = _itens.IndexOf(item);
+        if (index >= 0)
+        {
+            _itens[index] = item with
+            {
+                QuantidadeContada = novaQuantidade,
+                Diferenca = novaQuantidade - item.QuantidadeSistema,
+                ValorDivergencia = Math.Round((novaQuantidade - item.QuantidadeSistema) * item.CustoUnitario, 2)
+            };
+            StateHasChanged();
+        }
+    }
+
+    private void OnObservacaoAlterada(InventarioItemDto item, string? novaObservacao)
+    {
+        int index = _itens.IndexOf(item);
+        if (index >= 0)
+        {
+            _itens[index] = item with
+            {
+                Observacao = novaObservacao
+            };
+            StateHasChanged();
+        }
+    }
+
+    private int TotalItensComDivergencia => _itens.Count(it => (it.QuantidadeContada - it.QuantidadeSistema) != 0);
+
+    private decimal TotalSobrasFinanceiro => _itens
+        .Where(it => (it.QuantidadeContada - it.QuantidadeSistema) > 0)
+        .Sum(it => (it.QuantidadeContada - it.QuantidadeSistema) * it.CustoUnitario);
+
+    private decimal TotalFaltasFinanceiro => _itens
+        .Where(it => (it.QuantidadeContada - it.QuantidadeSistema) < 0)
+        .Sum(it => Math.Abs(it.QuantidadeContada - it.QuantidadeSistema) * it.CustoUnitario);
+
+    private async Task SalvarContagem()
+    {
+        _salvando = true;
+        try
+        {
+            var dtos = _itens.Select(i => new AtualizarContagemItemDto(i.Id, i.QuantidadeContada, i.Observacao)).ToList();
+            await Mediator.Send(new AtualizarContagemInventarioCommand(Id, dtos));
+            Snackbar.Add("Contagem salva com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private async Task FinalizarInventario()
+    {
+        int divergentes = TotalItensComDivergencia;
+        decimal saldoLiquido = _itens.Sum(it => (it.QuantidadeContada - it.QuantidadeSistema) * it.CustoUnitario);
+
+        bool? confirmou = await DialogService.ShowMessageBoxAsync(
+            "Finalizar Inventário",
+            $"Confirma o fechamento do inventário {_inventario?.Protocolo}? " +
+            $"Existem {divergentes} item(ns) com divergência, totalizando impacto de {saldoLiquido:C2}. " +
+            "Os ajustes de entrada/saída no estoque serão aplicados automaticamente!",
+            yesText: "Sim, Finalizar e Ajustar",
+            cancelText: "Não, Continuar Conferência"
+        );
+
+        if (confirmou != true) return;
+
+        _salvando = true;
+        try
+        {
+            // Primeiro garante que a contagem atual está salva
+            var dtos = _itens.Select(i => new AtualizarContagemItemDto(i.Id, i.QuantidadeContada, i.Observacao)).ToList();
+            await Mediator.Send(new AtualizarContagemInventarioCommand(Id, dtos));
+
+            // Dispara finalização e geração de ajustes
+            await Mediator.Send(new FinalizarInventarioCommand(new FinalizarInventarioDto(Id, $"Fechamento do inventário {_inventario?.Protocolo}")));
+
+            Snackbar.Add("Inventário finalizado e estoque ajustado com sucesso!", Severity.Success);
+            await CarregarDados();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao finalizar: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private async Task CancelarInventario()
+    {
+        bool? confirmou = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Inventário",
+            "Deseja realmente cancelar este processo de inventário? Nenhuma alteração de estoque será realizada.",
+            yesText: "Sim, Cancelar",
+            cancelText: "Não"
+        );
+
+        if (confirmou != true) return;
+
+        try
+        {
+            await Mediator.Send(new CancelarInventarioCommand(Id));
+            Snackbar.Add("Inventário cancelado.", Severity.Info);
+            Navigation.NavigateTo("/estoque/inventarios");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao cancelar: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -29,4 +29,10 @@ public class MovimentacaoEstoque : BaseEmpresaEntity, IAggregateRoot
     public string? DocumentoOrigem { get; set; }
     public int? DocumentoOrigemId { get; set; }
     public string? Observacao { get; set; }
+
+    public int? LoteId { get; set; }
+    public Lote? Lote { get; set; }
+
+    public int? NumeroSerieId { get; set; }
+    public NumeroSerie? NumeroSerie { get; set; }
 }

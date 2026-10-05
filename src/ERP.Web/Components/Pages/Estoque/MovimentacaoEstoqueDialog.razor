@@ -15,16 +15,22 @@
         <MudForm @ref="_form" @bind-IsValid="_isValid">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="6">
-                    <MudSelect T="int" @bind-Value="_produtoId" Label="Produto *" Required="true" RequiredError="Selecione um produto" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    <MudSelect T="int" Value="_produtoId" Label="Produto *" Required="true" RequiredError="Selecione um produto"
+                               Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                               ValueChanged="OnProdutoSelecionado">
                         @foreach (var prod in _produtos)
                         {
-                            <MudSelectItem Value="@prod.Id">@prod.Codigo - @prod.Nome</MudSelectItem>
+                            <MudSelectItem Value="@prod.Id">
+                                @prod.Codigo - @prod.Nome @(prod.ControlaLote ? "[Lote]" : "") @(prod.ControlaSerie ? "[Série]" : "")
+                            </MudSelectItem>
                         }
                     </MudSelect>
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudSelect T="int" @bind-Value="_depositoId" Label="Depósito *" Required="true" RequiredError="Selecione o depósito" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    <MudSelect T="int" Value="_depositoId" Label="Depósito *" Required="true" RequiredError="Selecione o depósito"
+                               Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter"
+                               ValueChanged="OnDepositoSelecionado">
                         @foreach (var dep in _depositos)
                         {
                             <MudSelectItem Value="@dep.Id">@dep.Nome @(dep.Padrao ? "(Padrão)" : "")</MudSelectItem>
@@ -33,20 +39,83 @@
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudSelect T="TipoMovimentacaoEstoque" @bind-Value="_tipo" Label="Tipo de Movimentação *" Required="true" Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
+                    <MudSelect T="TipoMovimentacaoEstoque" @bind-Value="_tipo" Label="Tipo de Movimentação *" Required="true"
+                               Variant="Variant.Outlined" AnchorOrigin="Origin.BottomCenter">
                         <MudSelectItem Value="TipoMovimentacaoEstoque.Entrada">Entrada (Compra / Recebimento)</MudSelectItem>
                         <MudSelectItem Value="TipoMovimentacaoEstoque.Saida">Saída (Venda / Consumo)</MudSelectItem>
-                        <MudSelectItem Value="TipoMovimentacaoEstoque.AjustePositivo">Ajuste Positivo (Inventário)</MudSelectItem>
+                        <MudSelectItem Value="TipoMovimentacaoEstoque.AjustePositivo">Ajuste Positivo</MudSelectItem>
                         <MudSelectItem Value="TipoMovimentacaoEstoque.AjusteNegativo">Ajuste Negativo (Perda / Avaria)</MudSelectItem>
                     </MudSelect>
                 </MudItem>
 
                 <MudItem xs="12" md="6">
-                    <MudNumericField T="decimal" @bind-Value="_quantidade" Label="Quantidade *" Min="0.0001m" Required="true" RequiredError="Informe a quantidade" Variant="Variant.Outlined" Format="N2" />
+                    <MudNumericField T="decimal" @bind-Value="_quantidade" Label="Quantidade *" Min="0.0001m" Required="true"
+                                     RequiredError="Informe a quantidade" Variant="Variant.Outlined" Format="N2" />
                 </MudItem>
 
+                @* Se o produto controla lote *@
+                @if (ProdutoSelecionado?.ControlaLote == true)
+                {
+                    @if (_tipo == TipoMovimentacaoEstoque.Entrada || _tipo == TipoMovimentacaoEstoque.AjustePositivo)
+                    {
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_novoCodigoLote" Label="Código do Lote *" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Placeholder="Ex: LOT-2026-001" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudDatePicker @bind-Date="_novaDataValidade" Label="Data de Validade *" Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" Editable="true" DateFormat="dd/MM/yyyy" Required="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudDatePicker @bind-Date="_novaDataFabricacao" Label="Data de Fabricação" Variant="Variant.Outlined"
+                                           Margin="Margin.Dense" Editable="true" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12">
+                            <MudSelect T="int?" @bind-Value="_loteId" Label="Selecionar Lote *" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" Required="true">
+                                @foreach (var lote in _lotesDisponiveis)
+                                {
+                                    <MudSelectItem T="int?" Value="@lote.Id">
+                                        Lote: @lote.CodigoLote (Validade: @lote.DataValidade.ToString("dd/MM/yyyy") | Saldo: @lote.QuantidadeAtual.ToString("N2"))
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                }
+
+                @* Se o produto controla série *@
+                @if (ProdutoSelecionado?.ControlaSerie == true)
+                {
+                    @if (_tipo == TipoMovimentacaoEstoque.Entrada || _tipo == TipoMovimentacaoEstoque.AjustePositivo)
+                    {
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_novoNumeroSerie" Label="Número de Série *" Variant="Variant.Outlined"
+                                          Margin="Margin.Dense" Placeholder="Ex: SN-987654321" Required="true" />
+                        </MudItem>
+                    }
+                    else
+                    {
+                        <MudItem xs="12">
+                            <MudSelect T="int?" @bind-Value="_numeroSerieId" Label="Selecionar Número de Série *" Variant="Variant.Outlined"
+                                       Margin="Margin.Dense" Required="true">
+                                @foreach (var serial in _seriaisDisponiveis)
+                                {
+                                    <MudSelectItem T="int?" Value="@serial.Id">
+                                        Nº Série: @serial.Numero
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    }
+                }
+
                 <MudItem xs="12" md="6">
-                    <MudNumericField T="decimal" @bind-Value="_custoUnitario" Label="Custo Unitário (R$)" Min="0" Variant="Variant.Outlined" Format="N2" HelperText="Se vazio na saída, usa o custo médio atual" />
+                    <MudNumericField T="decimal" @bind-Value="_custoUnitario" Label="Custo Unitário (R$)" Min="0"
+                                     Variant="Variant.Outlined" Format="N2" HelperText="Se vazio na saída, usa o custo médio atual" />
                 </MudItem>
 
                 <MudItem xs="12" md="6">
@@ -92,8 +161,20 @@
     private string? _documentoOrigem;
     private string? _observacao;
 
+    // Lotes & Séries
+    private int? _loteId;
+    private string? _novoCodigoLote;
+    private DateTime? _novaDataValidade = DateTime.UtcNow.Date.AddMonths(12);
+    private DateTime? _novaDataFabricacao = DateTime.UtcNow.Date;
+    private int? _numeroSerieId;
+    private string? _novoNumeroSerie;
+
     private List<Produto> _produtos = new();
     private List<DepositoDto> _depositos = new();
+    private List<LoteDto> _lotesDisponiveis = new();
+    private List<NumeroSerieDto> _seriaisDisponiveis = new();
+
+    private Produto? ProdutoSelecionado => _produtos.FirstOrDefault(p => p.Id == _produtoId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -120,11 +201,45 @@
         }
 
         AtualizarCustoSugerido();
+        await CarregarLotesESeriais();
+    }
+
+    private async Task OnProdutoSelecionado(int id)
+    {
+        _produtoId = id;
+        AtualizarCustoSugerido();
+        await CarregarLotesESeriais();
+    }
+
+    private async Task OnDepositoSelecionado(int id)
+    {
+        _depositoId = id;
+        await CarregarLotesESeriais();
+    }
+
+    private async Task CarregarLotesESeriais()
+    {
+        _loteId = null;
+        _numeroSerieId = null;
+
+        if (_produtoId > 0 && _depositoId > 0)
+        {
+            var lotes = await Mediator.Send(new GetLotesQuery(ProdutoId: _produtoId, DepositoId: _depositoId));
+            _lotesDisponiveis = lotes.Where(l => l.QuantidadeAtual > 0).ToList();
+
+            var seriais = await Mediator.Send(new GetNumerosSerieQuery(ProdutoId: _produtoId, DepositoId: _depositoId, Status: StatusNumeroSerie.Disponivel));
+            _seriaisDisponiveis = seriais;
+        }
+        else
+        {
+            _lotesDisponiveis.Clear();
+            _seriaisDisponiveis.Clear();
+        }
     }
 
     private void AtualizarCustoSugerido()
     {
-        var prod = _produtos.FirstOrDefault(p => p.Id == _produtoId);
+        var prod = ProdutoSelecionado;
         if (prod != null && prod.PrecoCusto > 0 && _custoUnitario == 0)
         {
             _custoUnitario = prod.PrecoCusto;
@@ -148,7 +263,13 @@
                 _quantidade,
                 _custoUnitario,
                 _documentoOrigem,
-                _observacao
+                _observacao,
+                _loteId,
+                _novoCodigoLote,
+                _novaDataValidade,
+                _novaDataFabricacao,
+                _numeroSerieId,
+                _novoNumeroSerie
             );
 
             await Mediator.Send(new RegistrarMovimentacaoEstoqueCommand(dto));

@@ -23,6 +23,9 @@
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Storage" Href="/estoque/posicao">
             Ver Saldo de Estoque
         </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.SwapHoriz" OnClick="AbrirTransferencia">
+            Transferir
+        </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovaMovimentacao">
             Registrar Movimentação
         </MudButton>
@@ -136,6 +139,19 @@
         var parameters = new DialogParameters();
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<MovimentacaoEstoqueDialog>("Registrar Movimentação de Estoque", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarMovimentacoes();
+        }
+    }
+
+    private async Task AbrirTransferencia()
+    {
+        var parameters = new DialogParameters();
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TransferenciaEstoqueDialog>("Transferência entre Depósitos", parameters, options);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)

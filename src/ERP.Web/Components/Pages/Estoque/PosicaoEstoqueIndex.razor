@@ -22,6 +22,9 @@
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Warehouse" Href="/estoque/depositos">
             Gerenciar Depósitos
         </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.SwapHoriz" OnClick="@(() => AbrirDialogTransferencia())">
+            Transferir
+        </MudButton>
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.SwapVert" OnClick="@(() => AbrirDialogMovimentacao())">
             Nova Movimentação
         </MudButton>
@@ -177,10 +180,16 @@
                         }
                     </MudTd>
                     <MudTd DataLabel="Ação" Class="text-right">
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.SwapHoriz"
-                                   OnClick="@(() => AbrirDialogMovimentacao(context.ProdutoId, context.DepositoId))">
-                            Movimentar
-                        </MudButton>
+                        <div class="d-flex justify-end gap-1">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" StartIcon="@Icons.Material.Filled.SwapHoriz"
+                                       OnClick="@(() => AbrirDialogTransferencia(context.ProdutoId, context.DepositoId))">
+                                Transferir
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.SwapVert"
+                                       OnClick="@(() => AbrirDialogMovimentacao(context.ProdutoId, context.DepositoId))">
+                                Movimentar
+                            </MudButton>
+                        </div>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -229,6 +238,23 @@
         };
         var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
         var dialog = await DialogService.ShowAsync<MovimentacaoEstoqueDialog>("Registrar Movimentação de Estoque", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarPosicao();
+        }
+    }
+
+    private async Task AbrirDialogTransferencia(int? produtoId = null, int? depositoId = null)
+    {
+        var parameters = new DialogParameters
+        {
+            ["ProdutoIdPreSelecionado"] = produtoId,
+            ["DepositoOrigemPreSelecionado"] = depositoId
+        };
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<TransferenciaEstoqueDialog>("Transferência entre Depósitos", parameters, options);
         var result = await dialog.Result;
 
         if (result != null && !result.Canceled)

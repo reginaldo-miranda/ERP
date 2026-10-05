@@ -9,5 +9,6 @@ public enum OrigemMovimentacaoEstoque
     Compra = 2,
     Venda = 3,
     Inventario = 4,
-    Devolucao = 5
+    Devolucao = 5,
+    Transferencia = 6
 }

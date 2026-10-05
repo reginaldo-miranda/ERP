@@ -63,6 +63,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Estoque.Deposito> Depositos => Set<ERP.Domain.Core.Entities.Estoque.Deposito>();
     public DbSet<ERP.Domain.Core.Entities.Estoque.EstoqueProduto> EstoqueProdutos => Set<ERP.Domain.Core.Entities.Estoque.EstoqueProduto>();
     public DbSet<ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque> MovimentacoesEstoque => Set<ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque>();
+    public DbSet<ERP.Domain.Core.Entities.Estoque.Lote> Lotes => Set<ERP.Domain.Core.Entities.Estoque.Lote>();
+    public DbSet<ERP.Domain.Core.Entities.Estoque.NumeroSerie> NumerosSerie => Set<ERP.Domain.Core.Entities.Estoque.NumeroSerie>();
+    public DbSet<ERP.Domain.Core.Entities.Estoque.Inventario> Inventarios => Set<ERP.Domain.Core.Entities.Estoque.Inventario>();
+    public DbSet<ERP.Domain.Core.Entities.Estoque.InventarioItem> InventarioItens => Set<ERP.Domain.Core.Entities.Estoque.InventarioItem>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

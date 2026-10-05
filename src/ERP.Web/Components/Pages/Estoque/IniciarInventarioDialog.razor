@@ -1,0 +1,137 @@
+@using ERP.Application.Estoque.Commands
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.FactCheck" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Iniciar Novo Inventário Físico</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+            O sistema criará a lista de contagem com os saldos atuais do depósito para conferência física assistida.
+        </MudText>
+
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-4">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudSelect T="int" Label="Depósito a Inventariar *" @bind-Value="_depositoId"
+                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                        @foreach (var dep in _depositos)
+                        {
+                            <MudSelectItem Value="@dep.Id">@dep.Nome @(dep.Padrao ? "(Padrão)" : "")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField Label="Responsável pela Contagem *" @bind-Value="_responsavel"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Nome do conferente / auditor" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField Label="Observações / Motivo" @bind-Value="_observacao"
+                                  Variant="Variant.Outlined" Lines="2" Margin="Margin.Dense"
+                                  Placeholder="Ex: Inventário mensal de fechamento" />
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Iniciar"
+                   Disabled="@(_salvando || _depositoId == 0 || string.IsNullOrWhiteSpace(_responsavel))">
+            @if (_salvando)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <MudText Class="ms-2">Iniciando...</MudText>
+            }
+            else
+            {
+                <span>Iniciar Contagem</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _carregando = true;
+    private bool _salvando = false;
+
+    private List<DepositoDto> _depositos = new();
+    private int _depositoId;
+    private int? _categoriaId;
+    private string _responsavel = "Operador de Estoque";
+    private string? _observacao;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _carregando = true;
+        try
+        {
+            _depositos = await Mediator.Send(new GetDepositosQuery(SomenteAtivos: true));
+            if (_depositos.Any())
+            {
+                var padrao = _depositos.FirstOrDefault(d => d.Padrao) ?? _depositos.First();
+                _depositoId = padrao.Id;
+            }
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Iniciar()
+    {
+        if (_depositoId == 0)
+        {
+            Snackbar.Add("Selecione um depósito para inventariar.", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_responsavel))
+        {
+            Snackbar.Add("Informe o responsável pela contagem.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            var dto = new IniciarInventarioDto(_depositoId, _categoriaId, _responsavel, _observacao);
+            var inventarioId = await Mediator.Send(new IniciarInventarioCommand(dto));
+
+            Snackbar.Add("Inventário criado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(inventarioId));
+            Navigation.NavigateTo($"/estoque/inventario/{inventarioId}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao iniciar inventário: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

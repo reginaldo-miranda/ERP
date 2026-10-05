@@ -309,16 +309,16 @@ custeio (Custo Médio ou PEPS configurável por empresa).
 
 ### 📦 Entregáveis
 
-- [ ] Cadastro de Depósitos/Armazéns
-- [ ] Saldo de estoque por produto/depósito
-- [ ] Movimentações de estoque (entrada, saída, transferência, ajuste)
-- [ ] Cálculo automático de custo (Médio Ponderado ou PEPS)
-- [ ] Controle de lotes (opcional por produto)
-- [ ] Controle de número de série (opcional por produto)
-- [ ] Transferência entre depósitos
-- [ ] Inventário físico (contagem → ajuste automático)
-- [ ] Alerta de estoque mínimo (notificação)
-- [ ] Histórico completo de movimentação por produto
+- [x] Cadastro de Depósitos/Armazéns
+- [x] Saldo de estoque por produto/depósito
+- [x] Movimentações de estoque (entrada, saída, transferência, ajuste)
+- [x] Cálculo automático de custo (Médio Ponderado ou PEPS)
+- [x] Controle de lotes (opcional por produto)
+- [x] Controle de número de série (opcional por produto)
+- [x] Transferência entre depósitos
+- [x] Inventário físico (contagem → ajuste automático)
+- [x] Alerta de estoque mínimo (notificação)
+- [x] Histórico completo de movimentação por produto
 
 ### 🗄️ Tabelas
 

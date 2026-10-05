@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddHostedService<ERP.Infrastructure.Services.VencimentoNotificacaoService>();
+builder.Services.AddHostedService<ERP.Infrastructure.Services.EstoqueNotificacaoService>();
 
 // MudBlazor Services
 builder.Services.AddMudServices();

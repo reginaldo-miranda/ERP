@@ -1,0 +1,377 @@
+@page "/estoque/lotes"
+@using ERP.Application.Estoque.DTOs
+@using ERP.Application.Estoque.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Lotes &amp; Validades - ERP</PageTitle>
+
+<div class="d-flex flex-wrap justify-space-between align-center mb-4 gap-2">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.QrCode2" Class="mr-2" />
+            Lotes &amp; Rastreabilidade de Validades
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Controle estrito de lotes, datas de fabricação, prazos de validade e números de série por depósito.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarDados">
+            Atualizar
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoLoteDialog">
+            Novo Lote
+        </MudButton>
+    </div>
+</div>
+
+@* CARDS DE RESUMO KPI *@
+<MudGrid Class="mb-4" Spacing="2">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE LOTES</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold">@_lotes.Count</MudText>
+            </div>
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">LOTES VENCIDOS</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="@(_lotes.Count(l => l.Vencido) > 0 ? Color.Error : Color.Default)">
+                    @_lotes.Count(l => l.Vencido)
+                </MudText>
+            </div>
+            <MudAvatar Color="@(_lotes.Count(l => l.Vencido) > 0 ? Color.Error : Color.Default)" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Dangerous" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">VENCENDO EM ATÉ 30 DIAS</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="@(_lotes.Count(l => !l.Vencido && l.DiasParaVencer <= 30) > 0 ? Color.Warning : Color.Default)">
+                    @_lotes.Count(l => !l.Vencido && l.DiasParaVencer <= 30)
+                </MudText>
+            </div>
+            <MudAvatar Color="@(_lotes.Count(l => !l.Vencido && l.DiasParaVencer <= 30) > 0 ? Color.Warning : Color.Default)" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex align-center justify-space-between" Elevation="2">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR TOTAL EM LOTES</MudText>
+                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">
+                    @_lotes.Sum(l => l.QuantidadeAtual * l.CustoUnitario).ToString("C2")
+                </MudText>
+            </div>
+            <MudAvatar Color="Color.Success" Variant="Variant.Filled">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" />
+            </MudAvatar>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    @* ABA 1: LOTES E VALIDADES *@
+    <MudTabPanel Text="Lotes & Validades" Icon="@Icons.Material.Filled.QrCode2">
+        <MudCard Class="mb-4" Elevation="0" Outlined="true">
+            <MudCardContent Class="py-2">
+                <MudGrid Spacing="2" Class="align-center">
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_buscaLote" Placeholder="Buscar lote ou produto..."
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Clearable="true" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="int?" Label="Filtrar por Depósito" @bind-Value="_depositoFiltroId"
+                                   Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                   SelectedValuesChanged="@(async () => await CarregarDados())">
+                            @foreach (var dep in _depositos)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)dep.Id)">@dep.Nome</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="string" Label="Status de Validade" @bind-Value="_statusValidadeFiltro"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem Value="@("Todos")">Todos os Lotes</MudSelectItem>
+                            <MudSelectItem Value="@("Criticos")">Vencendo em até 30 dias</MudSelectItem>
+                            <MudSelectItem Value="@("Vencidos")">Somente Vencidos</MudSelectItem>
+                            <MudSelectItem Value="@("Validos")">Válidos (&gt; 30 dias)</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@LotesFiltrados" Dense="true" Hover="true" Striped="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Código do Lote</MudTh>
+                    <MudTh>Produto</MudTh>
+                    <MudTh>Depósito</MudTh>
+                    <MudTh Style="text-align: right;">Saldo Atual</MudTh>
+                    <MudTh>Fabricação</MudTh>
+                    <MudTh>Validade</MudTh>
+                    <MudTh>Situação</MudTh>
+                    <MudTh Style="text-align: right;">Custo Unit.</MudTh>
+                    <MudTh Style="text-align: right;">Total (R$)</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Código">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Dark" Variant="Variant.Outlined" Class="font-weight-bold">
+                            @context.CodigoLote
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Produto">
+                        <div>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ProdutoNome</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Cód: @context.ProdutoCodigo</MudText>
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Depósito">@context.DepositoNome</MudTd>
+                    <MudTd DataLabel="Saldo Atual" Style="text-align: right;">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.QuantidadeAtual.ToString("N2")</MudText>
+                        <MudProgressLinear Color="@(context.QuantidadeAtual > 0 ? Color.Primary : Color.Default)"
+                                           Value="@(context.QuantidadeInicial > 0 ? (double)(context.QuantidadeAtual / context.QuantidadeInicial * 100) : 0)"
+                                           Class="mt-1" Rounded="true" Size="Size.Small" />
+                    </MudTd>
+                    <MudTd DataLabel="Fabricação">
+                        @(context.DataFabricacao.HasValue ? context.DataFabricacao.Value.ToString("dd/MM/yyyy") : "-")
+                    </MudTd>
+                    <MudTd DataLabel="Validade">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.DataValidade.ToString("dd/MM/yyyy")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Situação">
+                        @if (context.Vencido)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Cancel">
+                                Vencido há @Math.Abs(context.DiasParaVencer)d
+                            </MudChip>
+                        }
+                        else if (context.DiasParaVencer <= 30)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Icon="@Icons.Material.Filled.Warning">
+                                Vence em @context.DiasParaVencer d
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">
+                                Válido (@context.DiasParaVencer d)
+                            </MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Custo Unit." Style="text-align: right;">@context.CustoUnitario.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Total" Style="text-align: right;" Class="font-weight-bold">
+                        @((context.QuantidadeAtual * context.CustoUnitario).ToString("C2"))
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <div class="pa-4 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Large" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body1" Color="Color.Secondary">Nenhum lote encontrado com os filtros selecionados.</MudText>
+                    </div>
+                </NoRecordsContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    @* ABA 2: NÚMEROS DE SÉRIE *@
+    <MudTabPanel Text="Rastreabilidade de Séries" Icon="@Icons.Material.Filled.FormatListNumbered">
+        <MudCard Class="mb-4" Elevation="0" Outlined="true">
+            <MudCardContent Class="py-2">
+                <MudGrid Spacing="2" Class="align-center">
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_buscaSerial" Placeholder="Buscar número de série ou produto..."
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Clearable="true" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="StatusNumeroSerie?" Label="Status do Serial" @bind-Value="_statusSerialFiltro"
+                                   Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            <MudSelectItem T="StatusNumeroSerie?" Value="@((StatusNumeroSerie?)StatusNumeroSerie.Disponivel)">Disponível</MudSelectItem>
+                            <MudSelectItem T="StatusNumeroSerie?" Value="@((StatusNumeroSerie?)StatusNumeroSerie.Alocado)">Alocado</MudSelectItem>
+                            <MudSelectItem T="StatusNumeroSerie?" Value="@((StatusNumeroSerie?)StatusNumeroSerie.Baixado)">Baixado / Vendido</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        <MudTable Items="@SeriaisFiltrados" Dense="true" Hover="true" Striped="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Número de Série</MudTh>
+                <MudTh>Produto</MudTh>
+                <MudTh>Depósito Atual</MudTh>
+                <MudTh>Lote Vinculado</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Data Entrada</MudTh>
+                <MudTh>Data Saída</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Número de Série">
+                    <MudText Typo="Typo.body2" Class="font-family-monospace font-weight-bold">@context.Numero</MudText>
+                </MudTd>
+                <MudTd DataLabel="Produto">
+                    @context.ProdutoCodigo - @context.ProdutoNome
+                </MudTd>
+                <MudTd DataLabel="Depósito">@context.DepositoNome</MudTd>
+                <MudTd DataLabel="Lote">
+                    @(string.IsNullOrWhiteSpace(context.CodigoLote) ? "-" : context.CodigoLote)
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    @switch (context.Status)
+                    {
+                        case StatusNumeroSerie.Disponivel:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Disponível</MudChip>
+                            break;
+                        case StatusNumeroSerie.Alocado:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">Alocado</MudChip>
+                            break;
+                        case StatusNumeroSerie.Baixado:
+                            <MudChip T="string" Color="Color.Dark" Size="Size.Small">Baixado</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Data Entrada">@context.DataEntrada.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                <MudTd DataLabel="Data Saída">@(context.DataSaida.HasValue ? context.DataSaida.Value.ToString("dd/MM/yyyy HH:mm") : "-")</MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <div class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">Nenhum número de série cadastrado.</MudText>
+                </div>
+            </NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private bool _carregando = true;
+    private List<LoteDto> _lotes = new();
+    private List<NumeroSerieDto> _seriais = new();
+    private List<DepositoDto> _depositos = new();
+
+    private string _buscaLote = string.Empty;
+    private string _buscaSerial = string.Empty;
+    private int? _depositoFiltroId;
+    private string _statusValidadeFiltro = "Todos";
+    private StatusNumeroSerie? _statusSerialFiltro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        _carregando = true;
+        try
+        {
+            _depositos = await Mediator.Send(new GetDepositosQuery(SomenteAtivos: true));
+            _lotes = await Mediator.Send(new GetLotesQuery(DepositoId: _depositoFiltroId));
+            _seriais = await Mediator.Send(new GetNumerosSerieQuery(DepositoId: _depositoFiltroId));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private IEnumerable<LoteDto> LotesFiltrados
+    {
+        get
+        {
+            var itens = _lotes.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_buscaLote))
+            {
+                var termo = _buscaLote.Trim().ToLower();
+                itens = itens.Where(l =>
+                    l.CodigoLote.ToLower().Contains(termo) ||
+                    l.ProdutoNome.ToLower().Contains(termo) ||
+                    l.ProdutoCodigo.ToLower().Contains(termo)
+                );
+            }
+
+            switch (_statusValidadeFiltro)
+            {
+                case "Vencidos":
+                    itens = itens.Where(l => l.Vencido);
+                    break;
+                case "Criticos":
+                    itens = itens.Where(l => !l.Vencido && l.DiasParaVencer <= 30);
+                    break;
+                case "Validos":
+                    itens = itens.Where(l => !l.Vencido && l.DiasParaVencer > 30);
+                    break;
+            }
+
+            return itens;
+        }
+    }
+
+    private IEnumerable<NumeroSerieDto> SeriaisFiltrados
+    {
+        get
+        {
+            var itens = _seriais.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_buscaSerial))
+            {
+                var termo = _buscaSerial.Trim().ToLower();
+                itens = itens.Where(s =>
+                    s.Numero.ToLower().Contains(termo) ||
+                    s.ProdutoNome.ToLower().Contains(termo) ||
+                    s.ProdutoCodigo.ToLower().Contains(termo)
+                );
+            }
+
+            if (_statusSerialFiltro.HasValue)
+            {
+                itens = itens.Where(s => s.Status == _statusSerialFiltro.Value);
+            }
+
+            return itens;
+        }
+    }
+
+    private async Task AbrirNovoLoteDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<CriarLoteDialog>("Cadastrar Lote", options);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+}

@@ -801,6 +801,211 @@ namespace ERP.Infrastructure.Migrations
                     b.ToTable("EstoqueProdutos", (string)null);
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Inventario", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("CategoriaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataAbertura")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataFechamento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DepositoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Protocolo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Responsavel")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoriaId");
+
+                    b.HasIndex("DepositoId");
+
+                    b.HasIndex("EmpresaId", "Protocolo")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "Status");
+
+                    b.ToTable("Inventarios", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.InventarioItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AjusteAplicado")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("CustoUnitario")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<int>("InventarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LoteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("QuantidadeContada")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("QuantidadeSistema")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LoteId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("InventarioId", "ProdutoId", "LoteId");
+
+                    b.ToTable("InventarioItens", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Lote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("CodigoLote")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("CustoUnitario")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<DateTime?>("DataFabricacao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DataValidade")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DepositoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("QuantidadeAtual")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("QuantidadeInicial")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepositoId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("EmpresaId", "DataValidade");
+
+                    b.HasIndex("EmpresaId", "ProdutoId", "CodigoLote", "DepositoId")
+                        .IsUnique();
+
+                    b.ToTable("Lotes", (string)null);
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque", b =>
                 {
                     b.Property<int>("Id")
@@ -855,6 +1060,12 @@ namespace ERP.Infrastructure.Migrations
                     b.Property<int>("EmpresaId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("LoteId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NumeroSerieId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Observacao")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -878,6 +1089,10 @@ namespace ERP.Infrastructure.Migrations
 
                     b.HasIndex("DepositoOrigemId");
 
+                    b.HasIndex("LoteId");
+
+                    b.HasIndex("NumeroSerieId");
+
                     b.HasIndex("ProdutoId");
 
                     b.HasIndex("EmpresaId", "DataMovimentacao");
@@ -885,6 +1100,75 @@ namespace ERP.Infrastructure.Migrations
                     b.HasIndex("EmpresaId", "ProdutoId");
 
                     b.ToTable("MovimentacoesEstoque", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.NumeroSerie", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataEntrada")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataSaida")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DepositoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LoteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepositoId");
+
+                    b.HasIndex("LoteId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("EmpresaId", "Status");
+
+                    b.HasIndex("EmpresaId", "ProdutoId", "Numero")
+                        .IsUnique();
+
+                    b.ToTable("NumerosSerie", (string)null);
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Financeiro.BaixaContaPagar", b =>
@@ -2329,6 +2613,85 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Produto");
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Inventario", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Categoria", "Categoria")
+                        .WithMany()
+                        .HasForeignKey("CategoriaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "Deposito")
+                        .WithMany()
+                        .HasForeignKey("DepositoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Categoria");
+
+                    b.Navigation("Deposito");
+
+                    b.Navigation("Empresa");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.InventarioItem", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Inventario", "Inventario")
+                        .WithMany("Itens")
+                        .HasForeignKey("InventarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Lote", "Lote")
+                        .WithMany()
+                        .HasForeignKey("LoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Inventario");
+
+                    b.Navigation("Lote");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Lote", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "Deposito")
+                        .WithMany()
+                        .HasForeignKey("DepositoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deposito");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Produto");
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.MovimentacaoEstoque", b =>
                 {
                     b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "DepositoDestino")
@@ -2348,6 +2711,16 @@ namespace ERP.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Lote", "Lote")
+                        .WithMany()
+                        .HasForeignKey("LoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.NumeroSerie", "NumeroSerie")
+                        .WithMany()
+                        .HasForeignKey("NumeroSerieId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
                         .WithMany()
                         .HasForeignKey("ProdutoId")
@@ -2359,6 +2732,44 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("DepositoOrigem");
 
                     b.Navigation("Empresa");
+
+                    b.Navigation("Lote");
+
+                    b.Navigation("NumeroSerie");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.NumeroSerie", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "Deposito")
+                        .WithMany()
+                        .HasForeignKey("DepositoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Lote", "Lote")
+                        .WithMany()
+                        .HasForeignKey("LoteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Deposito");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Lote");
 
                     b.Navigation("Produto");
                 });
@@ -2808,6 +3219,11 @@ namespace ERP.Infrastructure.Migrations
             modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Deposito", b =>
                 {
                     b.Navigation("EstoquesProdutos");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Inventario", b =>
+                {
+                    b.Navigation("Itens");
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Financeiro.Banco", b =>
