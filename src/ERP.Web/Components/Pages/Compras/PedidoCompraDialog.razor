@@ -1,0 +1,381 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.Commands
+@using ERP.Application.Compras.DTOs
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Entities.Financeiro
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Novo Pedido de Compra</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-4">
+                <!-- ABA 1: DADOS PRINCIPAIS -->
+                <MudTabPanel Text="Dados Principais" Icon="@Icons.Material.Filled.Info">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int" Label="Fornecedor *" @bind-Value="_fornecedorId" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var forn in _fornecedores)
+                                {
+                                    <MudSelectItem T="int" Value="@forn.Id">
+                                        @(forn.NomeFantasia ?? forn.RazaoSocial) - @forn.Cnpj
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int" Label="Depósito de Destino *" @bind-Value="_depositoDestinoId" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var dep in _depositos)
+                                {
+                                    <MudSelectItem T="int" Value="@dep.Id">@dep.Nome</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudDatePicker Label="Data do Pedido" @bind-Date="_dataPedido" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudDatePicker Label="Previsão de Entrega" @bind-Date="_previsaoEntrega" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_compradorNome" Label="Comprador Responsável" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_observacoes" Label="Observações Gerais / Instruções de Entrega" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- ABA 2: ITENS DA COMPRA -->
+                <MudTabPanel Text="Itens da Compra" Icon="@Icons.Material.Filled.Inventory2">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudGrid Spacing="2" Class="align-center">
+                            <MudItem xs="12" sm="4">
+                                <MudAutocomplete T="Produto" Label="Produto *" Value="_produtoSelecionado" ValueChanged="OnProdutoSelecionado"
+                                                 SearchFunc="BuscarProdutos" ToStringFunc="@(p => p == null ? "" : $"{p.Codigo} - {p.Nome}")"
+                                                 Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true" Placeholder="Buscar produto..." />
+                            </MudItem>
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField T="decimal" Label="Quantidade" @bind-Value="_itemQuantidade" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.0001m" />
+                            </MudItem>
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField T="decimal" Label="Preço Unit. (R$)" @bind-Value="_itemPrecoUnitario" Variant="Variant.Outlined" Margin="Margin.Dense" Format="C2" Min="0.01m" />
+                            </MudItem>
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField T="decimal" Label="Desconto (R$)" @bind-Value="_itemDesconto" Variant="Variant.Outlined" Margin="Margin.Dense" Format="C2" Min="0m" />
+                            </MudItem>
+                            <MudItem xs="6" sm="2" Class="d-flex align-center">
+                                <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItem" Disabled="_produtoSelecionado == null || _itemQuantidade <= 0" FullWidth="true">
+                                    Adicionar
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+
+                    @if (_itens.Any())
+                    {
+                        <MudTable Items="@_itens" Dense="true" Hover="true" Elevation="0" Outlined="true">
+                            <HeaderContent>
+                                <MudTh>Código</MudTh>
+                                <MudTh>Produto</MudTh>
+                                <MudTh>UN</MudTh>
+                                <MudTh class="text-right">Qtd</MudTh>
+                                <MudTh class="text-right">Preço Unit.</MudTh>
+                                <MudTh class="text-right">Desconto</MudTh>
+                                <MudTh class="text-right">Subtotal</MudTh>
+                                <MudTh class="text-center">Ação</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Código">@context.ProdutoCodigo</MudTd>
+                                <MudTd DataLabel="Produto" Class="font-weight-bold">@context.ProdutoNome</MudTd>
+                                <MudTd DataLabel="UN">@context.UnidadeMedida</MudTd>
+                                <MudTd DataLabel="Qtd" Class="text-right">@context.Quantidade.ToString("N2")</MudTd>
+                                <MudTd DataLabel="Preço Unit." Class="text-right">@context.PrecoUnitario.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Desconto" Class="text-right">@(context.ValorDesconto > 0 ? context.ValorDesconto.ToString("C2") : "-")</MudTd>
+                                <MudTd DataLabel="Subtotal" Class="text-right font-weight-bold">@context.SubTotal.ToString("C2")</MudTd>
+                                <MudTd Class="text-center">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoverItem(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">Nenhum item adicionado ao pedido ainda.</MudAlert>
+                    }
+                </MudTabPanel>
+
+                <!-- ABA 3: CONDICIONAL FINANCEIRO & TOTAIS -->
+                <MudTabPanel Text="Condições &amp; Totais" Icon="@Icons.Material.Filled.AttachMoney">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int?" Label="Forma de Pagamento" @bind-Value="_formaPagamentoId" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var fp in _formasPagamento)
+                                {
+                                    <MudSelectItem T="int?" Value="@((int?)fp.Id)">@fp.Nome</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="int" Label="Número de Parcelas" @bind-Value="_numeroParcelas" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="72" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="int" Label="Intervalo entre Parcelas (Dias)" @bind-Value="_intervaloDias" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="int" Label="Carência 1º Vencimento (Dias)" @bind-Value="_diasPrimeiroVencimento" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="0 = Vencimento à vista / na entrega" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="decimal" Label="Valor do Frete (R$)" @bind-Value="_valorFrete" Variant="Variant.Outlined" Margin="Margin.Dense" Format="C2" Min="0m" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="decimal" Label="Valor do Seguro (R$)" @bind-Value="_valorSeguro" Variant="Variant.Outlined" Margin="Margin.Dense" Format="C2" Min="0m" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField T="decimal" Label="Outras Despesas (R$)" @bind-Value="_valorOutrasDespesas" Variant="Variant.Outlined" Margin="Margin.Dense" Format="C2" Min="0m" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="my-4" />
+
+                    <!-- RESUMO DE VALORES -->
+                    <div class="d-flex justify-end">
+                        <MudPaper Elevation="0" Outlined="true" Class="pa-4" Style="min-width: 280px; background-color: var(--mud-palette-background-grey);">
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">Subtotal Produtos:</MudText>
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@CalcularTotalProdutos().ToString("C2")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">Total Descontos:</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Error">- @CalcularTotalDescontos().ToString("C2")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">Frete / Despesas:</MudText>
+                                <MudText Typo="Typo.body2">+ @((_valorFrete + _valorSeguro + _valorOutrasDespesas).ToString("C2"))</MudText>
+                            </div>
+                            <MudDivider Class="my-2" />
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold" Color="Color.Primary">VALOR TOTAL:</MudText>
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold" Color="Color.Primary">@CalcularTotalGeral().ToString("C2")</MudText>
+                            </div>
+                        </MudPaper>
+                    </div>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Check" OnClick="Salvar" Disabled="_carregando || !_itens.Any()">
+            Salvar Pedido de Compra
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _carregando = true;
+    private int _fornecedorId;
+    private int _depositoDestinoId;
+    private DateTime? _dataPedido = DateTime.UtcNow.Date;
+    private DateTime? _previsaoEntrega = DateTime.UtcNow.Date.AddDays(7);
+    private string? _compradorNome;
+    private string? _observacoes;
+
+    private int? _formaPagamentoId;
+    private int _numeroParcelas = 1;
+    private int _intervaloDias = 30;
+    private int _diasPrimeiroVencimento = 0;
+
+    private decimal _valorFrete = 0m;
+    private decimal _valorSeguro = 0m;
+    private decimal _valorOutrasDespesas = 0m;
+
+    private List<Fornecedor> _fornecedores = new();
+    private List<Deposito> _depositos = new();
+    private List<FormaPagamento> _formasPagamento = new();
+    private List<Produto> _produtos = new();
+
+    private Produto? _produtoSelecionado;
+    private decimal _itemQuantidade = 1m;
+    private decimal _itemPrecoUnitario = 0m;
+    private decimal _itemDesconto = 0m;
+
+    private class ItemLinha
+    {
+        public int ProdutoId { get; set; }
+        public string ProdutoCodigo { get; set; } = string.Empty;
+        public string ProdutoNome { get; set; } = string.Empty;
+        public string UnidadeMedida { get; set; } = string.Empty;
+        public decimal Quantidade { get; set; }
+        public decimal PrecoUnitario { get; set; }
+        public decimal ValorDesconto { get; set; }
+        public decimal SubTotal => (Quantidade * PrecoUnitario) - ValorDesconto;
+        public string? Observacao { get; set; }
+    }
+
+    private List<ItemLinha> _itens = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _carregando = true;
+
+            _fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+            _depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+            _formasPagamento = await Context.FormasPagamento.AsNoTracking().Where(fp => fp.Ativo).OrderBy(fp => fp.Nome).ToListAsync();
+            _produtos = await Context.Produtos.AsNoTracking().Include(p => p.UnidadeMedida).Where(p => p.Ativo).OrderBy(p => p.Nome).ToListAsync();
+
+            if (_fornecedores.Any()) _fornecedorId = _fornecedores.First().Id;
+            if (_depositos.Any()) _depositoDestinoId = _depositos.First().Id;
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private Task<IEnumerable<Produto>> BuscarProdutos(string text, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return Task.FromResult<IEnumerable<Produto>>(_produtos.Take(20));
+
+        var filtrados = _produtos
+            .Where(p => p.Nome.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                        p.Codigo.Contains(text, StringComparison.OrdinalIgnoreCase))
+            .Take(20);
+
+        return Task.FromResult(filtrados);
+    }
+
+    private void OnProdutoSelecionado(Produto? prod)
+    {
+        _produtoSelecionado = prod;
+        if (prod != null)
+        {
+            _itemPrecoUnitario = prod.PrecoCusto > 0 ? prod.PrecoCusto : 0m;
+        }
+    }
+
+    private void AdicionarItem()
+    {
+        if (_produtoSelecionado == null || _itemQuantidade <= 0) return;
+
+        var existente = _itens.FirstOrDefault(i => i.ProdutoId == _produtoSelecionado.Id);
+        if (existente != null)
+        {
+            existente.Quantidade += _itemQuantidade;
+            existente.PrecoUnitario = _itemPrecoUnitario;
+            existente.ValorDesconto += _itemDesconto;
+        }
+        else
+        {
+            _itens.Add(new ItemLinha
+            {
+                ProdutoId = _produtoSelecionado.Id,
+                ProdutoCodigo = _produtoSelecionado.Codigo,
+                ProdutoNome = _produtoSelecionado.Nome,
+                UnidadeMedida = _produtoSelecionado.UnidadeMedida?.Sigla ?? "UN",
+                Quantidade = _itemQuantidade,
+                PrecoUnitario = _itemPrecoUnitario,
+                ValorDesconto = _itemDesconto
+            });
+        }
+
+        _produtoSelecionado = null;
+        _itemQuantidade = 1m;
+        _itemPrecoUnitario = 0m;
+        _itemDesconto = 0m;
+    }
+
+    private void RemoverItem(ItemLinha item)
+    {
+        _itens.Remove(item);
+    }
+
+    private decimal CalcularTotalProdutos() => _itens.Sum(i => i.Quantidade * i.PrecoUnitario);
+    private decimal CalcularTotalDescontos() => _itens.Sum(i => i.ValorDesconto);
+    private decimal CalcularTotalGeral() => (CalcularTotalProdutos() - CalcularTotalDescontos()) + _valorFrete + _valorSeguro + _valorOutrasDespesas;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (_fornecedorId <= 0)
+        {
+            Snackbar.Add("Selecione um fornecedor.", Severity.Warning);
+            return;
+        }
+
+        if (_depositoDestinoId <= 0)
+        {
+            Snackbar.Add("Selecione o depósito de destino.", Severity.Warning);
+            return;
+        }
+
+        if (!_itens.Any())
+        {
+            Snackbar.Add("Adicione ao menos um item ao pedido.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var dto = new CriarPedidoCompraDto(
+                _fornecedorId,
+                null,
+                _dataPedido ?? DateTime.UtcNow,
+                _previsaoEntrega,
+                _compradorNome,
+                _depositoDestinoId,
+                _formaPagamentoId,
+                _numeroParcelas,
+                _intervaloDias,
+                _diasPrimeiroVencimento,
+                _valorFrete,
+                _valorSeguro,
+                _valorOutrasDespesas,
+                _observacoes,
+                _itens.Select(i => new CriarPedidoCompraItemDto(i.ProdutoId, i.Quantidade, i.PrecoUnitario, i.ValorDesconto, i.Observacao)).ToList()
+            );
+
+            var id = await Mediator.Send(new CriarPedidoCompraCommand(dto));
+            Snackbar.Add("Pedido de compra criado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(id));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar pedido: {ex.Message}", Severity.Error);
+        }
+    }
+}

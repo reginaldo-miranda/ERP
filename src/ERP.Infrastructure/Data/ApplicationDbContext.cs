@@ -75,6 +75,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Vendas.PedidoVendaItem> PedidoVendaItens => Set<ERP.Domain.Core.Entities.Vendas.PedidoVendaItem>();
     public DbSet<ERP.Domain.Core.Entities.Vendas.Faturamento> Faturamentos => Set<ERP.Domain.Core.Entities.Vendas.Faturamento>();
 
+    // Fase 6 - Compras
+    public DbSet<ERP.Domain.Core.Entities.Compras.SolicitacaoCompra> SolicitacoesCompra => Set<ERP.Domain.Core.Entities.Compras.SolicitacaoCompra>();
+    public DbSet<ERP.Domain.Core.Entities.Compras.SolicitacaoCompraItem> SolicitacaoCompraItens => Set<ERP.Domain.Core.Entities.Compras.SolicitacaoCompraItem>();
+    public DbSet<ERP.Domain.Core.Entities.Compras.PedidoCompra> PedidosCompra => Set<ERP.Domain.Core.Entities.Compras.PedidoCompra>();
+    public DbSet<ERP.Domain.Core.Entities.Compras.PedidoCompraItem> PedidoCompraItens => Set<ERP.Domain.Core.Entities.Compras.PedidoCompraItem>();
+    public DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoria> EntradasMercadoria => Set<ERP.Domain.Core.Entities.Compras.EntradaMercadoria>();
+    public DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem> EntradaMercadoriaItens => Set<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

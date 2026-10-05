@@ -483,12 +483,12 @@ Integra automaticamente com estoque e financeiro.
 
 ### 📦 Entregáveis
 
-- [ ] Solicitação de Compra (requisição interna)
-- [ ] Pedido de Compra (CRUD + envio ao fornecedor + aprovação)
-- [ ] Entrada de Mercadorias (recebimento + conferência)
-- [ ] Integração automática: compra → entrada de estoque + conta a pagar
-- [ ] Comparativo de preços entre fornecedores
-- [ ] Histórico de compras por fornecedor/produto
+- [x] Solicitação de Compra (requisição interna)
+- [x] Pedido de Compra (CRUD + envio ao fornecedor + aprovação)
+- [x] Entrada de Mercadorias (recebimento + conferência)
+- [x] Integração automática: compra → entrada de estoque + conta a pagar
+- [x] Comparativo de preços entre fornecedores
+- [x] Histórico de compras por fornecedor/produto
 
 ### 🗄️ Tabelas
 

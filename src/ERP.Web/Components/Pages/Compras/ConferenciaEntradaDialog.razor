@@ -1,0 +1,679 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.Commands
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Compras
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Entities.Financeiro
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.FactCheck" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Conferência Física & Recebimento de Mercadorias</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-4">
+                <!-- ABA 1: NOTA FISCAL & CABEÇALHO -->
+                <MudTabPanel Text="Nota Fiscal & Transporte" Icon="@Icons.Material.Filled.ReceiptLong">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_numeroNotaFiscal" Label="Número da Nota Fiscal *" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Ex: 000123" />
+                        </MudItem>
+                        <MudItem xs="6" sm="2">
+                            <MudTextField @bind-Value="_serieNotaFiscal" Label="Série" Variant="Variant.Outlined" Margin="Margin.Dense" Placeholder="Ex: 1" />
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudDatePicker Label="Data de Emissão *" @bind-Date="_dataEmissao" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+                        <MudItem xs="12" sm="3">
+                            <MudDatePicker Label="Data de Entrada / Conferência *" @bind-Date="_dataEntrada" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_chaveAcessoNfe" Label="Chave de Acesso da NF-e (44 dígitos)" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="44" HelperText="Opcional. Chave numérica impressa no DANFE." />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int" Label="Fornecedor *" Value="_fornecedorId" ValueChanged="OnFornecedorChanged" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var forn in _fornecedores)
+                                {
+                                    <MudSelectItem T="int" Value="@forn.Id">
+                                        @(forn.NomeFantasia ?? forn.RazaoSocial) - @forn.Cnpj
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int" Label="Depósito de Destino *" @bind-Value="_depositoId" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                @foreach (var dep in _depositos)
+                                {
+                                    <MudSelectItem T="int" Value="@dep.Id">@dep.Nome</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int?" Label="Pedido de Compra Vinculado (Opcional)" Value="_pedidoCompraId" ValueChanged="OnPedidoCompraChanged" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                <MudSelectItem T="int?" Value="@((int?)null)">-- Nenhum (Entrada Avulsa) --</MudSelectItem>
+                                @foreach (var ped in _pedidosDisponiveis)
+                                {
+                                    <MudSelectItem T="int?" Value="@((int?)ped.Id)">
+                                        @ped.Numero (@ped.DataPedido.ToString("dd/MM/yyyy")) - Total: @ped.ValorTotal.ToString("C2")
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_conferenteNome" Label="Nome do Conferente / Recebedor" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_observacoes" Label="Observações da Conferência" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="2" Placeholder="Ex: Mercadoria entregue pela transportadora X, lacres íntegros..." />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- ABA 2: CONFERÊNCIA DOS ITENS (QUANTIDADES, CUSTOS, LOTES E SÉRIES) -->
+                <MudTabPanel Text="Itens da Entrada & Lotes" Icon="@Icons.Material.Filled.Inventory">
+                    <!-- Painel para adicionar itens avulsos se necessário -->
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="background-color: var(--mud-palette-background-grey);">
+                        <MudGrid Spacing="2" Class="align-center">
+                            <MudItem xs="12" sm="5">
+                                <MudAutocomplete T="Produto" Label="Adicionar Produto à Conferência" Value="_produtoSelecionado" ValueChanged="OnProdutoSelecionado"
+                                                 SearchFunc="BuscarProdutos" ToStringFunc="@(p => p == null ? "" : $"{p.Codigo} - {p.Nome}")"
+                                                 Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true" Placeholder="Buscar produto..." />
+                            </MudItem>
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField @bind-Value="_itemQtd" Label="Quantidade" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                            </MudItem>
+                            <MudItem xs="6" sm="2">
+                                <MudNumericField @bind-Value="_itemCusto" Label="Custo Unit. (R$)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Format="N2" />
+                            </MudItem>
+                            <MudItem xs="12" sm="3" Class="d-flex justify-end">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItemAvulso" Disabled="@(_produtoSelecionado == null || _itemQtd <= 0)">
+                                    Inserir Item
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+
+                    @if (_itens.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-2">
+                            Nenhum item na conferência. Adicione produtos acima ou vincule a um Pedido de Compra na primeira aba.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="_itens" Dense="true" Hover="true" Elevation="1" Class="mt-2">
+                            <HeaderContent>
+                                <MudTh>Produto</MudTh>
+                                <MudTh Style="width: 120px;">Qtd Pedida</MudTh>
+                                <MudTh Style="width: 140px;">Qtd Conferida *</MudTh>
+                                <MudTh Style="width: 140px;">Custo Unit. (R$)</MudTh>
+                                <MudTh Style="width: 140px;">Subtotal (R$)</MudTh>
+                                <MudTh>Lote / Validade / Séries</MudTh>
+                                <MudTh Style="width: 50px;"></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ProdutoCodigo - @context.ProdutoNome</MudText>
+                                    <div class="d-flex gap-1 mt-1">
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@context.UnidadeMedida</MudChip>
+                                        @if (context.ControlaLote)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">Lote Obrigatório</MudChip>
+                                        }
+                                        @if (context.ControlaSerie)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">Nº Série</MudChip>
+                                        }
+                                    </div>
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.PedidoCompraItemId.HasValue)
+                                    {
+                                        <MudText Typo="Typo.body2">@context.QuantidadePedida.ToString("N2")</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Avulso</MudText>
+                                    }
+                                </MudTd>
+                                <MudTd>
+                                    <MudNumericField @bind-Value="context.Quantidade" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0.01m" Format="N2" />
+                                </MudTd>
+                                <MudTd>
+                                    <MudNumericField @bind-Value="context.CustoUnitario" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Format="N2" />
+                                </MudTd>
+                                <MudTd>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold" Color="Color.Primary">
+                                        @((context.Quantidade * context.CustoUnitario).ToString("C2"))
+                                    </MudText>
+                                </MudTd>
+                                <MudTd>
+                                    @if (context.ControlaLote)
+                                    {
+                                        <div class="d-flex gap-2 mb-1">
+                                            <MudTextField @bind-Value="context.CodigoLote" Label="Cód. Lote *" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 110px;" />
+                                            <MudDatePicker Label="Validade Lote" @bind-Date="context.DataValidadeLote" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Style="min-width: 120px;" />
+                                        </div>
+                                    }
+                                    @if (context.ControlaSerie)
+                                    {
+                                        <MudTextField @bind-Value="context.NumerosSerieTexto" Label="Números de Série (separados por vírgula)" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="1" Placeholder="Ex: SN001, SN002, SN003" />
+                                    }
+                                    @if (!context.ControlaLote && !context.ControlaSerie)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Controle padrão de estoque</MudText>
+                                    }
+                                </MudTd>
+                                <MudTd>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => _itens.Remove(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudTabPanel>
+
+                <!-- ABA 3: DESPESAS ADICIONAIS & INTEGRAÇÃO FINANCEIRA -->
+                <MudTabPanel Text="Financeiro & Despesas" Icon="@Icons.Material.Filled.Payments">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudCard Elevation="1" Outlined="true" Class="pa-4">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-3" Color="Color.Primary">
+                                    Valores Adicionais & Descontos
+                                </MudText>
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="6">
+                                        <MudNumericField @bind-Value="_valorFrete" Label="Frete (R$)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Format="N2" />
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudNumericField @bind-Value="_valorSeguro" Label="Seguro (R$)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Format="N2" />
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudNumericField @bind-Value="_valorOutrasDespesas" Label="Outras Despesas (R$)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Format="N2" />
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudNumericField @bind-Value="_valorDesconto" Label="Desconto (R$)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0m" Format="N2" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCard>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudCard Elevation="1" Outlined="true" Class="pa-4" Style="background-color: var(--mud-palette-background-grey);">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-3">
+                                    Resumo da Entrada
+                                </MudText>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Total dos Produtos:</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@ValorProdutosCalculado.ToString("C2")</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Frete + Despesas:</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">+ @((_valorFrete + _valorSeguro + _valorOutrasDespesas).ToString("C2"))</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-2">
+                                    <MudText Typo="Typo.body2">Desconto da NF:</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Error">- @(_valorDesconto.ToString("C2"))</MudText>
+                                </div>
+                                <MudDivider Class="my-2" />
+                                <div class="d-flex justify-space-between">
+                                    <MudText Typo="Typo.h6" Class="font-weight-bold">Total da Nota Fiscal:</MudText>
+                                    <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">@ValorTotalFinal.ToString("C2")</MudText>
+                                </div>
+                            </MudCard>
+                        </MudItem>
+
+                        <!-- Condições para geração de Contas a Pagar -->
+                        <MudItem xs="12">
+                            <MudCard Elevation="1" Outlined="true" Class="pa-4 mt-2">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-3" Color="Color.Secondary">
+                                    Geração Automática de Contas a Pagar
+                                </MudText>
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" sm="4">
+                                        <MudSelect T="int?" Label="Forma de Pagamento" @bind-Value="_formaPagamentoId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                            @foreach (var fp in _formasPagamento)
+                                            {
+                                                <MudSelectItem T="int?" Value="@((int?)fp.Id)">@fp.Nome</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudItem>
+                                    <MudItem xs="12" sm="4">
+                                        <MudSelect T="int?" Label="Plano de Contas / Categoria" @bind-Value="_planoContaId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                            @foreach (var pc in _planosConta)
+                                            {
+                                                <MudSelectItem T="int?" Value="@((int?)pc.Id)">@pc.Codigo - @pc.Descricao</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudItem>
+                                    <MudItem xs="12" sm="4">
+                                        <MudSelect T="int?" Label="Centro de Custo" @bind-Value="_centroCustoId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                            @foreach (var cc in _centrosCusto)
+                                            {
+                                                <MudSelectItem T="int?" Value="@((int?)cc.Id)">@cc.Codigo - @cc.Descricao</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="4">
+                                        <MudNumericField @bind-Value="_numeroParcelas" Label="Número de Parcelas" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" Max="60" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="4">
+                                        <MudNumericField @bind-Value="_diasPrimeiroVencimento" Label="Dias 1º Vencimento (Carência)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="0" HelperText="0 = mesmo dia da entrada" />
+                                    </MudItem>
+                                    <MudItem xs="12" sm="4">
+                                        <MudNumericField @bind-Value="_intervaloDias" Label="Intervalo Entre Parcelas (Dias)" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                                    </MudItem>
+                                </MudGrid>
+
+                                <!-- Projeção de Parcelas -->
+                                @if (ValorTotalFinal > 0 && _numeroParcelas > 0)
+                                {
+                                    <div class="mt-4">
+                                        <MudText Typo="Typo.caption" Class="font-weight-bold d-block mb-1">PROJEÇÃO DAS PARCELAS A PAGAR:</MudText>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @{
+                                                var projecao = CalcularProjecaoParcelas();
+                                                foreach (var p in projecao)
+                                                {
+                                                    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+                                                        Parc @p.Numero/@_numeroParcelas: @p.Valor.ToString("C2") (Venc: @p.Vencimento.ToString("dd/MM/yyyy"))
+                                                    </MudChip>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="SalvarEntrada" Disabled="_salvando">
+            @if (_salvando)
+            {
+                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                <span class="ms-2">Conferindo & Recebendo...</span>
+            }
+            else
+            {
+                <span>Confirmar Recebimento Físico</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int? PedidoCompraIdInicial { get; set; }
+
+    private bool _carregando = true;
+    private bool _salvando = false;
+
+    // Cabeçalho NF
+    private string _numeroNotaFiscal = string.Empty;
+    private string? _serieNotaFiscal = "1";
+    private string? _chaveAcessoNfe;
+    private DateTime? _dataEmissao = DateTime.Today;
+    private DateTime? _dataEntrada = DateTime.Today;
+    private int _fornecedorId;
+    private int _depositoId;
+    private int? _pedidoCompraId;
+    private string? _conferenteNome;
+    private string? _observacoes;
+
+    // Valores adicionais
+    private decimal _valorFrete = 0m;
+    private decimal _valorSeguro = 0m;
+    private decimal _valorOutrasDespesas = 0m;
+    private decimal _valorDesconto = 0m;
+
+    // Condições financeiras
+    private int? _formaPagamentoId;
+    private int? _planoContaId;
+    private int? _centroCustoId;
+    private int _numeroParcelas = 1;
+    private int _intervaloDias = 30;
+    private int _diasPrimeiroVencimento = 30;
+
+    // Listas de apoio
+    private List<Fornecedor> _fornecedores = new();
+    private List<Deposito> _depositos = new();
+    private List<Produto> _produtos = new();
+    private List<FormaPagamento> _formasPagamento = new();
+    private List<PlanoConta> _planosConta = new();
+    private List<CentroCusto> _centrosCusto = new();
+    private List<PedidoCompra> _pedidosDisponiveis = new();
+
+    // Itens
+    private List<ItemConferenciaModel> _itens = new();
+
+    // Inserção avulsa
+    private Produto? _produtoSelecionado;
+    private decimal _itemQtd = 1m;
+    private decimal _itemCusto = 0m;
+
+    private decimal ValorProdutosCalculado => _itens.Sum(i => i.Quantidade * i.CustoUnitario);
+    private decimal ValorTotalFinal => (ValorProdutosCalculado - _valorDesconto) + _valorFrete + _valorSeguro + _valorOutrasDespesas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _carregando = true;
+
+            _fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+            _depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+            _produtos = await Context.Produtos.AsNoTracking().Include(p => p.UnidadeMedida).Where(p => p.Ativo).OrderBy(p => p.Nome).ToListAsync();
+            _formasPagamento = await Context.FormasPagamento.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.Nome).ToListAsync();
+            _planosConta = await Context.PlanosContas.AsNoTracking().Where(p => p.Ativo && p.Tipo == TipoPlanoConta.Despesa && !p.Sintetica).OrderBy(p => p.Codigo).ToListAsync();
+            _centrosCusto = await Context.CentrosCusto.AsNoTracking().Where(c => c.Ativo).OrderBy(c => c.Codigo).ToListAsync();
+
+            if (_depositos.Any())
+                _depositoId = _depositos.First().Id;
+
+            if (_fornecedores.Any())
+                _fornecedorId = _fornecedores.First().Id;
+
+            if (PedidoCompraIdInicial.HasValue)
+            {
+                await CarregarDadosDoPedido(PedidoCompraIdInicial.Value);
+            }
+            else if (_fornecedorId > 0)
+            {
+                await AtualizarPedidosDisponiveis(_fornecedorId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados da conferência: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnFornecedorChanged(int novoFornecedorId)
+    {
+        _fornecedorId = novoFornecedorId;
+        _pedidoCompraId = null;
+        await AtualizarPedidosDisponiveis(novoFornecedorId);
+    }
+
+    private async Task AtualizarPedidosDisponiveis(int fornecedorId)
+    {
+        _pedidosDisponiveis = await Context.PedidosCompra
+            .AsNoTracking()
+            .Where(p => p.FornecedorId == fornecedorId && (p.Status == StatusPedidoCompra.Aprovado || p.Status == StatusPedidoCompra.ParcialmenteRecebido))
+            .OrderByDescending(p => p.DataPedido)
+            .ToListAsync();
+    }
+
+    private async Task OnPedidoCompraChanged(int? pedidoId)
+    {
+        _pedidoCompraId = pedidoId;
+        if (pedidoId.HasValue)
+        {
+            await CarregarDadosDoPedido(pedidoId.Value);
+        }
+    }
+
+    private async Task CarregarDadosDoPedido(int pedidoId)
+    {
+        var pedido = await Mediator.Send(new GetPedidoCompraByIdQuery(pedidoId));
+        if (pedido != null)
+        {
+            _pedidoCompraId = pedido.Id;
+            _fornecedorId = pedido.FornecedorId;
+            _depositoId = pedido.DepositoDestinoId;
+            _formaPagamentoId = pedido.FormaPagamentoId;
+            _numeroParcelas = pedido.NumeroParcelas > 0 ? pedido.NumeroParcelas : 1;
+            _intervaloDias = pedido.IntervaloDias > 0 ? pedido.IntervaloDias : 30;
+            _diasPrimeiroVencimento = pedido.DiasPrimeiroVencimento;
+            _valorFrete = pedido.ValorFrete;
+            _valorSeguro = pedido.ValorSeguro;
+            _valorOutrasDespesas = pedido.ValorOutrasDespesas;
+            _valorDesconto = pedido.ValorDesconto;
+
+            await AtualizarPedidosDisponiveis(_fornecedorId);
+
+            _itens.Clear();
+            foreach (var item in pedido.Itens)
+            {
+                decimal qtdPendente = Math.Max(0, item.Quantidade - item.QuantidadeEntregue);
+                if (qtdPendente > 0)
+                {
+                    var prod = _produtos.FirstOrDefault(p => p.Id == item.ProdutoId);
+                    _itens.Add(new ItemConferenciaModel
+                    {
+                        PedidoCompraItemId = item.Id,
+                        ProdutoId = item.ProdutoId,
+                        ProdutoCodigo = item.ProdutoCodigo,
+                        ProdutoNome = item.ProdutoNome,
+                        UnidadeMedida = item.UnidadeMedida,
+                        ControlaLote = prod?.ControlaLote ?? false,
+                        ControlaSerie = prod?.ControlaSerie ?? false,
+                        QuantidadePedida = item.Quantidade,
+                        Quantidade = qtdPendente,
+                        CustoUnitario = item.PrecoUnitario,
+                        DataValidadeLote = DateTime.Today.AddMonths(12),
+                        DataFabricacaoLote = DateTime.Today
+                    });
+                }
+            }
+        }
+    }
+
+    private Task<IEnumerable<Produto>> BuscarProdutos(string valor, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return Task.FromResult<IEnumerable<Produto>>(_produtos.Take(20));
+
+        var filtrados = _produtos.Where(p =>
+            p.Nome.Contains(valor, StringComparison.OrdinalIgnoreCase) ||
+            p.Codigo.Contains(valor, StringComparison.OrdinalIgnoreCase) ||
+            (p.CodigoBarras != null && p.CodigoBarras.Contains(valor, StringComparison.OrdinalIgnoreCase))
+        ).Take(20);
+
+        return Task.FromResult(filtrados);
+    }
+
+    private void OnProdutoSelecionado(Produto? produto)
+    {
+        _produtoSelecionado = produto;
+        if (produto != null)
+        {
+            _itemCusto = produto.PrecoCusto;
+        }
+    }
+
+    private void AdicionarItemAvulso()
+    {
+        if (_produtoSelecionado == null || _itemQtd <= 0) return;
+
+        _itens.Add(new ItemConferenciaModel
+        {
+            PedidoCompraItemId = null,
+            ProdutoId = _produtoSelecionado.Id,
+            ProdutoCodigo = _produtoSelecionado.Codigo,
+            ProdutoNome = _produtoSelecionado.Nome,
+            UnidadeMedida = _produtoSelecionado.UnidadeMedida?.Sigla ?? "UN",
+            ControlaLote = _produtoSelecionado.ControlaLote,
+            ControlaSerie = _produtoSelecionado.ControlaSerie,
+            QuantidadePedida = 0,
+            Quantidade = _itemQtd,
+            CustoUnitario = _itemCusto,
+            DataValidadeLote = DateTime.Today.AddMonths(12),
+            DataFabricacaoLote = DateTime.Today
+        });
+
+        _produtoSelecionado = null;
+        _itemQtd = 1m;
+        _itemCusto = 0m;
+    }
+
+    private List<(int Numero, decimal Valor, DateTime Vencimento)> CalcularProjecaoParcelas()
+    {
+        var lista = new List<(int, decimal, DateTime)>();
+        int n = _numeroParcelas > 0 ? _numeroParcelas : 1;
+        int intervalo = _intervaloDias > 0 ? _intervaloDias : 30;
+        decimal total = ValorTotalFinal;
+
+        decimal valorBase = Math.Floor((total / n) * 100) / 100m;
+        decimal centavos = total - (valorBase * n);
+
+        DateTime baseDate = (_dataEmissao ?? DateTime.Today).AddDays(_diasPrimeiroVencimento);
+        if (_diasPrimeiroVencimento == 0) baseDate = _dataEntrada ?? DateTime.Today;
+
+        for (int i = 1; i <= n; i++)
+        {
+            decimal v = (i == 1) ? valorBase + centavos : valorBase;
+            DateTime dt = (i == 1) ? baseDate : baseDate.AddDays((i - 1) * intervalo);
+            lista.Add((i, v, dt));
+        }
+
+        return lista;
+    }
+
+    private async Task SalvarEntrada()
+    {
+        if (string.IsNullOrWhiteSpace(_numeroNotaFiscal))
+        {
+            Snackbar.Add("O número da Nota Fiscal é obrigatório.", Severity.Warning);
+            return;
+        }
+
+        if (_fornecedorId <= 0)
+        {
+            Snackbar.Add("Selecione o Fornecedor.", Severity.Warning);
+            return;
+        }
+
+        if (_depositoId <= 0)
+        {
+            Snackbar.Add("Selecione o Depósito de Destino.", Severity.Warning);
+            return;
+        }
+
+        if (!_itens.Any())
+        {
+            Snackbar.Add("Adicione ao menos um item à conferência.", Severity.Warning);
+            return;
+        }
+
+        // Validação de lotes obrigatórios
+        foreach (var item in _itens)
+        {
+            if (item.Quantidade <= 0)
+            {
+                Snackbar.Add($"A quantidade do produto '{item.ProdutoNome}' deve ser maior que zero.", Severity.Warning);
+                return;
+            }
+
+            if (item.ControlaLote && string.IsNullOrWhiteSpace(item.CodigoLote))
+            {
+                Snackbar.Add($"O produto '{item.ProdutoNome}' exige a identificação do Código do Lote.", Severity.Warning);
+                return;
+            }
+        }
+
+        try
+        {
+            _salvando = true;
+
+            var dto = new RegistrarEntradaMercadoriaDto(
+                _pedidoCompraId,
+                _fornecedorId,
+                _depositoId,
+                _numeroNotaFiscal.Trim(),
+                _serieNotaFiscal?.Trim(),
+                _chaveAcessoNfe?.Trim(),
+                _dataEmissao ?? DateTime.Today,
+                _dataEntrada ?? DateTime.Today,
+                _conferenteNome,
+                _valorFrete,
+                _valorSeguro,
+                _valorOutrasDespesas,
+                _valorDesconto,
+                _observacoes,
+                _formaPagamentoId,
+                _planoContaId,
+                _centroCustoId,
+                _numeroParcelas,
+                _intervaloDias,
+                _diasPrimeiroVencimento,
+                _itens.Select(i => new RegistrarEntradaMercadoriaItemDto(
+                    i.PedidoCompraItemId,
+                    i.ProdutoId,
+                    i.Quantidade,
+                    i.CustoUnitario,
+                    null,
+                    i.CodigoLote?.Trim(),
+                    i.DataValidadeLote,
+                    i.DataFabricacaoLote,
+                    i.NumerosSerieTexto?.Trim(),
+                    null
+                )).ToList()
+            );
+
+            var entradaId = await Mediator.Send(new RegistrarEntradaMercadoriaCommand(dto));
+            Snackbar.Add($"Entrada e conferência registradas com sucesso! Estoque e Custo Médio atualizados. Títulos gerados no Contas a Pagar.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(entradaId));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao registrar entrada: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    public class ItemConferenciaModel
+    {
+        public int? PedidoCompraItemId { get; set; }
+        public int ProdutoId { get; set; }
+        public string ProdutoCodigo { get; set; } = string.Empty;
+        public string ProdutoNome { get; set; } = string.Empty;
+        public string UnidadeMedida { get; set; } = "UN";
+        public bool ControlaLote { get; set; }
+        public bool ControlaSerie { get; set; }
+        public decimal QuantidadePedida { get; set; }
+        public decimal Quantidade { get; set; }
+        public decimal CustoUnitario { get; set; }
+        public string? CodigoLote { get; set; }
+        public DateTime? DataFabricacaoLote { get; set; }
+        public DateTime? DataValidadeLote { get; set; }
+        public string? NumerosSerieTexto { get; set; }
+    }
+}

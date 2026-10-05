@@ -59,5 +59,13 @@ public interface IApplicationDbContext
     DbSet<ERP.Domain.Core.Entities.Vendas.PedidoVendaItem> PedidoVendaItens { get; }
     DbSet<ERP.Domain.Core.Entities.Vendas.Faturamento> Faturamentos { get; }
 
+    // Fase 6 - Compras
+    DbSet<ERP.Domain.Core.Entities.Compras.SolicitacaoCompra> SolicitacoesCompra { get; }
+    DbSet<ERP.Domain.Core.Entities.Compras.SolicitacaoCompraItem> SolicitacaoCompraItens { get; }
+    DbSet<ERP.Domain.Core.Entities.Compras.PedidoCompra> PedidosCompra { get; }
+    DbSet<ERP.Domain.Core.Entities.Compras.PedidoCompraItem> PedidoCompraItens { get; }
+    DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoria> EntradasMercadoria { get; }
+    DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem> EntradaMercadoriaItens { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

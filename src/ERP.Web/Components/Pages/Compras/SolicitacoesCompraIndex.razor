@@ -1,0 +1,398 @@
+@page "/compras/solicitacoes"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.Commands
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<PageTitle>Solicitações de Compra — ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">Solicitações de Compra</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Requisições internas de materiais e reposição para aprovação e cotação.</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaSolicitacao">
+        Nova Solicitação
+    </MudButton>
+</div>
+
+<!-- CARDS DE INDICADORES -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-primary);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE REQUISIÇÕES</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalGeral</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.PlaylistAdd" Color="Color.Primary" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">Todas as solicitações</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-warning);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">AGUARDANDO APROVAÇÃO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Warning">@_totalPendentes</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" Color="Color.Warning" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-1 d-block">Necessitam revisão</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-info);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">APROVADAS P/ COMPRA</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">@_totalAprovadas</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ThumbUp" Color="Color.Info" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-1 d-block">Prontas para gerar pedido</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-success);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CONVERTIDAS EM PEDIDO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_totalConvertidas</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-1 d-block">Pedidos de compra criados</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- FILTROS E TABELA -->
+<MudCard Elevation="2">
+    <MudCardContent Class="pa-4">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="5">
+                <MudTextField @bind-Value="_busca" Label="Buscar por número, solicitante ou setor..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" OnKeyUp="@(async (e) => { if (e.Key == "Enter") await CarregarSolicitacoes(); })"
+                              Clearable="true" OnClearButtonClick="CarregarSolicitacoes" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="StatusSolicitacaoCompra?" Label="Status" @bind-Value="_statusFiltro" Clearable="true" SelectedValuesChanged="CarregarSolicitacoes" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="StatusSolicitacaoCompra?" Value="@((StatusSolicitacaoCompra?)StatusSolicitacaoCompra.Pendente)">Pendente</MudSelectItem>
+                    <MudSelectItem T="StatusSolicitacaoCompra?" Value="@((StatusSolicitacaoCompra?)StatusSolicitacaoCompra.Aprovada)">Aprovada</MudSelectItem>
+                    <MudSelectItem T="StatusSolicitacaoCompra?" Value="@((StatusSolicitacaoCompra?)StatusSolicitacaoCompra.ConvertidaPedido)">Convertida em Pedido</MudSelectItem>
+                    <MudSelectItem T="StatusSolicitacaoCompra?" Value="@((StatusSolicitacaoCompra?)StatusSolicitacaoCompra.Rejeitada)">Rejeitada</MudSelectItem>
+                    <MudSelectItem T="StatusSolicitacaoCompra?" Value="@((StatusSolicitacaoCompra?)StatusSolicitacaoCompra.Cancelada)">Cancelada</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="PrioridadeSolicitacaoCompra?" Label="Prioridade" @bind-Value="_prioridadeFiltro" Clearable="true" SelectedValuesChanged="CarregarSolicitacoes" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="PrioridadeSolicitacaoCompra?" Value="@((PrioridadeSolicitacaoCompra?)PrioridadeSolicitacaoCompra.Baixa)">Baixa</MudSelectItem>
+                    <MudSelectItem T="PrioridadeSolicitacaoCompra?" Value="@((PrioridadeSolicitacaoCompra?)PrioridadeSolicitacaoCompra.Normal)">Normal</MudSelectItem>
+                    <MudSelectItem T="PrioridadeSolicitacaoCompra?" Value="@((PrioridadeSolicitacaoCompra?)PrioridadeSolicitacaoCompra.Alta)">Alta</MudSelectItem>
+                    <MudSelectItem T="PrioridadeSolicitacaoCompra?" Value="@((PrioridadeSolicitacaoCompra?)PrioridadeSolicitacaoCompra.Urgente)">Urgente</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_solicitacoes.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.PlaylistAddCheck" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhuma solicitação encontrada</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Crie uma nova solicitação para requisitar itens ao setor de compras.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaSolicitacao">
+                Criar Solicitação
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@_solicitacoes" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>Número</MudTh>
+                <MudTh>Solicitante / Setor</MudTh>
+                <MudTh>Data</MudTh>
+                <MudTh>Necessidade</MudTh>
+                <MudTh class="text-center">Prioridade</MudTh>
+                <MudTh class="text-right">Itens</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+                <MudTh class="text-right">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Número" Class="font-weight-bold">
+                    @context.Numero
+                </MudTd>
+                <MudTd DataLabel="Solicitante">
+                    <span class="font-weight-bold">@context.SolicitanteNome</span>
+                    @if (!string.IsNullOrWhiteSpace(context.Departamento))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">Setor: @context.Departamento</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Data">@context.DataSolicitacao.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Necessidade">
+                    @(context.DataNecessidade.HasValue ? context.DataNecessidade.Value.ToString("dd/MM/yyyy") : "-")
+                </MudTd>
+                <MudTd DataLabel="Prioridade" Class="text-center">
+                    @switch (context.Prioridade)
+                    {
+                        case PrioridadeSolicitacaoCompra.Urgente:
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Label="true">Urgente</MudChip>
+                            break;
+                        case PrioridadeSolicitacaoCompra.Alta:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Label="true">Alta</MudChip>
+                            break;
+                        case PrioridadeSolicitacaoCompra.Normal:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Label="true">Normal</MudChip>
+                            break;
+                        default:
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Label="true">Baixa</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Itens" Class="text-right">@context.TotalItens</MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @switch (context.Status)
+                    {
+                        case StatusSolicitacaoCompra.Pendente:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">Pendente</MudChip>
+                            break;
+                        case StatusSolicitacaoCompra.Aprovada:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">Aprovada</MudChip>
+                            break;
+                        case StatusSolicitacaoCompra.ConvertidaPedido:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Convertida em Pedido</MudChip>
+                            break;
+                        case StatusSolicitacaoCompra.Rejeitada:
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Outlined">Rejeitada</MudChip>
+                            break;
+                        case StatusSolicitacaoCompra.Cancelada:
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">Cancelada</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ações" Class="text-right">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        @if (context.Status == StatusSolicitacaoCompra.Pendente)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.ThumbUp" OnClick="@(() => AprovarSolicitacao(context))">
+                                Aprovar Solicitação
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.ThumbDown" OnClick="@(() => RejeitarSolicitacao(context))">
+                                Rejeitar Solicitação
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => CancelarSolicitacao(context))">
+                                Cancelar
+                            </MudMenuItem>
+                        }
+                        @if (context.Status == StatusSolicitacaoCompra.Aprovada)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.AddShoppingCart" OnClick="@(() => ConverterEmPedido(context))">
+                                Gerar Pedido de Compra
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => CancelarSolicitacao(context))">
+                                Cancelar
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private StatusSolicitacaoCompra? _statusFiltro;
+    private PrioridadeSolicitacaoCompra? _prioridadeFiltro;
+
+    private List<SolicitacaoCompraListItemDto> _solicitacoes = new();
+
+    private int _totalGeral = 0;
+    private int _totalPendentes = 0;
+    private int _totalAprovadas = 0;
+    private int _totalConvertidas = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarSolicitacoes();
+    }
+
+    private async Task CarregarSolicitacoes()
+    {
+        try
+        {
+            _carregando = true;
+
+            var resultado = await Mediator.Send(new GetSolicitacoesCompraQuery(
+                _busca,
+                _statusFiltro,
+                _prioridadeFiltro,
+                null,
+                null,
+                1,
+                100
+            ));
+
+            _solicitacoes = resultado.Itens.ToList();
+
+            var todas = await Context.SolicitacoesCompra.AsNoTracking().ToListAsync();
+            _totalGeral = todas.Count;
+            _totalPendentes = todas.Count(s => s.Status == StatusSolicitacaoCompra.Pendente);
+            _totalAprovadas = todas.Count(s => s.Status == StatusSolicitacaoCompra.Aprovada);
+            _totalConvertidas = todas.Count(s => s.Status == StatusSolicitacaoCompra.ConvertidaPedido);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar solicitações: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task NovaSolicitacao()
+    {
+        var dialog = await DialogService.ShowAsync<SolicitacaoCompraDialog>("Nova Solicitação", new DialogParameters(), new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarSolicitacoes();
+        }
+    }
+
+    private async Task AprovarSolicitacao(SolicitacaoCompraListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Aprovar Solicitação de Compra",
+            $"Deseja aprovar a solicitação {item.Numero} do setor '{item.Departamento ?? "Geral"}'?",
+            yesText: "Sim, Aprovar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new AprovarSolicitacaoCompraCommand(item.Id, "Gerente de Suprimentos"));
+                Snackbar.Add($"Solicitação {item.Numero} aprovada!", Severity.Success);
+                await CarregarSolicitacoes();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao aprovar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RejeitarSolicitacao(SolicitacaoCompraListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Rejeitar Solicitação de Compra",
+            $"Deseja marcar a solicitação {item.Numero} como Rejeitada?",
+            yesText: "Sim, Rejeitar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new RejeitarSolicitacaoCompraCommand(item.Id, "Rejeitada pela gestão de compras"));
+                Snackbar.Add($"Solicitação {item.Numero} rejeitada.", Severity.Info);
+                await CarregarSolicitacoes();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao rejeitar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelarSolicitacao(SolicitacaoCompraListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Solicitação de Compra",
+            $"Confirma o cancelamento da solicitação {item.Numero}?",
+            yesText: "Sim, Cancelar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new CancelarSolicitacaoCompraCommand(item.Id));
+                Snackbar.Add("Solicitação cancelada.", Severity.Warning);
+                await CarregarSolicitacoes();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao cancelar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ConverterEmPedido(SolicitacaoCompraListItemDto item)
+    {
+        var fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+        var depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+
+        if (!fornecedores.Any())
+        {
+            Snackbar.Add("Cadastre ao menos um fornecedor antes de gerar pedidos.", Severity.Warning);
+            return;
+        }
+
+        if (!depositos.Any())
+        {
+            Snackbar.Add("Cadastre ao menos um depósito de destino antes de gerar pedidos.", Severity.Warning);
+            return;
+        }
+
+        int fornecedorSelecionadoId = fornecedores.First().Id;
+        int depositoSelecionadoId = depositos.First().Id;
+
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Gerar Pedido de Compra",
+            $"Deseja converter a solicitação {item.Numero} em um Pedido de Compra formal para o fornecedor '{fornecedores.First().NomeFantasia ?? fornecedores.First().RazaoSocial}' no depósito '{depositos.First().Nome}'?",
+            yesText: "Gerar Pedido Agora", cancelText: "Cancelar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                var pedidoId = await Mediator.Send(new ConverterSolicitacaoEmPedidoCommand(item.Id, fornecedorSelecionadoId, depositoSelecionadoId));
+                Snackbar.Add($"Pedido de compra gerado com sucesso a partir da solicitação {item.Numero}!", Severity.Success);
+                await CarregarSolicitacoes();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao converter: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

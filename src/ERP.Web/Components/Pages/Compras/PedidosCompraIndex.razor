@@ -1,0 +1,370 @@
+@page "/compras/pedidos"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.Commands
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+@inject IApplicationDbContext Context
+
+<PageTitle>Pedidos de Compra — ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">Pedidos de Compra</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Gestão de pedidos formais de fornecedores, aprovação, impressão e recebimento físico.</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoPedido">
+        Novo Pedido de Compra
+    </MudButton>
+</div>
+
+<!-- CARDS DE INDICADORES -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-primary);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE PEDIDOS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalGeral</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Color="Color.Primary" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">Valor Total: @_valorGeral.ToString("C2")</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-warning);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">AGUARDANDO APROVAÇÃO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Warning">@_totalPendentes</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.PendingActions" Color="Color.Warning" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-1 d-block">@_valorPendentes.ToString("C2")</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-info);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">APROVADOS / AGUARDANDO ENTREGA</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">@_totalAprovados</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.LocalShipping" Color="Color.Info" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-1 d-block">Prontos para recebimento</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-success);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">RECEBIDOS TOTAL</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_totalRecebidos</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Success" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-1 d-block">Conferidos e estocados</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- FILTROS E TABELA -->
+<MudCard Elevation="2">
+    <MudCardContent Class="pa-4">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="5">
+                <MudTextField @bind-Value="_busca" Label="Buscar por número ou fornecedor..."
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" OnKeyUp="@(async (e) => { if (e.Key == "Enter") await CarregarPedidos(); })"
+                              Clearable="true" OnClearButtonClick="CarregarPedidos" />
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int?" Label="Filtrar por Fornecedor" @bind-Value="_fornecedorFiltroId" Clearable="true" SelectedValuesChanged="CarregarPedidos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var f in _fornecedores)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)f.Id)">@(f.NomeFantasia ?? f.RazaoSocial)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="StatusPedidoCompra?" Label="Status" @bind-Value="_statusFiltro" Clearable="true" SelectedValuesChanged="CarregarPedidos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="StatusPedidoCompra?" Value="@((StatusPedidoCompra?)StatusPedidoCompra.Pendente)">Pendente</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoCompra?" Value="@((StatusPedidoCompra?)StatusPedidoCompra.Aprovado)">Aprovado</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoCompra?" Value="@((StatusPedidoCompra?)StatusPedidoCompra.ParcialmenteRecebido)">Parcialmente Recebido</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoCompra?" Value="@((StatusPedidoCompra?)StatusPedidoCompra.Recebido)">Recebido Total</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoCompra?" Value="@((StatusPedidoCompra?)StatusPedidoCompra.Cancelado)">Cancelado</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_pedidos.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.ShoppingCartCheckout" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum pedido de compra encontrado</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Crie um novo pedido para comprar mercadorias com seus fornecedores.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoPedido">
+                Criar Pedido de Compra
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@_pedidos" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>Número</MudTh>
+                <MudTh>Fornecedor</MudTh>
+                <MudTh>Emissão</MudTh>
+                <MudTh>Previsão</MudTh>
+                <MudTh>Depósito Destino</MudTh>
+                <MudTh class="text-right">Itens</MudTh>
+                <MudTh class="text-right">Valor Total</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+                <MudTh class="text-right">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Número" Class="font-weight-bold">
+                    <MudLink Href="#" OnClick="@(() => VerDetalhes(context.Id))">@context.Numero</MudLink>
+                    @if (!string.IsNullOrWhiteSpace(context.SolicitacaoNumero))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">Sol: @context.SolicitacaoNumero</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Fornecedor">
+                    <span class="font-weight-bold">@context.FornecedorNome</span>
+                    @if (!string.IsNullOrWhiteSpace(context.FornecedorCnpj))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">CNPJ: @context.FornecedorCnpj</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Emissão">@context.DataPedido.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Previsão">@(context.PrevisaoEntrega.HasValue ? context.PrevisaoEntrega.Value.ToString("dd/MM/yyyy") : "-")</MudTd>
+                <MudTd DataLabel="Depósito">@context.DepositoDestinoNome</MudTd>
+                <MudTd DataLabel="Itens" Class="text-right">@context.TotalItens</MudTd>
+                <MudTd DataLabel="Valor Total" Class="text-right font-weight-bold">@context.ValorTotal.ToString("C2")</MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @switch (context.Status)
+                    {
+                        case StatusPedidoCompra.Pendente:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">Pendente</MudChip>
+                            break;
+                        case StatusPedidoCompra.Aprovado:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small">Aprovado</MudChip>
+                            break;
+                        case StatusPedidoCompra.ParcialmenteRecebido:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Parcialmente Recebido</MudChip>
+                            break;
+                        case StatusPedidoCompra.Recebido:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Recebido Total</MudChip>
+                            break;
+                        case StatusPedidoCompra.Cancelado:
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">Cancelado</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ações" Class="text-right">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => VerDetalhes(context.Id))">
+                            Ver Detalhes
+                        </MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Filled.PictureAsPdf" OnClick="@(() => BaixarPdf(context.Id))">
+                            Imprimir PDF
+                        </MudMenuItem>
+
+                        @if (context.Status == StatusPedidoCompra.Pendente)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.ThumbUp" OnClick="@(() => AprovarPedido(context))">
+                                Aprovar Pedido
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => CancelarPedido(context))">
+                                Cancelar Pedido
+                            </MudMenuItem>
+                        }
+
+                        @if (context.Status == StatusPedidoCompra.Aprovado || context.Status == StatusPedidoCompra.ParcialmenteRecebido)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Input" OnClick="@(() => ReceberPedido(context))">
+                                Receber / Conferir Entrega
+                            </MudMenuItem>
+                            @if (context.Status == StatusPedidoCompra.Aprovado)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => CancelarPedido(context))">
+                                    Cancelar Pedido
+                                </MudMenuItem>
+                            }
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private int? _fornecedorFiltroId;
+    private StatusPedidoCompra? _statusFiltro;
+
+    private List<PedidoCompraListItemDto> _pedidos = new();
+    private List<Fornecedor> _fornecedores = new();
+
+    private int _totalGeral = 0;
+    private decimal _valorGeral = 0m;
+    private int _totalPendentes = 0;
+    private decimal _valorPendentes = 0m;
+    private int _totalAprovados = 0;
+    private int _totalRecebidos = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+        await CarregarPedidos();
+    }
+
+    private async Task CarregarPedidos()
+    {
+        try
+        {
+            _carregando = true;
+
+            var resultado = await Mediator.Send(new GetPedidosCompraQuery(
+                _busca,
+                _fornecedorFiltroId,
+                _statusFiltro,
+                null,
+                null,
+                1,
+                100
+            ));
+
+            _pedidos = resultado.Itens.ToList();
+
+            var todos = await Context.PedidosCompra.AsNoTracking().ToListAsync();
+            _totalGeral = todos.Count;
+            _valorGeral = todos.Sum(p => p.ValorTotal);
+
+            _totalPendentes = todos.Count(p => p.Status == StatusPedidoCompra.Pendente);
+            _valorPendentes = todos.Where(p => p.Status == StatusPedidoCompra.Pendente).Sum(p => p.ValorTotal);
+
+            _totalAprovados = todos.Count(p => p.Status == StatusPedidoCompra.Aprovado);
+            _totalRecebidos = todos.Count(p => p.Status == StatusPedidoCompra.Recebido);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar pedidos de compra: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task NovoPedido()
+    {
+        var dialog = await DialogService.ShowAsync<PedidoCompraDialog>("Novo Pedido de Compra", new DialogParameters(), new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarPedidos();
+        }
+    }
+
+    private async Task VerDetalhes(int pedidoId)
+    {
+        var parameters = new DialogParameters { { nameof(PedidoCompraDetalhesDialog.PedidoCompraId), pedidoId } };
+        await DialogService.ShowAsync<PedidoCompraDetalhesDialog>("Detalhes do Pedido", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task AprovarPedido(PedidoCompraListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Aprovar Pedido de Compra",
+            $"Deseja aprovar o Pedido {item.Numero} para o fornecedor '{item.FornecedorNome}' no valor de {item.ValorTotal:C2}?",
+            yesText: "Sim, Aprovar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new AprovarPedidoCompraCommand(item.Id));
+                Snackbar.Add($"Pedido {item.Numero} aprovado com sucesso! Pronto para entrega do fornecedor.", Severity.Success);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao aprovar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelarPedido(PedidoCompraListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Pedido de Compra",
+            $"Confirma o cancelamento do Pedido {item.Numero}?",
+            yesText: "Sim, Cancelar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new CancelarPedidoCompraCommand(item.Id, "Cancelamento solicitado pelo usuário"));
+                Snackbar.Add($"Pedido {item.Numero} cancelado.", Severity.Warning);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ReceberPedido(PedidoCompraListItemDto item)
+    {
+        var parameters = new DialogParameters { { nameof(ConferenciaEntradaDialog.PedidoCompraIdInicial), item.Id } };
+        var dialog = await DialogService.ShowAsync<ConferenciaEntradaDialog>("Receber Mercadorias", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarPedidos();
+        }
+    }
+
+    private async Task BaixarPdf(int id)
+    {
+        try
+        {
+            var pdfBytes = await Mediator.Send(new GerarPedidoCompraPdfQuery(id));
+            string base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("open", $"data:application/pdf;base64,{base64}", "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+}

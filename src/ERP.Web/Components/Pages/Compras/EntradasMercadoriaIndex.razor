@@ -1,0 +1,347 @@
+@page "/compras/entradas"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.Commands
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<PageTitle>Recebimento & Entradas — ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">Recebimento de Mercadorias (Entradas)</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Conferência física, entrada de estoque com recálculo de custo médio ponderado e geração de Contas a Pagar.</MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FactCheck" OnClick="NovaEntrada">
+        Novo Recebimento / NF
+    </MudButton>
+</div>
+
+<!-- CARDS DE INDICADORES -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-primary);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE RECEBIMENTOS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalGeral</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Primary" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">Valor Faturado: @_valorGeral.ToString("C2")</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-success);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CONFERIDAS & INTEGRADAS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_totalConferidas</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-1 d-block">Estoque e Financeiro atualizados</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-info);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ENTRADAS NO MÊS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">@_totalMes</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Color="Color.Info" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-1 d-block">Mês Atual</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Elevation="2" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-error);">
+            <div class="d-flex justify-space-between align-center">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CANCELADAS / ESTORNADAS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Error">@_totalCanceladas</MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Large" />
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-1 d-block">Estoque e Títulos revertidos</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- FILTROS DE PESQUISA -->
+<MudCard Elevation="1" Class="mb-4">
+    <MudCardContent>
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_busca" Label="Buscar por NF, Recibo ou Fornecedor" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" OnKeyUp="@(async e => { if (e.Key == "Enter") await CarregarEntradas(); })" />
+            </MudItem>
+
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" Label="Fornecedor" @bind-Value="_fornecedorFiltroId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="int?" Value="@((int?)null)">Todos os Fornecedores</MudSelectItem>
+                    @foreach (var f in _fornecedores)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)f.Id)">@(f.NomeFantasia ?? f.RazaoSocial)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="2">
+                <MudSelect T="int?" Label="Depósito" @bind-Value="_depositoFiltroId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="int?" Value="@((int?)null)">Todos os Depósitos</MudSelectItem>
+                    @foreach (var d in _depositos)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)d.Id)">@d.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="2">
+                <MudSelect T="StatusEntradaMercadoria?" Label="Status" @bind-Value="_statusFiltro" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="StatusEntradaMercadoria?" Value="@((StatusEntradaMercadoria?)null)">Todos</MudSelectItem>
+                    <MudSelectItem T="StatusEntradaMercadoria?" Value="StatusEntradaMercadoria.Conferida">Conferida</MudSelectItem>
+                    <MudSelectItem T="StatusEntradaMercadoria?" Value="StatusEntradaMercadoria.Cancelada">Cancelada</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="2" Class="d-flex gap-2 justify-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterList" OnClick="CarregarEntradas">
+                    Filtrar
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="LimparFiltros">
+                    Limpar
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<!-- TABELA DE ENTRADAS -->
+<MudCard Elevation="2">
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_entradas.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Inbox" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum recebimento ou entrada encontrado.</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Clique no botão acima para registrar a primeira entrada de mercadoria.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaEntrada">
+                Registrar Entrada
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="_entradas" Hover="true" Dense="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Recibo / NF</MudTh>
+                <MudTh>Data Entrada</MudTh>
+                <MudTh>Fornecedor</MudTh>
+                <MudTh>Depósito</MudTh>
+                <MudTh>Pedido Compra</MudTh>
+                <MudTh Style="text-align: center;">Itens</MudTh>
+                <MudTh Style="text-align: right;">Valor Total</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh Style="text-align: center;">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <div class="d-flex flex-column">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Numero</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            NF: @context.NumeroNotaFiscal @(!string.IsNullOrEmpty(context.SerieNotaFiscal) ? $"- Série {context.SerieNotaFiscal}" : "")
+                        </MudText>
+                    </div>
+                </MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.body2">@context.DataEntrada.ToString("dd/MM/yyyy")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Emissão: @context.DataEmissao.ToString("dd/MM/yyyy")</MudText>
+                </MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.body2">@context.FornecedorNome</MudText>
+                </MudTd>
+                <MudTd>
+                    <MudText Typo="Typo.body2">@context.DepositoNome</MudText>
+                </MudTd>
+                <MudTd>
+                    @if (!string.IsNullOrEmpty(context.PedidoCompraNumero))
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                            @context.PedidoCompraNumero
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Entrada Avulsa</MudText>
+                    }
+                </MudTd>
+                <MudTd Style="text-align: center;">
+                    <MudBadge Content="@context.TotalItens" Color="Color.Default" Overlap="false" Class="d-inline-flex" />
+                </MudTd>
+                <MudTd Style="text-align: right;">
+                    <MudText Typo="Typo.body2" Class="font-weight-bold" Color="Color.Primary">
+                        @context.ValorTotal.ToString("C2")
+                    </MudText>
+                </MudTd>
+                <MudTd>
+                    @if (context.Status == StatusEntradaMercadoria.Conferida)
+                    {
+                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.CheckCircle">
+                            Conferida
+                        </MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Cancel">
+                            Cancelada
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd Style="text-align: center;">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => VerDetalhes(context.Id))">
+                            Ver Detalhes & Rastreabilidade
+                        </MudMenuItem>
+
+                        @if (context.Status == StatusEntradaMercadoria.Conferida)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" OnClick="@(() => CancelarEntrada(context))">
+                                Cancelar & Estornar Estoque
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private int? _fornecedorFiltroId;
+    private int? _depositoFiltroId;
+    private StatusEntradaMercadoria? _statusFiltro;
+
+    private List<EntradaMercadoriaListItemDto> _entradas = new();
+    private List<Fornecedor> _fornecedores = new();
+    private List<Deposito> _depositos = new();
+
+    private int _totalGeral = 0;
+    private decimal _valorGeral = 0m;
+    private int _totalConferidas = 0;
+    private int _totalMes = 0;
+    private int _totalCanceladas = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+        _depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+        await CarregarEntradas();
+    }
+
+    private async Task CarregarEntradas()
+    {
+        try
+        {
+            _carregando = true;
+
+            var resultado = await Mediator.Send(new GetEntradasMercadoriaQuery(
+                _busca,
+                _fornecedorFiltroId,
+                _depositoFiltroId,
+                _statusFiltro,
+                null,
+                null,
+                1,
+                100
+            ));
+
+            _entradas = resultado.Itens.ToList();
+
+            var todas = await Context.EntradasMercadoria.AsNoTracking().ToListAsync();
+            _totalGeral = todas.Count;
+            _valorGeral = todas.Where(e => e.Status == StatusEntradaMercadoria.Conferida).Sum(e => e.ValorTotal);
+            _totalConferidas = todas.Count(e => e.Status == StatusEntradaMercadoria.Conferida);
+            _totalCanceladas = todas.Count(e => e.Status == StatusEntradaMercadoria.Cancelada);
+
+            var inicioMes = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            _totalMes = todas.Count(e => e.DataEntrada >= inicioMes && e.Status == StatusEntradaMercadoria.Conferida);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar entradas de mercadoria: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task LimparFiltros()
+    {
+        _busca = null;
+        _fornecedorFiltroId = null;
+        _depositoFiltroId = null;
+        _statusFiltro = null;
+        await CarregarEntradas();
+    }
+
+    private async Task NovaEntrada()
+    {
+        var dialog = await DialogService.ShowAsync<ConferenciaEntradaDialog>("Conferência Física & Recebimento", new DialogParameters(), new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarEntradas();
+        }
+    }
+
+    private async Task VerDetalhes(int entradaId)
+    {
+        var parameters = new DialogParameters { { nameof(EntradaMercadoriaDetalhesDialog.EntradaId), entradaId } };
+        await DialogService.ShowAsync<EntradaMercadoriaDetalhesDialog>("Detalhes da Entrada", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task CancelarEntrada(EntradaMercadoriaListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Entrada de Mercadorias",
+            $"Tem certeza que deseja cancelar a entrada '{item.Numero}' (NF {item.NumeroNotaFiscal}) no valor de {item.ValorTotal:C2}? Esta ação estornará os saldos de estoque, devolverá as quantidades entregues ao pedido e cancelará os títulos pendentes em Contas a Pagar.",
+            yesText: "Sim, Cancelar Entrada", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new CancelarEntradaMercadoriaCommand(item.Id, "Cancelamento solicitado pelo usuário na tela de recebimento"));
+                Snackbar.Add($"Entrada {item.Numero} cancelada com sucesso e estoque estornado.", Severity.Warning);
+                await CarregarEntradas();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao cancelar entrada: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

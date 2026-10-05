@@ -1,0 +1,440 @@
+@page "/compras/historico"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<PageTitle>Histórico & Comparativo de Compras — ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">Histórico & Comparativo de Preços</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Análise detalhada de compras realizadas, evolução de custos unitários e comparação de preços entre fornecedores.</MudText>
+    </div>
+</div>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+    <!-- ABA 1: HISTÓRICO ANALÍTICO DE COMPRAS -->
+    <MudTabPanel Text="Histórico Analítico de Compras" Icon="@Icons.Material.Filled.History">
+        <!-- CARDS DE INDICADORES DE COMPRAS -->
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-primary);">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR TOTAL COMPRADO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Primary">
+                        @(_resumo?.ValorTotalComprado.ToString("C2") ?? "R$ 0,00")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">Em notas fiscais recebidas</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-info);">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DE RECEBIMENTOS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">
+                        @(_resumo?.TotalEntradas ?? 0)
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">Entradas conferidas</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-success);">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">PEDIDOS ATENDIDOS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">
+                        @(_resumo?.PedidosRecebidos ?? 0) / @(_resumo?.TotalPedidos ?? 0)
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-1 d-block">Pedidos de compra concluídos</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-warning);">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">TICKET MÉDIO POR PEDIDO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Warning">
+                        @(_resumo?.TicketMedioPedido.ToString("C2") ?? "R$ 0,00")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-1 d-block">Média faturada por compra</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- FILTROS DO HISTÓRICO -->
+        <MudCard Elevation="1" Class="mb-4">
+            <MudCardContent>
+                <MudGrid Spacing="2" Class="align-center">
+                    <MudItem xs="12" sm="3">
+                        <MudSelect T="int?" Label="Fornecedor" @bind-Value="_filtroFornecedorId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                            <MudSelectItem T="int?" Value="@((int?)null)">Todos os Fornecedores</MudSelectItem>
+                            @foreach (var f in _fornecedores)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)f.Id)">@(f.NomeFantasia ?? f.RazaoSocial)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="3">
+                        <MudSelect T="int?" Label="Produto" @bind-Value="_filtroProdutoId" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                            <MudSelectItem T="int?" Value="@((int?)null)">Todos os Produtos</MudSelectItem>
+                            @foreach (var p in _produtos)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)p.Id)">@p.Codigo - @p.Nome</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="6" sm="2">
+                        <MudDatePicker Label="Data Início" @bind-Date="_filtroDataInicio" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Clearable="true" />
+                    </MudItem>
+
+                    <MudItem xs="6" sm="2">
+                        <MudDatePicker Label="Data Fim" @bind-Date="_filtroDataFim" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Clearable="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="2" Class="d-flex gap-2 justify-end">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterList" OnClick="CarregarHistorico">
+                            Filtrar
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="LimparFiltrosHistorico">
+                            Limpar
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        <!-- TABELA ANALÍTICA -->
+        @if (_carregandoHistorico)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (!_itensHistorico.Any())
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-2">
+                Nenhum registro de compra encontrado para os filtros selecionados.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_itensHistorico" Hover="true" Dense="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Data Entrada</MudTh>
+                    <MudTh>NF / Recibo</MudTh>
+                    <MudTh>Fornecedor</MudTh>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Produto</MudTh>
+                    <MudTh Style="text-align: right;">Quantidade</MudTh>
+                    <MudTh Style="text-align: right;">Custo Unit.</MudTh>
+                    <MudTh Style="text-align: right;">Custo Total</MudTh>
+                    <MudTh>Depósito</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.DataEntrada.ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.NotaFiscal</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.EntradaNumero</MudText>
+                    </MudTd>
+                    <MudTd>@context.FornecedorNome</MudTd>
+                    <MudTd>@context.ProdutoCodigo</MudTd>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ProdutoNome</MudText>
+                    </MudTd>
+                    <MudTd Style="text-align: right;">
+                        @context.Quantidade.ToString("N2") @context.UnidadeMedida
+                    </MudTd>
+                    <MudTd Style="text-align: right;">@context.CustoUnitario.ToString("C2")</MudTd>
+                    <MudTd Style="text-align: right;" Class="font-weight-bold">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold" Color="Color.Primary">@context.CustoTotal.ToString("C2")</MudText>
+                    </MudTd>
+                    <MudTd>@context.DepositoNome</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    <!-- ABA 2: COMPARATIVO DE PREÇOS ENTRE FORNECEDORES -->
+    <MudTabPanel Text="Comparativo de Preços por Fornecedor" Icon="@Icons.Material.Filled.CompareArrows">
+        <MudCard Elevation="1" Class="mb-4">
+            <MudCardContent>
+                <MudGrid Spacing="2" Class="align-center">
+                    <MudItem xs="12" sm="8">
+                        <MudAutocomplete T="Produto" Label="Selecione um Produto para Comparar Fornecedores *" Value="_produtoComparativo" ValueChanged="OnProdutoComparativoSelecionado"
+                                         SearchFunc="BuscarProdutos" ToStringFunc="@(p => p == null ? "" : $"{p.Codigo} - {p.Nome}")"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" ResetValueOnEmptyText="true" Placeholder="Digite código ou nome do produto..." />
+                    </MudItem>
+                    <MudItem xs="12" sm="4" Class="d-flex justify-end">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="CarregarComparativo" Disabled="@(_produtoComparativo == null)">
+                            Comparar Preços
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        @if (_carregandoComparativo)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_produtoComparativo == null)
+        {
+            <div class="pa-8 text-center">
+                <MudIcon Icon="@Icons.Material.Filled.ManageSearch" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                <MudText Typo="Typo.h6" Color="Color.Secondary">Selecione um produto no campo acima.</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">O sistema listará todos os fornecedores dos quais o item já foi comprado, com menor preço, maior preço, histórico e economia potencial.</MudText>
+            </div>
+        }
+        else if (!_comparativo.Any())
+        {
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mt-2">
+                Não há registro de compras realizadas para o produto <strong>@_produtoComparativo.Nome</strong>.
+            </MudAlert>
+        }
+        else
+        {
+            <!-- CARDS DE INSIGHTS DO COMPARATIVO -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-success);">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">MENOR PREÇO HISTÓRICO</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">
+                            @_menorPreco.ToString("C2")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-1 d-block">
+                            Fornecedor: @_fornecedorMelhorPreco
+                        </MudText>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-error);">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">MAIOR PREÇO PAGO</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Error">
+                            @_maiorPreco.ToString("C2")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">Pico de custo registrado</MudText>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-info);">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">ÚLTIMO PREÇO PAGO</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">
+                            @_ultimoPreco.ToString("C2")
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-1 d-block">Na compra mais recente</MudText>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-warning);">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">VARIAÇÃO MÁXIMA DE PREÇO</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Warning">
+                            @_variacaoPercentual.ToString("N1")%
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-1 d-block">Diferença entre melhor e pior preço</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- TABELA COMPARATIVA POR FORNECEDOR -->
+            <MudTable Items="_comparativo" Hover="true" Dense="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Fornecedor</MudTh>
+                    <MudTh>Última Compra</MudTh>
+                    <MudTh>Última NF</MudTh>
+                    <MudTh Style="text-align: right;">Menor Preço</MudTh>
+                    <MudTh Style="text-align: right;">Maior Preço</MudTh>
+                    <MudTh Style="text-align: right;">Último Preço</MudTh>
+                    <MudTh Style="text-align: right;">Qtd Total Comprada</MudTh>
+                    <MudTh Style="text-align: center;">Avaliação</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>
+                        <MudText Typo="Typo.body2" Class="font-weight-bold">@context.FornecedorNome</MudText>
+                    </MudTd>
+                    <MudTd>@context.UltimaCompraData.ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd>@context.UltimaNotaFiscal</MudTd>
+                    <MudTd Style="text-align: right;" Class="font-weight-bold">
+                        <MudText Typo="Typo.body2" Class="font-weight-bold" Color="Color.Success">@context.MenorPreco.ToString("C2")</MudText>
+                    </MudTd>
+                    <MudTd Style="text-align: right;">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@context.MaiorPreco.ToString("C2")</MudText>
+                    </MudTd>
+                    <MudTd Style="text-align: right;" Class="font-weight-bold">
+                        @context.UltimoPreco.ToString("C2")
+                    </MudTd>
+                    <MudTd Style="text-align: right;">
+                        @context.QuantidadeTotalComprada.ToString("N2")
+                    </MudTd>
+                    <MudTd Style="text-align: center;">
+                        @if (context.MenorPreco == _menorPreco)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.ThumbUp">
+                                Melhor Custo
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
+                                Competitivo
+                            </MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private bool _carregandoHistorico = true;
+    private bool _carregandoComparativo = false;
+
+    // Apoio
+    private List<Fornecedor> _fornecedores = new();
+    private List<Produto> _produtos = new();
+    private ResumoComprasDto? _resumo;
+
+    // Filtros Histórico
+    private int? _filtroFornecedorId;
+    private int? _filtroProdutoId;
+    private DateTime? _filtroDataInicio;
+    private DateTime? _filtroDataFim;
+    private List<HistoricoComprasItemDto> _itensHistorico = new();
+
+    // Comparativo
+    private Produto? _produtoComparativo;
+    private List<ComparativoPrecoFornecedorDto> _comparativo = new();
+    private decimal _menorPreco = 0m;
+    private decimal _maiorPreco = 0m;
+    private decimal _ultimoPreco = 0m;
+    private decimal _variacaoPercentual = 0m;
+    private string _fornecedorMelhorPreco = "-";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+        _produtos = await Context.Produtos.AsNoTracking().Where(p => p.Ativo).OrderBy(p => p.Nome).ToListAsync();
+
+        await CarregarResumo();
+        await CarregarHistorico();
+    }
+
+    private async Task CarregarResumo()
+    {
+        try
+        {
+            _resumo = await Mediator.Send(new GetResumoComprasQuery(_filtroDataInicio, _filtroDataFim));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar resumo de compras: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CarregarHistorico()
+    {
+        try
+        {
+            _carregandoHistorico = true;
+            var resultado = await Mediator.Send(new GetHistoricoComprasQuery(
+                _filtroFornecedorId,
+                _filtroProdutoId,
+                _filtroDataInicio,
+                _filtroDataFim,
+                1,
+                100
+            ));
+
+            _itensHistorico = resultado.Itens.ToList();
+            await CarregarResumo();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar histórico: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregandoHistorico = false;
+        }
+    }
+
+    private async Task LimparFiltrosHistorico()
+    {
+        _filtroFornecedorId = null;
+        _filtroProdutoId = null;
+        _filtroDataInicio = null;
+        _filtroDataFim = null;
+        await CarregarHistorico();
+    }
+
+    private Task<IEnumerable<Produto>> BuscarProdutos(string valor, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return Task.FromResult<IEnumerable<Produto>>(_produtos.Take(20));
+
+        var filtrados = _produtos.Where(p =>
+            p.Nome.Contains(valor, StringComparison.OrdinalIgnoreCase) ||
+            p.Codigo.Contains(valor, StringComparison.OrdinalIgnoreCase)
+        ).Take(20);
+
+        return Task.FromResult(filtrados);
+    }
+
+    private async Task OnProdutoComparativoSelecionado(Produto? produto)
+    {
+        _produtoComparativo = produto;
+        if (produto != null)
+        {
+            await CarregarComparativo();
+        }
+        else
+        {
+            _comparativo.Clear();
+        }
+    }
+
+    private async Task CarregarComparativo()
+    {
+        if (_produtoComparativo == null) return;
+
+        try
+        {
+            _carregandoComparativo = true;
+            _comparativo = await Mediator.Send(new GetComparativoPrecosFornecedoresQuery(_produtoComparativo.Id));
+
+            if (_comparativo.Any())
+            {
+                _menorPreco = _comparativo.Min(c => c.MenorPreco);
+                _maiorPreco = _comparativo.Max(c => c.MaiorPreco);
+                var ultimo = _comparativo.OrderByDescending(c => c.UltimaCompraData).First();
+                _ultimoPreco = ultimo.UltimoPreco;
+
+                var melhorForn = _comparativo.OrderBy(c => c.MenorPreco).First();
+                _fornecedorMelhorPreco = melhorForn.FornecedorNome;
+
+                if (_menorPreco > 0)
+                {
+                    _variacaoPercentual = ((_maiorPreco - _menorPreco) / _menorPreco) * 100m;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar comparativo de fornecedores: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregandoComparativo = false;
+        }
+    }
+}

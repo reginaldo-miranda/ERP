@@ -1,0 +1,256 @@
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Financeiro
+@using ERP.Domain.Core.Enums
+@using ERP.Application.Common.Interfaces
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Detalhes do Recebimento & Nota Fiscal</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_entrada == null)
+        {
+            <MudAlert Severity="Severity.Error">Entrada de mercadorias não encontrada.</MudAlert>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <!-- CABEÇALHO COM DADOS DA NF E STATUS -->
+                <MudItem xs="12">
+                    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-2" Style="background-color: var(--mud-palette-background-grey);">
+                        <div class="d-flex justify-space-between align-center flex-wrap gap-2">
+                            <div>
+                                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">
+                                    @_entrada.Numero — NF @_entrada.NumeroNotaFiscal (Série @_entrada.SerieNotaFiscal)
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Emitida em: @_entrada.DataEmissao.ToString("dd/MM/yyyy") | Recebida em: @_entrada.DataEntrada.ToString("dd/MM/yyyy HH:mm")
+                                </MudText>
+                            </div>
+                            <div>
+                                @if (_entrada.Status == StatusEntradaMercadoria.Conferida)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Medium" Icon="@Icons.Material.Filled.CheckCircle">
+                                        Conferida & Integrada
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Medium" Icon="@Icons.Material.Filled.Cancel">
+                                        Cancelada / Estornada
+                                    </MudChip>
+                                }
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_entrada.ChaveAcessoNfe))
+                        {
+                            <MudText Typo="Typo.caption" Class="mt-2 font-weight-bold d-block" Color="Color.Secondary">
+                                Chave de Acesso: @_entrada.ChaveAcessoNfe
+                            </MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <!-- DADOS DO FORNECEDOR E DEPÓSITO -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="1" Outlined="true" Class="pa-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">FORNECEDOR</MudText>
+                        <MudText Typo="Typo.body1" Class="font-weight-bold">@_entrada.FornecedorNome</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">CNPJ: @(_entrada.FornecedorCnpj ?? "Não informado")</MudText>
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="1" Outlined="true" Class="pa-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">DEPÓSITO & CONFERENTE</MudText>
+                        <MudText Typo="Typo.body1" Class="font-weight-bold">@_entrada.DepositoNome</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Conferente: @(_entrada.ConferenteNome ?? "Não informado")</MudText>
+                    </MudPaper>
+                </MudItem>
+
+                @if (!string.IsNullOrWhiteSpace(_entrada.PedidoCompraNumero))
+                {
+                    <MudItem xs="12">
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="my-1">
+                            Vinculado ao Pedido de Compra: <strong>@_entrada.PedidoCompraNumero</strong>
+                        </MudAlert>
+                    </MudItem>
+                }
+
+                <!-- TABELA DE ITENS RECEBIDOS COM LOTES E SÉRIES -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1 mt-2">
+                        Itens Conferidos & Movimentação de Estoque (@_entrada.Itens.Count itens)
+                    </MudText>
+                    <MudTable Items="_entrada.Itens" Dense="true" Hover="true" Elevation="1">
+                        <HeaderContent>
+                            <MudTh>Código</MudTh>
+                            <MudTh>Produto</MudTh>
+                            <MudTh Style="text-align: right;">Qtd Recebida</MudTh>
+                            <MudTh Style="text-align: right;">Custo Unit.</MudTh>
+                            <MudTh Style="text-align: right;">Custo Total</MudTh>
+                            <MudTh>Rastreabilidade (Lote / Série)</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ProdutoCodigo</MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ProdutoNome</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Unidade: @context.UnidadeMedida</MudText>
+                            </MudTd>
+                            <MudTd Style="text-align: right;">
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Quantidade.ToString("N2")</MudText>
+                                @if (context.QuantidadePedida > 0)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">De @context.QuantidadePedida.ToString("N2") pedidas</MudText>
+                                }
+                            </MudTd>
+                            <MudTd Style="text-align: right;">@context.CustoUnitario.ToString("C2")</MudTd>
+                            <MudTd Style="text-align: right;" Class="font-weight-bold" Color="Color.Primary">
+                                @context.CustoTotal.ToString("C2")
+                            </MudTd>
+                            <MudTd>
+                                @if (context.ControlaLote && !string.IsNullOrWhiteSpace(context.CodigoLote))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                                        Lote: @context.CodigoLote (Val: @context.DataValidadeLote?.ToString("dd/MM/yyyy"))
+                                    </MudChip>
+                                }
+                                @if (context.ControlaSerie && !string.IsNullOrWhiteSpace(context.NumerosSerieTexto))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">
+                                        Séries: @context.NumerosSerieTexto
+                                    </MudChip>
+                                }
+                                @if (!context.ControlaLote && !context.ControlaSerie)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Estoque Regular</MudText>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudItem>
+
+                <!-- RESUMO DE TOTAIS E FINANCEIRO -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="1" Outlined="true" Class="pa-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold mb-2 d-block">TÍTULOS GERADOS NO CONTAS A PAGAR</MudText>
+                        @if (_titulosFinanceiro.Any())
+                        {
+                            <MudTable Items="_titulosFinanceiro" Dense="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Doc / Parc</MudTh>
+                                    <MudTh>Vencimento</MudTh>
+                                    <MudTh Style="text-align: right;">Valor</MudTh>
+                                    <MudTh>Status</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>@context.NumeroDocumento</MudTd>
+                                    <MudTd>@context.DataVencimento.ToString("dd/MM/yyyy")</MudTd>
+                                    <MudTd Style="text-align: right;" Class="font-weight-bold">@context.ValorOriginal.ToString("C2")</MudTd>
+                                    <MudTd>
+                                        <MudChip T="string" Size="Size.Small" Color="@(context.Status == StatusContaFinanceira.Paga ? Color.Success : context.Status == StatusContaFinanceira.Cancelada ? Color.Error : Color.Warning)">
+                                            @context.Status
+                                        </MudChip>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhum título gerado ou entrada sem integração financeira.</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="1" Outlined="true" Class="pa-3">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold mb-2 d-block">COMPOSIÇÃO DE VALORES DA NOTA</MudText>
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2">Total dos Produtos:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@_entrada.ValorProdutos.ToString("C2")</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2">Frete / Seguro / Despesas:</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">+ @((_entrada.ValorFrete + _entrada.ValorSeguro + _entrada.ValorOutrasDespesas).ToString("C2"))</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2">Descontos:</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Error">- @_entrada.ValorDesconto.ToString("C2")</MudText>
+                        </div>
+                        <MudDivider Class="my-2" />
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Valor Total Faturado:</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="font-weight-bold" Color="Color.Primary">@_entrada.ValorTotal.ToString("C2")</MudText>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+
+                @if (!string.IsNullOrWhiteSpace(_entrada.Observacoes))
+                {
+                    <MudItem xs="12">
+                        <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">OBSERVAÇÕES DA CONFERÊNCIA:</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-1">@_entrada.Observacoes</MudText>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int EntradaId { get; set; }
+
+    private bool _carregando = true;
+    private EntradaMercadoriaDetalheDto? _entrada;
+    private List<ContaPagar> _titulosFinanceiro = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _carregando = true;
+            _entrada = await Mediator.Send(new GetEntradaMercadoriaByIdQuery(EntradaId));
+
+            if (_entrada?.IdParcelamento != null)
+            {
+                _titulosFinanceiro = await Context.ContasPagar
+                    .AsNoTracking()
+                    .Where(c => c.IdParcelamento == _entrada.IdParcelamento.Value)
+                    .OrderBy(c => c.NumeroParcela)
+                    .ToListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar detalhes: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void Fechar() => MudDialog.Close();
+}
