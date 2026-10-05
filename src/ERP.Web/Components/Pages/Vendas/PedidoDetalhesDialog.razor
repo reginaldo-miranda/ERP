@@ -1,0 +1,264 @@
+@using ERP.Application.Vendas.DTOs
+@using ERP.Application.Vendas.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Primary" Class="mr-2" />
+                <MudText Typo="Typo.h6">Detalhes do Pedido @_detalhe?.Numero</MudText>
+            </div>
+            @if (_detalhe != null)
+            {
+                <div>
+                    @switch (_detalhe.Status)
+                    {
+                        case StatusPedidoVenda.Pendente:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">Pendente</MudChip>
+                            break;
+                        case StatusPedidoVenda.Aprovado:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">Aprovado</MudChip>
+                            break;
+                        case StatusPedidoVenda.Faturado:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">Faturado</MudChip>
+                            break;
+                        case StatusPedidoVenda.Cancelado:
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Cancelado</MudChip>
+                            break;
+                    }
+                </div>
+            }
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_detalhe == null)
+        {
+            <MudAlert Severity="Severity.Error">Não foi possível carregar os detalhes do pedido.</MudAlert>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <!-- Card de Informações do Cliente -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">CLIENTE</MudText>
+                        <MudText Typo="Typo.body1" Class="font-weight-bold">@_detalhe.ClienteNome</MudText>
+                        @if (!string.IsNullOrWhiteSpace(_detalhe.ClienteCpfCnpj))
+                        {
+                            <MudText Typo="Typo.body2">CPF/CNPJ: @_detalhe.ClienteCpfCnpj</MudText>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_detalhe.ClienteEmail))
+                        {
+                            <MudText Typo="Typo.body2">E-mail: @_detalhe.ClienteEmail</MudText>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_detalhe.ClienteTelefone))
+                        {
+                            <MudText Typo="Typo.body2">Telefone: @_detalhe.ClienteTelefone</MudText>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Card de Informações Comerciais -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">INFORMAÇÕES COMERCIAIS</MudText>
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2">Data do Pedido:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@_detalhe.DataPedido.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2">Depósito de Saída:</MudText>
+                            <MudText Typo="Typo.body2">@(_detalhe.DepositoNome ?? "Padrão")</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2">Forma de Pagto:</MudText>
+                            <MudText Typo="Typo.body2">@(_detalhe.FormaPagamentoNome ?? "A Combinar")</MudText>
+                        </div>
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2">Condição:</MudText>
+                            <MudText Typo="Typo.body2">@_detalhe.NumeroParcelas x (a cada @_detalhe.IntervaloDias dias)</MudText>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(_detalhe.VendedorNome))
+                        {
+                            <div class="d-flex justify-space-between">
+                                <MudText Typo="Typo.body2">Vendedor:</MudText>
+                                <MudText Typo="Typo.body2">@_detalhe.VendedorNome</MudText>
+                            </div>
+                        }
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Tabela de Itens -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mt-2 mb-1">Itens do Pedido (@_detalhe.Itens.Count)</MudText>
+                    <MudTable Items="@_detalhe.Itens" Dense="true" Hover="true" Bordered="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Tipo</MudTh>
+                            <MudTh>Descrição</MudTh>
+                            <MudTh class="text-right">Qtd</MudTh>
+                            <MudTh class="text-right">Unitário</MudTh>
+                            <MudTh class="text-right">Desc.</MudTh>
+                            <MudTh class="text-right">Subtotal</MudTh>
+                            @if (_detalhe.Status == StatusPedidoVenda.Faturado)
+                            {
+                                <MudTh class="text-right">Custo Unit.</MudTh>
+                            }
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@(context.TipoItem == TipoItemVenda.Produto ? Color.Primary : Color.Secondary)">
+                                    @(context.TipoItem == TipoItemVenda.Produto ? "Produto" : "Serviço")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd Class="font-weight-bold">
+                                @(string.IsNullOrWhiteSpace(context.ProdutoCodigo) ? "" : $"[{context.ProdutoCodigo}] ")
+                                @context.Descricao
+                            </MudTd>
+                            <MudTd Class="text-right">@context.Quantidade.ToString("N2")</MudTd>
+                            <MudTd Class="text-right">@context.PrecoUnitario.ToString("C2")</MudTd>
+                            <MudTd Class="text-right">@context.ValorDesconto.ToString("C2")</MudTd>
+                            <MudTd Class="text-right font-weight-bold">@context.SubTotal.ToString("C2")</MudTd>
+                            @if (_detalhe.Status == StatusPedidoVenda.Faturado)
+                            {
+                                <MudTd Class="text-right mud-text-secondary" style="font-size: 0.8rem;">
+                                    @context.CustoUnitario.ToString("C2")
+                                </MudTd>
+                            }
+                        </RowTemplate>
+                    </MudTable>
+                </MudItem>
+
+                <!-- Totais e Observação -->
+                <MudItem xs="12" sm="7">
+                    @if (!string.IsNullOrWhiteSpace(_detalhe.Observacao))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Observações:</MudText>
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@_detalhe.Observacao</MudText>
+                    }
+                    @if (_detalhe.DataCancelamento.HasValue)
+                    {
+                        <div class="mt-2 text-danger">
+                            <MudText Typo="Typo.caption" Color="Color.Error">Cancelado em @_detalhe.DataCancelamento.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
+                            @if (!string.IsNullOrWhiteSpace(_detalhe.MotivoCancelamento))
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Error">Motivo: @_detalhe.MotivoCancelamento</MudText>
+                            }
+                        </div>
+                    }
+                </MudItem>
+
+                <MudItem xs="12" sm="5">
+                    <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2">Total Bruto:</MudText>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold">@_detalhe.ValorBruto.ToString("C2")</MudText>
+                        </div>
+                        @if (_detalhe.ValorDesconto > 0)
+                        {
+                            <div class="d-flex justify-space-between mb-1 text-danger">
+                                <MudText Typo="Typo.body2" Color="Color.Error">Desconto Geral:</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Error" Class="font-weight-bold">- @_detalhe.ValorDesconto.ToString("C2")</MudText>
+                            </div>
+                        }
+                        <MudDivider Class="my-2" />
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.h6" Class="font-weight-bold">TOTAL:</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Primary" Class="font-weight-bold">@_detalhe.ValorTotal.ToString("C2")</MudText>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+
+                <!-- Histórico de Faturamentos -->
+                @if (_detalhe.Faturamentos.Any())
+                {
+                    <MudItem xs="12">
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">Faturamentos Emitidos</MudText>
+                        @foreach (var f in _detalhe.Faturamentos)
+                        {
+                            <div class="d-flex justify-space-between align-center pa-2 mb-1" style="background: var(--mud-palette-background-grey); border-radius: 6px;">
+                                <div>
+                                    <span class="font-weight-bold">@f.Numero</span>
+                                    <span class="mud-text-secondary ml-2">(@f.DataFaturamento.ToString("dd/MM/yyyy HH:mm"))</span>
+                                </div>
+                                <div class="d-flex align-center gap-3">
+                                    <span>Valor: <b>@f.ValorTotal.ToString("C2")</b></span>
+                                    <span class="mud-text-secondary" style="font-size: 0.8rem;">CMV: @f.CustoTotal.ToString("C2")</span>
+                                    <MudChip T="string" Size="Size.Small" Color="@(f.Status == StatusFaturamento.Emitido ? Color.Success : Color.Error)">
+                                        @f.Status
+                                    </MudChip>
+                                </div>
+                            </div>
+                        }
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" Color="Color.Default" OnClick="BaixarPdf">
+            Imprimir PDF
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Fechar">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int PedidoVendaId { get; set; }
+
+    private bool _carregando = true;
+    private PedidoVendaDetalheDto? _detalhe;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _carregando = true;
+            var result = await Mediator.Send(new GetPedidoVendaByIdQuery(PedidoVendaId));
+            if (result.Sucesso)
+            {
+                _detalhe = result.Dados;
+            }
+            else
+            {
+                Snackbar.Add($"Erro ao carregar detalhes: {string.Join(", ", result.Erros)}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task BaixarPdf()
+    {
+        try
+        {
+            var pdfBytes = await Mediator.Send(new GerarPedidoVendaPdfQuery(PedidoVendaId));
+            string base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("open", $"data:application/pdf;base64,{base64}", "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Fechar() => MudDialog.Close();
+}

@@ -37,7 +37,11 @@ public static class DatabaseSeeder
             ("Financeiro.ContasPagar.Visualizar", "Financeiro", "ContasPagar", "Visualizar", "Visualizar contas a pagar"),
             ("Financeiro.ContasReceber.Visualizar", "Financeiro", "ContasReceber", "Visualizar", "Visualizar contas a receber"),
 
+            ("Vendas.Orcamentos.Visualizar", "Vendas", "Orcamentos", "Visualizar", "Visualizar orçamentos"),
+            ("Vendas.Orcamentos.Gerenciar", "Vendas", "Orcamentos", "Gerenciar", "Criar, editar e converter orçamentos"),
             ("Vendas.Pedidos.Visualizar", "Vendas", "Pedidos", "Visualizar", "Visualizar pedidos de venda"),
+            ("Vendas.Pedidos.Gerenciar", "Vendas", "Pedidos", "Gerenciar", "Criar, aprovar e faturar pedidos de venda"),
+            ("Vendas.Relatorios.Visualizar", "Vendas", "Relatorios", "Visualizar", "Visualizar relatórios e histórico de vendas"),
             ("Estoque.Posicao.Visualizar", "Estoque", "Posicao", "Visualizar", "Visualizar posição de estoque"),
             ("Fiscal.NFe.Visualizar", "Fiscal", "NFe", "Visualizar", "Visualizar notas fiscais"),
             ("Contabilidade.Eventos.Visualizar", "Contabilidade", "Eventos", "Visualizar", "Visualizar eventos contábeis"),

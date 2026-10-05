@@ -1,0 +1,277 @@
+@page "/vendas/faturamento"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Vendas.Commands
+@using ERP.Application.Vendas.DTOs
+@using ERP.Application.Vendas.Queries
+@using ERP.Domain.Core.Entities.Vendas
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<PageTitle>Faturamento de Vendas - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+            Central de Faturamento
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Processamento de pedidos aprovados, baixa definitiva de estoque e geração de títulos a receber.
+        </MudText>
+    </div>
+</div>
+
+<!-- Indicadores de Faturamento -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.HourglassTop" Size="Size.Large" Color="Color.Warning" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">AGUARDANDO FATURAMENTO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_pedidosAFaturar.Count</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Warning">@_pedidosAFaturar.Sum(p => p.ValorTotal).ToString("C2")</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">RECEITA FATURADA</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalReceitaFaturada.ToString("C2")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">@_totalFaturamentosEmitidos faturamentos</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Color="Color.Info" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CMV (CUSTO DO ESTOQUE)</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalCmvFaturado.ToString("C2")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Info">Custo dos produtos baixados</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">LUCRO BRUTO DA VENDA</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@((_totalReceitaFaturada - _totalCmvFaturado).ToString("C2"))</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Primary">
+                        @(_totalReceitaFaturada > 0 ? $"{((_totalReceitaFaturada - _totalCmvFaturado) / _totalReceitaFaturada * 100m):N1}% de margem" : "0% de margem")
+                    </MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<MudCard Elevation="2">
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true">
+        <!-- Aba 1: Fila de Pedidos Aprovados -->
+        <MudTabPanel Text="Fila de Faturamento" Icon="@Icons.Material.Filled.QueuePlayNext" BadgeData="@_pedidosAFaturar.Count" BadgeColor="Color.Warning">
+            <div class="pa-4">
+                @if (_carregando)
+                {
+                    <div class="d-flex justify-center pa-8">
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                    </div>
+                }
+                else if (!_pedidosAFaturar.Any())
+                {
+                    <div class="pa-8 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.TaskAlt" Size="Size.Large" Color="Color.Success" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">Fila de faturamento zerada!</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Todos os pedidos aprovados já foram faturados ou não há novos pedidos aprovados.</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudTable Items="@_pedidosAFaturar" Hover="true" Striped="true" Elevation="0" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Pedido</MudTh>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh>Data Aprovado</MudTh>
+                            <MudTh>Depósito</MudTh>
+                            <MudTh>Condição Pagamento</MudTh>
+                            <MudTh class="text-right">Itens</MudTh>
+                            <MudTh class="text-right">Valor Total</MudTh>
+                            <MudTh class="text-right">Ação</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Pedido" Class="font-weight-bold">@context.Numero</MudTd>
+                            <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                            <MudTd DataLabel="Data">@(context.DataAprovacao?.ToString("dd/MM/yyyy HH:mm") ?? "-")</MudTd>
+                            <MudTd DataLabel="Depósito">@(context.DepositoNome ?? "Padrão")</MudTd>
+                            <MudTd DataLabel="Condição">
+                                @(context.FormaPagamentoNome ?? "A Combinar")
+                                @if (context.NumeroParcelas > 1)
+                                {
+                                    <span class="mud-text-secondary"> (@context.NumeroParcelas x)</span>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Itens" Class="text-right">@context.TotalItens</MudTd>
+                            <MudTd DataLabel="Valor Total" Class="text-right font-weight-bold" Style="color: var(--mud-palette-success);">
+                                @context.ValorTotal.ToString("C2")
+                            </MudTd>
+                            <MudTd DataLabel="Ação" Class="text-right">
+                                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small" StartIcon="@Icons.Material.Filled.Receipt" OnClick="@(() => FaturarPedido(context))">
+                                    Faturar Agora
+                                </MudButton>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <!-- Aba 2: Histórico de Faturamentos -->
+        <MudTabPanel Text="Faturamentos Realizados" Icon="@Icons.Material.Filled.History">
+            <div class="pa-4">
+                @if (_carregando)
+                {
+                    <div class="d-flex justify-center pa-8">
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                    </div>
+                }
+                else if (!_faturamentos.Any())
+                {
+                    <div class="pa-8 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum faturamento registrado</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudTable Items="@_faturamentos" Hover="true" Striped="true" Elevation="0" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Nº Faturamento</MudTh>
+                            <MudTh>Data / Hora</MudTh>
+                            <MudTh>Nº Pedido</MudTh>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh class="text-right">Valor Faturado</MudTh>
+                            <MudTh class="text-right">CMV (Custo)</MudTh>
+                            <MudTh class="text-right">Lucro Bruto</MudTh>
+                            <MudTh class="text-center">Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Nº Faturamento" Class="font-weight-bold">@context.Numero</MudTd>
+                            <MudTd DataLabel="Data">@context.DataFaturamento.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd DataLabel="Pedido">@context.PedidoVenda?.Numero</MudTd>
+                            <MudTd DataLabel="Cliente">@context.PedidoVenda?.Cliente?.Nome</MudTd>
+                            <MudTd DataLabel="Valor Faturado" Class="text-right font-weight-bold" Style="color: var(--mud-palette-success);">
+                                @context.ValorTotal.ToString("C2")
+                            </MudTd>
+                            <MudTd DataLabel="CMV" Class="text-right mud-text-secondary">@context.CustoTotal.ToString("C2")</MudTd>
+                            <MudTd DataLabel="Lucro Bruto" Class="text-right font-weight-bold">
+                                @((context.ValorTotal - context.CustoTotal).ToString("C2"))
+                            </MudTd>
+                            <MudTd DataLabel="Status" Class="text-center">
+                                @if (context.Status == StatusFaturamento.Emitido)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">Emitido</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Cancelado</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </div>
+        </MudTabPanel>
+    </MudTabs>
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private List<PedidoVendaListItemDto> _pedidosAFaturar = new();
+    private List<Faturamento> _faturamentos = new();
+
+    private decimal _totalReceitaFaturada = 0m;
+    private decimal _totalCmvFaturado = 0m;
+    private int _totalFaturamentosEmitidos = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            _carregando = true;
+
+            // Busca pedidos com status Aprovado
+            var resultadoPedidos = await Mediator.Send(new GetPedidosVendaQuery(
+                null, null, null, StatusPedidoVenda.Aprovado, null, null, 1, 200
+            ));
+            _pedidosAFaturar = resultadoPedidos.Itens.ToList();
+
+            // Busca faturamentos emitidos
+            _faturamentos = await Context.Faturamentos.AsNoTracking()
+                .Include(f => f.PedidoVenda)
+                    .ThenInclude(p => p.Cliente)
+                .OrderByDescending(f => f.DataFaturamento)
+                .ToListAsync();
+
+            var emitidos = _faturamentos.Where(f => f.Status == StatusFaturamento.Emitido).ToList();
+            _totalFaturamentosEmitidos = emitidos.Count;
+            _totalReceitaFaturada = emitidos.Sum(f => f.ValorTotal);
+            _totalCmvFaturado = emitidos.Sum(f => f.CustoTotal);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar faturamentos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task FaturarPedido(PedidoVendaListItemDto item)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(FaturarPedidoDialog.PedidoVendaId), item.Id },
+            { nameof(FaturarPedidoDialog.PedidoNumero), item.Numero },
+            { nameof(FaturarPedidoDialog.ClienteNome), item.ClienteNome },
+            { nameof(FaturarPedidoDialog.ValorTotal), item.ValorTotal },
+            { nameof(FaturarPedidoDialog.NumeroParcelasInicial), item.NumeroParcelas }
+        };
+
+        var dialog = await DialogService.ShowAsync<FaturarPedidoDialog>("Faturar Pedido", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is FaturarPedidoDto dto)
+        {
+            try
+            {
+                var fatId = await Mediator.Send(new FaturarPedidoVendaCommand(dto));
+                Snackbar.Add($"Pedido {item.Numero} faturado com sucesso! Baixa de estoque e títulos financeiros gerados.", Severity.Success);
+                await CarregarDados();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao faturar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

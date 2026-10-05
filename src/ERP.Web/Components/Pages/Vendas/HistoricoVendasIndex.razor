@@ -1,0 +1,246 @@
+@page "/vendas/historico"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Vendas.DTOs
+@using ERP.Application.Vendas.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+
+<PageTitle>Histórico & Relatórios de Vendas - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Insights" Class="mr-2" />
+            Histórico &amp; Relatórios de Vendas
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Análise comercial por período, cliente e produto com apuração de faturamento, CMV e margem de contribuição.
+        </MudText>
+    </div>
+</div>
+
+<!-- Cards de Indicadores Gerenciais -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">FATURAMENTO TOTAL</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_resumo.TotalVendido.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@_resumo.PedidosFaturados vendas</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">CMV (CUSTO TOTAL)</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Error">@_resumo.CustoTotalVendido.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Custo mercadorias</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">LUCRO BRUTO COMERCIAL</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">@_resumo.LucroBruto.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Primary">Receita - CMV</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">MARGEM BRUTA</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="@(_resumo.MargemGeralPercentual >= 25 ? Color.Success : Color.Warning)">
+                    @_resumo.MargemGeralPercentual.ToString("N1")%
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Média geral</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TICKET MÉDIO</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">@_resumo.TicketMedio.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Por venda faturada</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros de Pesquisa -->
+<MudCard Elevation="2" Class="mb-4">
+    <MudCardContent Class="pb-2">
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="3">
+                <MudTextField @bind-Value="_busca" Placeholder="Buscar por pedido, cliente ou vendedor..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Immediate="true" TextChanged="CarregarRelatorio" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" Label="Cliente" @bind-Value="_clienteId" Clearable="true" SelectedValuesChanged="CarregarRelatorio" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var c in _clientes)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudSelect T="StatusPedidoVenda?" Label="Status" @bind-Value="_status" Clearable="true" SelectedValuesChanged="CarregarRelatorio" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Faturado)">Faturado</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Aprovado)">Aprovado</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Pendente)">Pendente</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Cancelado)">Cancelado</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudDatePicker Label="Data Início" @bind-Date="_dataInicio" Editable="true" DateFormat="dd/MM/yyyy" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudDatePicker Label="Data Fim" @bind-Date="_dataFim" Editable="true" DateFormat="dd/MM/yyyy" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<!-- Tabela de Resultados -->
+<MudCard Elevation="2">
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_itens.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum registro encontrado para os filtros selecionados</MudText>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@_itens" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>Pedido</MudTh>
+                <MudTh>Data</MudTh>
+                <MudTh>Cliente</MudTh>
+                <MudTh>Vendedor</MudTh>
+                <MudTh>Pagamento</MudTh>
+                <MudTh class="text-right">Faturamento (R$)</MudTh>
+                <MudTh class="text-right">CMV / Custo</MudTh>
+                <MudTh class="text-right">Lucro Bruto</MudTh>
+                <MudTh class="text-right">Margem %</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+                <MudTh class="text-right">Ação</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Pedido" Class="font-weight-bold">
+                    <MudLink Href="#" OnClick="@(() => VerDetalhes(context.PedidoId))">@context.PedidoNumero</MudLink>
+                    @if (!string.IsNullOrWhiteSpace(context.FaturamentoNumero))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">Fat: @context.FaturamentoNumero</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Data">@context.DataVenda.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                <MudTd DataLabel="Vendedor">@(context.VendedorNome ?? "-")</MudTd>
+                <MudTd DataLabel="Pagamento">@context.FormasPagamento</MudTd>
+                <MudTd DataLabel="Faturamento" Class="text-right font-weight-bold" Style="color: var(--mud-palette-success);">
+                    @context.ValorTotal.ToString("C2")
+                </MudTd>
+                <MudTd DataLabel="CMV" Class="text-right mud-text-secondary">
+                    @context.CustoTotal.ToString("C2")
+                </MudTd>
+                <MudTd DataLabel="Lucro Bruto" Class="text-right font-weight-bold" Style="@(context.LucroBruto >= 0 ? "color: var(--mud-palette-primary);" : "color: var(--mud-palette-error);")">
+                    @context.LucroBruto.ToString("C2")
+                </MudTd>
+                <MudTd DataLabel="Margem %" Class="text-right font-weight-bold" Style="@(context.MargemPercentual >= 20 ? "color: var(--mud-palette-success);" : "color: var(--mud-palette-warning);")">
+                    @context.MargemPercentual.ToString("N1")%
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @switch (context.Status)
+                    {
+                        case StatusPedidoVenda.Faturado:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">Faturado</MudChip>
+                            break;
+                        case StatusPedidoVenda.Aprovado:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">Aprovado</MudChip>
+                            break;
+                        case StatusPedidoVenda.Pendente:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">Pendente</MudChip>
+                            break;
+                        case StatusPedidoVenda.Cancelado:
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Cancelado</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ação" Class="text-right">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Primary" OnClick="@(() => VerDetalhes(context.PedidoId))" Title="Ver Detalhes" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private int? _clienteId;
+    private StatusPedidoVenda? _status;
+    private DateTime? _dataInicio;
+    private DateTime? _dataFim;
+
+    private List<HistoricoVendasItemDto> _itens = new();
+    private List<Cliente> _clientes = new();
+    private ResumoVendasDto _resumo = new(0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientes = await Context.Clientes.AsNoTracking().Where(c => c.Ativo).OrderBy(c => c.Nome).ToListAsync();
+        await CarregarRelatorio();
+    }
+
+    private async Task CarregarRelatorio()
+    {
+        try
+        {
+            _carregando = true;
+
+            var resultado = await Mediator.Send(new GetHistoricoVendasQuery(
+                _busca,
+                _clienteId,
+                null,
+                _status,
+                _dataInicio,
+                _dataFim,
+                1,
+                100
+            ));
+
+            _itens = resultado.Itens.ToList();
+
+            _resumo = await Mediator.Send(new GetResumoVendasQuery(_dataInicio, _dataFim));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar relatório: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task VerDetalhes(int pedidoId)
+    {
+        var parameters = new DialogParameters { { nameof(PedidoDetalhesDialog.PedidoVendaId), pedidoId } };
+        await DialogService.ShowAsync<PedidoDetalhesDialog>("Detalhes do Pedido", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+}

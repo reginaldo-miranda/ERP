@@ -1,0 +1,170 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Vendas.DTOs
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Entities.Financeiro
+@using Microsoft.EntityFrameworkCore
+@inject IApplicationDbContext Context
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Success" Class="mr-2" />
+            <MudText Typo="Typo.h6">Faturar Pedido @PedidoNumero</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-6">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-3" Dense="true">
+                O faturamento efetuará a <b>baixa automática no estoque</b> e gerará os <b>títulos a receber</b> no módulo Financeiro.
+            </MudAlert>
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Cliente</MudText>
+                    <MudText Typo="Typo.body1" Class="font-weight-bold">@ClienteNome</MudText>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="int?" Label="Depósito para Baixa de Estoque *" @bind-Value="_depositoId" Required="true" Dense="true" Variant="Variant.Outlined">
+                        @foreach (var d in _depositos)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)d.Id)">@d.Nome @(d.Padrao ? "(Padrão)" : "")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSelect T="int?" Label="Forma de Pagamento *" @bind-Value="_formaPagamentoId" Dense="true" Variant="Variant.Outlined">
+                        <MudSelectItem T="int?" Value="@((int?)null)">A Combinar</MudSelectItem>
+                        @foreach (var fp in _formasPagamento)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)fp.Id)">@fp.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="4">
+                    <MudNumericField T="int" Label="Parcelas" @bind-Value="_numeroParcelas" Min="1" Max="60" Dense="true" Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="4">
+                    <MudNumericField T="int" Label="Intervalo" @bind-Value="_intervaloDias" Min="1" Max="365" Dense="true" Variant="Variant.Outlined" HelperText="dias" />
+                </MudItem>
+
+                <MudItem xs="4">
+                    <MudNumericField T="int" Label="1º Venc." @bind-Value="_diasPrimeiroVencimento" Min="0" Max="365" Dense="true" Variant="Variant.Outlined" HelperText="dias (+)" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_observacao" Label="Observações do Faturamento" Lines="2" Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                        <div class="d-flex justify-space-between align-center">
+                            <MudText Typo="Typo.subtitle2">Valor a Faturar:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Success" Class="font-weight-bold">@ValorTotal.ToString("C2")</MudText>
+                        </div>
+                        @if (_numeroParcelas > 1 && ValorTotal > 0)
+                        {
+                            <div class="text-right mud-text-secondary mt-1" style="font-size: 0.8rem;">
+                                Rateio: @_numeroParcelas x de aprox. @((ValorTotal / _numeroParcelas).ToString("C2"))
+                            </div>
+                        }
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="Confirmar" Disabled="_carregando || !_depositoId.HasValue">
+            Confirmar Faturamento
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int PedidoVendaId { get; set; }
+    [Parameter] public string PedidoNumero { get; set; } = string.Empty;
+    [Parameter] public string ClienteNome { get; set; } = string.Empty;
+    [Parameter] public decimal ValorTotal { get; set; }
+    [Parameter] public int? DepositoIdInicial { get; set; }
+    [Parameter] public int? FormaPagamentoIdInicial { get; set; }
+    [Parameter] public int NumeroParcelasInicial { get; set; } = 1;
+    [Parameter] public int IntervaloDiasInicial { get; set; } = 30;
+    [Parameter] public int DiasPrimeiroVencimentoInicial { get; set; } = 0;
+
+    private bool _carregando = true;
+    private int? _depositoId;
+    private int? _formaPagamentoId;
+    private int _numeroParcelas = 1;
+    private int _intervaloDias = 30;
+    private int _diasPrimeiroVencimento = 0;
+    private string? _observacao;
+
+    private List<Deposito> _depositos = new();
+    private List<FormaPagamento> _formasPagamento = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _carregando = true;
+            _depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+            _formasPagamento = await Context.FormasPagamento.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.Nome).ToListAsync();
+
+            _depositoId = DepositoIdInicial;
+            if (!_depositoId.HasValue)
+            {
+                var depPadrao = _depositos.FirstOrDefault(d => d.Padrao) ?? _depositos.FirstOrDefault();
+                _depositoId = depPadrao?.Id;
+            }
+
+            _formaPagamentoId = FormaPagamentoIdInicial;
+            _numeroParcelas = Math.Max(1, NumeroParcelasInicial);
+            _intervaloDias = Math.Max(1, IntervaloDiasInicial);
+            _diasPrimeiroVencimento = Math.Max(0, DiasPrimeiroVencimentoInicial);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar opções: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void Confirmar()
+    {
+        if (!_depositoId.HasValue)
+        {
+            Snackbar.Add("Selecione o depósito para a baixa de estoque.", Severity.Warning);
+            return;
+        }
+
+        var dto = new FaturarPedidoDto(
+            PedidoVendaId,
+            _depositoId,
+            _formaPagamentoId,
+            _numeroParcelas,
+            _intervaloDias,
+            _diasPrimeiroVencimento,
+            _observacao
+        );
+
+        MudDialog.Close(DialogResult.Ok(dto));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

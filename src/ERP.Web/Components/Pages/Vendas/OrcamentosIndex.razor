@@ -1,0 +1,448 @@
+@page "/vendas/orcamentos"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Vendas.Commands
+@using ERP.Application.Vendas.DTOs
+@using ERP.Application.Vendas.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IApplicationDbContext Context
+
+<PageTitle>Orçamentos de Venda - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.RequestQuote" Class="mr-2" />
+            Orçamentos de Venda
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Elaboração de propostas comerciais para clientes com conversão ágil para pedidos.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoOrcamento">
+        Novo Orçamento
+    </MudButton>
+</div>
+
+<!-- Cards de Indicadores Rápidos -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.FolderOpen" Size="Size.Large" Color="Color.Info" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">ORÇAMENTOS EM ABERTO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalAbertos</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Info">@_valorAbertos.ToString("C2")</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CONVERTIDOS EM PEDIDO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalConvertidos</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">@_valorConvertidos.ToString("C2")</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Large" Color="Color.Warning" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">PROPOSTAS EXPIRADAS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalExpirados</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Warning">Validade ultrapassada</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR TOTAL COTADO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_valorGeral.ToString("C2")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_totalGeral propostas</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros e Tabela -->
+<MudCard Elevation="2">
+    <MudCardContent Class="pb-2">
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_busca" Placeholder="Buscar por número, cliente ou vendedor..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Immediate="true" TextChanged="CarregarOrcamentos" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" Label="Filtrar por Cliente" @bind-Value="_clienteFiltroId" Clearable="true" SelectedValuesChanged="CarregarOrcamentos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var c in _clientes)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="StatusOrcamento?" Label="Status" @bind-Value="_statusFiltro" Clearable="true" SelectedValuesChanged="CarregarOrcamentos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="StatusOrcamento?" Value="@((StatusOrcamento?)StatusOrcamento.Aberto)">Aberto</MudSelectItem>
+                    <MudSelectItem T="StatusOrcamento?" Value="@((StatusOrcamento?)StatusOrcamento.Convertido)">Convertido em Pedido</MudSelectItem>
+                    <MudSelectItem T="StatusOrcamento?" Value="@((StatusOrcamento?)StatusOrcamento.Rejeitado)">Rejeitado</MudSelectItem>
+                    <MudSelectItem T="StatusOrcamento?" Value="@((StatusOrcamento?)StatusOrcamento.Cancelado)">Cancelado</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2" Class="d-flex align-center">
+                <MudCheckBox T="bool" Value="_apenasExpirados" ValueChanged="OnApenasExpiradosChanged" Label="Apenas Expirados" Color="Color.Warning" Dense="true" />
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_orcamentos.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.RequestQuote" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum orçamento encontrado</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Crie o primeiro orçamento para iniciar uma proposta de venda.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoOrcamento">
+                Criar Orçamento
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@_orcamentos" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>Número</MudTh>
+                <MudTh>Cliente</MudTh>
+                <MudTh>Emissão</MudTh>
+                <MudTh>Validade</MudTh>
+                <MudTh>Vendedor</MudTh>
+                <MudTh class="text-right">Itens</MudTh>
+                <MudTh class="text-right">Valor Total</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+                <MudTh class="text-right">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Número" Class="font-weight-bold">
+                    <MudLink Href="#" OnClick="@(() => EditarOrcamento(context))">@context.Numero</MudLink>
+                    @if (context.PedidoVendaId.HasValue)
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">
+                            Pedido: @context.PedidoVendaNumero
+                        </div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Cliente">
+                    <span class="font-weight-bold">@context.ClienteNome</span>
+                    @if (!string.IsNullOrWhiteSpace(context.ClienteCpfCnpj))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">@context.ClienteCpfCnpj</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Emissão">@context.DataOrcamento.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Validade">
+                    @context.DataValidade.ToString("dd/MM/yyyy")
+                    @if (context.StatusCalculado == "Expirado")
+                    {
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Warning" Class="ml-1" Title="Validade expirada" />
+                    }
+                </MudTd>
+                <MudTd DataLabel="Vendedor">@(context.VendedorNome ?? "-")</MudTd>
+                <MudTd DataLabel="Itens" Class="text-right">@context.TotalItens</MudTd>
+                <MudTd DataLabel="Valor Total" Class="text-right font-weight-bold">
+                    @context.ValorTotal.ToString("C2")
+                    @if (context.ValorDesconto > 0)
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.7rem; color: var(--mud-palette-error);">
+                            Desc: @context.ValorDesconto.ToString("C2")
+                        </div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @switch (context.StatusCalculado)
+                    {
+                        case "Convertido":
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">Convertido</MudChip>
+                            break;
+                        case "Expirado":
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">Expirado</MudChip>
+                            break;
+                        case "Aberto":
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">Aberto</MudChip>
+                            break;
+                        case "Rejeitado":
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Outlined">Rejeitado</MudChip>
+                            break;
+                        case "Cancelado":
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Text">Cancelado</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ações" Class="text-right">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Filled.PictureAsPdf" OnClick="@(() => BaixarPdf(context.Id))">
+                            Baixar / Imprimir PDF
+                        </MudMenuItem>
+                        @if (context.Status == StatusOrcamento.Aberto)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditarOrcamento(context))">
+                                Editar Orçamento
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.ShoppingBag" Color="Color.Success" OnClick="@(() => ConverterEmPedido(context))">
+                                Converter em Pedido de Venda
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.ThumbDown" Color="Color.Warning" OnClick="@(() => RejeitarOrcamento(context))">
+                                Marcar como Rejeitado
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" OnClick="@(() => CancelarOrcamento(context))">
+                                Cancelar Proposta
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private int? _clienteFiltroId;
+    private StatusOrcamento? _statusFiltro;
+    private bool _apenasExpirados = false;
+
+    private List<OrcamentoListItemDto> _orcamentos = new();
+    private List<Cliente> _clientes = new();
+
+    private int _totalAbertos = 0;
+    private decimal _valorAbertos = 0m;
+    private int _totalConvertidos = 0;
+    private decimal _valorConvertidos = 0m;
+    private int _totalExpirados = 0;
+    private decimal _valorGeral = 0m;
+    private int _totalGeral = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientes = await Context.Clientes.AsNoTracking().Where(c => c.Ativo).OrderBy(c => c.Nome).ToListAsync();
+        await CarregarOrcamentos();
+    }
+
+    private async Task CarregarOrcamentos()
+    {
+        try
+        {
+            _carregando = true;
+
+            var resultado = await Mediator.Send(new GetOrcamentosQuery(
+                _busca,
+                _clienteFiltroId,
+                _statusFiltro,
+                _apenasExpirados,
+                null,
+                null,
+                1,
+                100
+            ));
+
+            _orcamentos = resultado.Itens.ToList();
+
+            // Recalcula cards
+            var hoje = DateTime.UtcNow.Date;
+            var todos = await Context.Orcamentos.AsNoTracking().ToListAsync();
+            _totalGeral = todos.Count;
+            _valorGeral = todos.Sum(o => o.ValorTotal);
+
+            _totalAbertos = todos.Count(o => o.Status == StatusOrcamento.Aberto && o.DataValidade.Date >= hoje);
+            _valorAbertos = todos.Where(o => o.Status == StatusOrcamento.Aberto && o.DataValidade.Date >= hoje).Sum(o => o.ValorTotal);
+
+            _totalConvertidos = todos.Count(o => o.Status == StatusOrcamento.Convertido);
+            _valorConvertidos = todos.Where(o => o.Status == StatusOrcamento.Convertido).Sum(o => o.ValorTotal);
+
+            _totalExpirados = todos.Count(o => o.Status == StatusOrcamento.Aberto && o.DataValidade.Date < hoje);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar orçamentos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnApenasExpiradosChanged(bool valor)
+    {
+        _apenasExpirados = valor;
+        await CarregarOrcamentos();
+    }
+
+    private async Task NovoOrcamento()
+    {
+        var dialog = await DialogService.ShowAsync<OrcamentoDialog>("Novo Orçamento", new DialogParameters(), new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CriarOrcamentoDto dto)
+        {
+            try
+            {
+                var id = await Mediator.Send(new CriarOrcamentoCommand(dto));
+                Snackbar.Add("Orçamento criado com sucesso!", Severity.Success);
+                await CarregarOrcamentos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar orçamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task EditarOrcamento(OrcamentoListItemDto item)
+    {
+        if (item.Status != StatusOrcamento.Aberto)
+        {
+            Snackbar.Add($"Orçamentos com status '{item.StatusCalculado}' não podem ser editados.", Severity.Info);
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { nameof(OrcamentoDialog.OrcamentoId), item.Id },
+            { nameof(OrcamentoDialog.NumeroOrcamento), item.Numero }
+        };
+
+        var dialog = await DialogService.ShowAsync<OrcamentoDialog>("Editar Orçamento", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CriarOrcamentoDto dto)
+        {
+            try
+            {
+                var atualizarDto = new AtualizarOrcamentoDto(
+                    dto.ClienteId,
+                    dto.VendedorId,
+                    dto.VendedorNome,
+                    dto.DataOrcamento,
+                    dto.DataValidade,
+                    dto.DescontoTipo,
+                    dto.DescontoGeral,
+                    dto.Observacao,
+                    dto.Itens
+                );
+
+                await Mediator.Send(new AtualizarOrcamentoCommand(item.Id, atualizarDto));
+                Snackbar.Add("Orçamento atualizado com sucesso!", Severity.Success);
+                await CarregarOrcamentos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar orçamento: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ConverterEmPedido(OrcamentoListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Converter Orçamento em Pedido de Venda",
+            $"Deseja converter o Orçamento {item.Numero} do cliente '{item.ClienteNome}' no valor de {item.ValorTotal:C2} em um Pedido de Venda?",
+            yesText: "Converter Agora", cancelText: "Cancelar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                var pedidoId = await Mediator.Send(new ConverterOrcamentoEmPedidoCommand(item.Id));
+                Snackbar.Add($"Orçamento convertido com sucesso! Pedido de Venda gerado.", Severity.Success);
+                await CarregarOrcamentos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao converter: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RejeitarOrcamento(OrcamentoListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Rejeitar Proposta Comercial",
+            $"Confirma marcar o Orçamento {item.Numero} como Rejeitado pelo cliente?",
+            yesText: "Confirmar Rejeição", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new RejeitarOrcamentoCommand(item.Id, "Rejeitado pelo cliente"));
+                Snackbar.Add("Orçamento marcado como rejeitado.", Severity.Info);
+                await CarregarOrcamentos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelarOrcamento(OrcamentoListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Orçamento",
+            $"Tem certeza que deseja cancelar o Orçamento {item.Numero}?",
+            yesText: "Sim, Cancelar", cancelText: "Não"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new CancelarOrcamentoCommand(item.Id));
+                Snackbar.Add("Orçamento cancelado.", Severity.Warning);
+                await CarregarOrcamentos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task BaixarPdf(int id)
+    {
+        try
+        {
+            var pdfBytes = await Mediator.Send(new GerarOrcamentoPdfQuery(id));
+            string base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("open", $"data:application/pdf;base64,{base64}", "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+}

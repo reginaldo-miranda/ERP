@@ -1,0 +1,478 @@
+@page "/vendas/pedidos"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Vendas.Commands
+@using ERP.Application.Vendas.DTOs
+@using ERP.Application.Vendas.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IApplicationDbContext Context
+
+<PageTitle>Pedidos de Venda - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Class="mr-2" />
+            Pedidos de Venda
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gestão do ciclo de vendas: aprovação de crédito/estoque, faturamento e entrega.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoPedido">
+        Novo Pedido
+    </MudButton>
+</div>
+
+<!-- Cards de Indicadores Rápidos -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.PendingActions" Size="Size.Large" Color="Color.Warning" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">AGUARDANDO APROVAÇÃO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalPendentes</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Warning">@_valorPendentes.ToString("C2")</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.FactCheck" Size="Size.Large" Color="Color.Info" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">APROVADOS (A FATURAR)</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalAprovados</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Info">@_valorAprovados.ToString("C2")</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">FATURADOS COM SUCESSO</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalFaturados</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">@_valorFaturados.ToString("C2")</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR TOTAL DOS PEDIDOS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_valorGeral.ToString("C2")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_totalGeral pedidos registrados</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros e Tabela -->
+<MudCard Elevation="2">
+    <MudCardContent Class="pb-2">
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_busca" Placeholder="Buscar por número, cliente ou vendedor..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Clearable="true" Immediate="true" TextChanged="CarregarPedidos" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="int?" Label="Cliente" @bind-Value="_clienteFiltroId" Clearable="true" SelectedValuesChanged="CarregarPedidos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var c in _clientes)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3">
+                <MudSelect T="StatusPedidoVenda?" Label="Status" @bind-Value="_statusFiltro" Clearable="true" SelectedValuesChanged="CarregarPedidos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Pendente)">Pendente</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Aprovado)">Aprovado</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Faturado)">Faturado</MudSelectItem>
+                    <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Cancelado)">Cancelado</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2">
+                <MudSelect T="int?" Label="Depósito" @bind-Value="_depositoFiltroId" Clearable="true" SelectedValuesChanged="CarregarPedidos" Variant="Variant.Outlined" Margin="Margin.Dense">
+                    @foreach (var d in _depositos)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)d.Id)">@d.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_pedidos.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhum pedido de venda encontrado</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Cadastre um pedido ou converta um orçamento existente.</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoPedido">
+                Criar Pedido de Venda
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@_pedidos" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>Número</MudTh>
+                <MudTh>Cliente</MudTh>
+                <MudTh>Data</MudTh>
+                <MudTh>Depósito</MudTh>
+                <MudTh>Pagamento</MudTh>
+                <MudTh class="text-right">Itens</MudTh>
+                <MudTh class="text-right">Valor Total</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+                <MudTh class="text-right">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Número" Class="font-weight-bold">
+                    <MudLink Href="#" OnClick="@(() => VerDetalhes(context.Id))">@context.Numero</MudLink>
+                    @if (!string.IsNullOrWhiteSpace(context.FaturamentoNumero))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem; color: var(--mud-palette-success);">
+                            Fat: @context.FaturamentoNumero
+                        </div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Cliente">
+                    <span class="font-weight-bold">@context.ClienteNome</span>
+                    @if (!string.IsNullOrWhiteSpace(context.ClienteCpfCnpj))
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">@context.ClienteCpfCnpj</div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Data">@context.DataPedido.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Depósito">@(context.DepositoNome ?? "Padrão")</MudTd>
+                <MudTd DataLabel="Pagamento">
+                    @(context.FormaPagamentoNome ?? "A Combinar")
+                    @if (context.NumeroParcelas > 1)
+                    {
+                        <span class="mud-text-secondary" style="font-size: 0.75rem;"> (@context.NumeroParcelas x)</span>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Itens" Class="text-right">@context.TotalItens</MudTd>
+                <MudTd DataLabel="Valor Total" Class="text-right font-weight-bold">
+                    @context.ValorTotal.ToString("C2")
+                    @if (context.ValorDesconto > 0)
+                    {
+                        <div class="mud-text-secondary" style="font-size: 0.7rem; color: var(--mud-palette-error);">
+                            Desc: @context.ValorDesconto.ToString("C2")
+                        </div>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @switch (context.Status)
+                    {
+                        case StatusPedidoVenda.Pendente:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Outlined">Pendente</MudChip>
+                            break;
+                        case StatusPedidoVenda.Aprovado:
+                            <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Filled">Aprovado</MudChip>
+                            break;
+                        case StatusPedidoVenda.Faturado:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">Faturado</MudChip>
+                            break;
+                        case StatusPedidoVenda.Cancelado:
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Cancelado</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Ações" Class="text-right">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => VerDetalhes(context.Id))">
+                            Ver Detalhes
+                        </MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Filled.PictureAsPdf" OnClick="@(() => BaixarPdf(context.Id))">
+                            Baixar / Imprimir PDF
+                        </MudMenuItem>
+
+                        @if (context.Status == StatusPedidoVenda.Pendente)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditarPedido(context))">
+                                Editar Pedido
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Check" Color="Color.Primary" OnClick="@(() => AprovarPedido(context))">
+                                Aprovar Pedido
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" OnClick="@(() => CancelarPedido(context))">
+                                Cancelar Pedido
+                            </MudMenuItem>
+                        }
+                        else if (context.Status == StatusPedidoVenda.Aprovado)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Receipt" Color="Color.Success" OnClick="@(() => AbrirModalFaturar(context))">
+                                Faturar Pedido (Baixar Estoque)
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" OnClick="@(() => CancelarPedido(context))">
+                                Cancelar Pedido
+                            </MudMenuItem>
+                        }
+                        else if (context.Status == StatusPedidoVenda.Faturado)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.SettingsBackupRestore" Color="Color.Error" OnClick="@(() => CancelarPedido(context))">
+                                Cancelar & Estornar Venda
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private int? _clienteFiltroId;
+    private int? _depositoFiltroId;
+    private StatusPedidoVenda? _statusFiltro;
+
+    private List<PedidoVendaListItemDto> _pedidos = new();
+    private List<Cliente> _clientes = new();
+    private List<Deposito> _depositos = new();
+
+    private int _totalPendentes = 0;
+    private decimal _valorPendentes = 0m;
+    private int _totalAprovados = 0;
+    private decimal _valorAprovados = 0m;
+    private int _totalFaturados = 0;
+    private decimal _valorFaturados = 0m;
+    private decimal _valorGeral = 0m;
+    private int _totalGeral = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clientes = await Context.Clientes.AsNoTracking().Where(c => c.Ativo).OrderBy(c => c.Nome).ToListAsync();
+        _depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+        await CarregarPedidos();
+    }
+
+    private async Task CarregarPedidos()
+    {
+        try
+        {
+            _carregando = true;
+
+            var resultado = await Mediator.Send(new GetPedidosVendaQuery(
+                _busca,
+                _clienteFiltroId,
+                _depositoFiltroId,
+                _statusFiltro,
+                null,
+                null,
+                1,
+                100
+            ));
+
+            _pedidos = resultado.Itens.ToList();
+
+            // Recalcula cards
+            var todos = await Context.PedidosVenda.AsNoTracking().ToListAsync();
+            _totalGeral = todos.Count;
+            _valorGeral = todos.Sum(p => p.ValorTotal);
+
+            _totalPendentes = todos.Count(p => p.Status == StatusPedidoVenda.Pendente);
+            _valorPendentes = todos.Where(p => p.Status == StatusPedidoVenda.Pendente).Sum(p => p.ValorTotal);
+
+            _totalAprovados = todos.Count(p => p.Status == StatusPedidoVenda.Aprovado);
+            _valorAprovados = todos.Where(p => p.Status == StatusPedidoVenda.Aprovado).Sum(p => p.ValorTotal);
+
+            _totalFaturados = todos.Count(p => p.Status == StatusPedidoVenda.Faturado);
+            _valorFaturados = todos.Where(p => p.Status == StatusPedidoVenda.Faturado).Sum(p => p.ValorTotal);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar pedidos: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task NovoPedido()
+    {
+        var dialog = await DialogService.ShowAsync<PedidoVendaDialog>("Novo Pedido de Venda", new DialogParameters(), new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CriarPedidoVendaDto dto)
+        {
+            try
+            {
+                var id = await Mediator.Send(new CriarPedidoVendaCommand(dto));
+                Snackbar.Add("Pedido de venda cadastrado com sucesso!", Severity.Success);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao criar pedido: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task EditarPedido(PedidoVendaListItemDto item)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(PedidoVendaDialog.PedidoVendaId), item.Id },
+            { nameof(PedidoVendaDialog.NumeroPedido), item.Numero }
+        };
+
+        var dialog = await DialogService.ShowAsync<PedidoVendaDialog>("Editar Pedido de Venda", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is CriarPedidoVendaDto dto)
+        {
+            try
+            {
+                var atualizarDto = new AtualizarPedidoVendaDto(
+                    dto.ClienteId,
+                    dto.VendedorId,
+                    dto.VendedorNome,
+                    dto.DataPedido,
+                    dto.DepositoId,
+                    dto.FormaPagamentoId,
+                    dto.NumeroParcelas,
+                    dto.IntervaloDias,
+                    dto.DiasPrimeiroVencimento,
+                    dto.DescontoTipo,
+                    dto.DescontoGeral,
+                    dto.Observacao,
+                    dto.Itens
+                );
+
+                await Mediator.Send(new AtualizarPedidoVendaCommand(item.Id, atualizarDto));
+                Snackbar.Add("Pedido atualizado com sucesso!", Severity.Success);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao atualizar pedido: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task VerDetalhes(int pedidoId)
+    {
+        var parameters = new DialogParameters { { nameof(PedidoDetalhesDialog.PedidoVendaId), pedidoId } };
+        await DialogService.ShowAsync<PedidoDetalhesDialog>("Detalhes do Pedido", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task AprovarPedido(PedidoVendaListItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Aprovar Pedido de Venda",
+            $"Deseja aprovar o Pedido {item.Numero} no valor de {item.ValorTotal:C2}? O sistema verificará se há estoque disponível para todos os produtos antes de aprovar.",
+            yesText: "Sim, Aprovar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new AprovarPedidoVendaCommand(item.Id));
+                Snackbar.Add($"Pedido {item.Numero} aprovado com sucesso! Pronto para faturamento.", Severity.Success);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Warning);
+            }
+        }
+    }
+
+    private async Task AbrirModalFaturar(PedidoVendaListItemDto item)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(FaturarPedidoDialog.PedidoVendaId), item.Id },
+            { nameof(FaturarPedidoDialog.PedidoNumero), item.Numero },
+            { nameof(FaturarPedidoDialog.ClienteNome), item.ClienteNome },
+            { nameof(FaturarPedidoDialog.ValorTotal), item.ValorTotal },
+            { nameof(FaturarPedidoDialog.NumeroParcelasInicial), item.NumeroParcelas }
+        };
+
+        var dialog = await DialogService.ShowAsync<FaturarPedidoDialog>("Faturar Pedido", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is FaturarPedidoDto dto)
+        {
+            try
+            {
+                var fatId = await Mediator.Send(new FaturarPedidoVendaCommand(dto));
+                Snackbar.Add($"Pedido {item.Numero} faturado com sucesso! Baixa de estoque e títulos gerados.", Severity.Success);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao faturar: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CancelarPedido(PedidoVendaListItemDto item)
+    {
+        string mensagem = item.Status == StatusPedidoVenda.Faturado
+            ? $"ATENÇÃO: O Pedido {item.Numero} já foi faturado. Cancelá-lo estornará as mercadorias de volta ao estoque e cancelará as contas a receber pendentes no Financeiro. Deseja prosseguir?"
+            : $"Tem certeza que deseja cancelar o Pedido {item.Numero}?";
+
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Pedido de Venda",
+            mensagem,
+            yesText: "Sim, Cancelar", cancelText: "Voltar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new CancelarPedidoVendaCommand(item.Id, "Cancelamento solicitado pelo usuário"));
+                Snackbar.Add($"Pedido {item.Numero} cancelado com sucesso.", Severity.Warning);
+                await CarregarPedidos();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task BaixarPdf(int id)
+    {
+        try
+        {
+            var pdfBytes = await Mediator.Send(new GerarPedidoVendaPdfQuery(id));
+            string base64 = Convert.ToBase64String(pdfBytes);
+            await JS.InvokeVoidAsync("open", $"data:application/pdf;base64,{base64}", "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao gerar PDF: {ex.Message}", Severity.Error);
+        }
+    }
+}

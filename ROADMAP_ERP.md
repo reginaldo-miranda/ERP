@@ -401,13 +401,13 @@ completo de vendas e integra com estoque e financeiro.
 
 ### 📦 Entregáveis
 
-- [ ] Orçamentos (CRUD + impressão/PDF + conversão para pedido)
-- [ ] Pedidos de Venda (CRUD + aprovação + faturamento)
-- [ ] Faturamento (geração automática ou manual)
-- [ ] Histórico de Vendas (relatórios e consultas)
-- [ ] Integração automática: venda → baixa de estoque + conta a receber
-- [ ] Impressão/PDF de orçamento e pedido
-- [ ] Cálculo automático de descontos e totais
+- [x] Orçamentos (CRUD + impressão/PDF + conversão para pedido)
+- [x] Pedidos de Venda (CRUD + aprovação + faturamento)
+- [x] Faturamento (geração automática ou manual)
+- [x] Histórico de Vendas (relatórios e consultas)
+- [x] Integração automática: venda → baixa de estoque + conta a receber
+- [x] Impressão/PDF de orçamento e pedido
+- [x] Cálculo automático de descontos e totais
 
 ### 🗄️ Tabelas
 
