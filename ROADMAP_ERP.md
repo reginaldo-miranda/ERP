@@ -563,12 +563,12 @@ preparação para a reforma tributária.
 - [x] Tabelas fiscais (NCM, CFOP, CST, CSOSN) com carga inicial
 - [x] Configuração de regime tributário por empresa
 - [x] Regras de tributação configuráveis
-- [ ] Geração de XML da NF-e conforme layout SEFAZ
-- [ ] Assinatura digital com certificado A1
-- [ ] Comunicação SOAP com webservices da SEFAZ
+- [x] Geração de XML da NF-e conforme layout SEFAZ
+- [x] Assinatura digital com certificado A1
+- [x] Comunicação SOAP com webservices da SEFAZ
 - [ ] Emissão de NFC-e (modelo 65)
 - [ ] Consulta, cancelamento e carta de correção
-- [ ] Armazenamento de XMLs
+- [x] Armazenamento de XMLs
 - [ ] Impressão de DANFE (NF-e) e DANFE simplificado (NFC-e)
 - [ ] Contingência offline (NFC-e)
 - [x] Preparação para IBS/CBS (reforma tributária)
