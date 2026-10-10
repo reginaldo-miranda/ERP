@@ -83,6 +83,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoria> EntradasMercadoria => Set<ERP.Domain.Core.Entities.Compras.EntradaMercadoria>();
     public DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem> EntradaMercadoriaItens => Set<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem>();
 
+    // Fase 7 - Fiscal
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.Ncm> Ncms => Set<ERP.Domain.Core.Entities.Fiscal.Ncm>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.Cfop> Cfops => Set<ERP.Domain.Core.Entities.Fiscal.Cfop>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.RegimeTributario> RegimesTributarios => Set<ERP.Domain.Core.Entities.Fiscal.RegimeTributario>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.RegraTributaria> RegrasTributarias => Set<ERP.Domain.Core.Entities.Fiscal.RegraTributaria>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.CertificadoDigital> CertificadosDigitais => Set<ERP.Domain.Core.Entities.Fiscal.CertificadoDigital>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.NotaFiscal> NotasFiscais => Set<ERP.Domain.Core.Entities.Fiscal.NotaFiscal>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.NotaFiscalItem> NotaFiscalItens => Set<ERP.Domain.Core.Entities.Fiscal.NotaFiscalItem>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.XmlNotaFiscal> XmlNotasFiscais => Set<ERP.Domain.Core.Entities.Fiscal.XmlNotaFiscal>();
+    public DbSet<ERP.Domain.Core.Entities.Fiscal.CartaCorrecao> CartasCorrecao => Set<ERP.Domain.Core.Entities.Fiscal.CartaCorrecao>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

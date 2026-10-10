@@ -53,6 +53,10 @@ public static class DatabaseSeeder
 
             ("Estoque.Posicao.Visualizar", "Estoque", "Posicao", "Visualizar", "Visualizar posição de estoque"),
             ("Fiscal.NFe.Visualizar", "Fiscal", "NFe", "Visualizar", "Visualizar notas fiscais"),
+            ("Fiscal.NFe.Gerenciar", "Fiscal", "NFe", "Gerenciar", "Criar, emitir, cancelar e gerenciar notas fiscais"),
+            ("Fiscal.Regras.Gerenciar", "Fiscal", "Regras", "Gerenciar", "Gerenciar regras tributárias e regimes fiscais"),
+            ("Fiscal.Certificados.Gerenciar", "Fiscal", "Certificados", "Gerenciar", "Gerenciar certificados digitais A1"),
+            ("Fiscal.Tabelas.Visualizar", "Fiscal", "Tabelas", "Visualizar", "Consultar tabelas NCM e CFOP"),
             ("Contabilidade.Eventos.Visualizar", "Contabilidade", "Eventos", "Visualizar", "Visualizar eventos contábeis"),
 
             ("Admin.Usuarios.Gerenciar", "Admin", "Usuarios", "Gerenciar", "Gerenciar usuários e permissões do sistema")
@@ -225,5 +229,8 @@ public static class DatabaseSeeder
 
         // 9. Seed do Módulo de Estoque (Depósito Padrão e Saldos Iniciais)
         await DbInitializerEstoque.SeedEstoqueAsync(context);
+
+        // 10. Seed do Módulo Fiscal (CFOPs, NCMs, Regimes e Regras Tributárias)
+        await DbInitializerFiscal.SeedFiscalAsync(context);
     }
 }

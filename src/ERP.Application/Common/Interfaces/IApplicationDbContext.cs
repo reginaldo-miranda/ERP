@@ -67,5 +67,16 @@ public interface IApplicationDbContext
     DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoria> EntradasMercadoria { get; }
     DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem> EntradaMercadoriaItens { get; }
 
+    // Fase 7 - Fiscal
+    DbSet<ERP.Domain.Core.Entities.Fiscal.Ncm> Ncms { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.Cfop> Cfops { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.RegimeTributario> RegimesTributarios { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.RegraTributaria> RegrasTributarias { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.CertificadoDigital> CertificadosDigitais { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.NotaFiscal> NotasFiscais { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.NotaFiscalItem> NotaFiscalItens { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.XmlNotaFiscal> XmlNotasFiscais { get; }
+    DbSet<ERP.Domain.Core.Entities.Fiscal.CartaCorrecao> CartasCorrecao { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
