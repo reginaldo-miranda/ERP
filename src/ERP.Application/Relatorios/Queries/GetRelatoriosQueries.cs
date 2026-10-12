@@ -47,15 +47,15 @@ public class GetRelatorioVendasQueryHandler : IRequestHandler<GetRelatorioVendas
 
         var pedidos = await query.OrderByDescending(p => p.DataPedido).ToListAsync(cancellationToken);
 
-        var itens = pedidos.Select(p => new RelatorioVendasItemDto
+        List<RelatorioVendasItemDto> itens = pedidos.Select(p => new RelatorioVendasItemDto
         {
             PedidoId = p.Id,
             Numero = p.Numero,
             DataPedido = p.DataPedido,
             ClienteNome = p.Cliente.Nome,
             VendedorNome = p.VendedorNome ?? "Não informado",
-            FormaPagamento = p.FormaPagamento?.Descricao ?? "Padrão",
-            QuantidadeItens = p.Itens.Count,
+            FormaPagamento = p.FormaPagamento?.Nome ?? "Padrão",
+            QuantidadeItens = p.Itens.Count(),
             ValorBruto = p.ValorBruto,
             ValorDesconto = p.ValorDesconto,
             ValorTotal = p.ValorTotal,
@@ -129,7 +129,7 @@ public class GetRelatorioFinanceiroQueryHandler : IRequestHandler<GetRelatorioFi
                 DataVencimento = c.DataVencimento,
                 PessoaNome = c.Cliente?.Nome ?? "Cliente Avulso",
                 Descricao = c.Descricao,
-                CategoriaPlano = c.PlanoConta?.Nome ?? "Receita Operacional",
+                CategoriaPlano = c.PlanoConta?.Descricao ?? "Receita Operacional",
                 ValorOriginal = c.ValorOriginal,
                 ValorBaixado = c.ValorRecebido,
                 SaldoRestante = c.SaldoRestante,
@@ -161,7 +161,7 @@ public class GetRelatorioFinanceiroQueryHandler : IRequestHandler<GetRelatorioFi
                 DataVencimento = c.DataVencimento,
                 PessoaNome = c.Fornecedor?.RazaoSocial ?? "Fornecedor",
                 Descricao = c.Descricao,
-                CategoriaPlano = c.PlanoConta?.Nome ?? "Despesa Operacional",
+                CategoriaPlano = c.PlanoConta?.Descricao ?? "Despesa Operacional",
                 ValorOriginal = c.ValorOriginal,
                 ValorBaixado = c.ValorPago,
                 SaldoRestante = c.SaldoRestante,
@@ -407,7 +407,7 @@ public class GetRelatorioFiscalQueryHandler : IRequestHandler<GetRelatorioFiscal
 
         var notas = await query.OrderByDescending(n => n.DataEmissao).ToListAsync(cancellationToken);
 
-        var itens = notas.Select(n => new RelatorioFiscalItemDto
+        List<RelatorioFiscalItemDto> itens = notas.Select(n => new RelatorioFiscalItemDto
         {
             NotaFiscalId = n.Id,
             Modelo = ((int)n.Modelo).ToString(),
@@ -416,7 +416,7 @@ public class GetRelatorioFiscalQueryHandler : IRequestHandler<GetRelatorioFiscal
             DataEmissao = n.DataEmissao,
             DestinatarioNome = n.Cliente?.Nome ?? "Consumidor Final",
             ChaveAcesso = n.ChaveAcesso ?? string.Empty,
-            ValorTotal = n.ValorTotal,
+            ValorTotal = n.ValorTotalNota,
             BaseCalculoIcms = n.Itens.Sum(i => i.BaseCalculoIcms),
             ValorIcms = n.Itens.Sum(i => i.ValorIcms),
             ValorPis = n.Itens.Sum(i => i.ValorPis),

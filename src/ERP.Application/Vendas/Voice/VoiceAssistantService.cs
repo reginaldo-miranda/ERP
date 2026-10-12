@@ -315,7 +315,6 @@ public class VoiceAssistantService : IVoiceAssistantService
                 Descricao = item.ProdutoNome,
                 Quantidade = item.Quantidade,
                 PrecoUnitario = item.ValorUnitario,
-                ValorTotal = item.ValorTotal,
                 SubTotal = item.ValorTotal
             });
         }
@@ -350,11 +349,10 @@ public class VoiceAssistantService : IVoiceAssistantService
         }
 
         // Criar registro da Nota Fiscal autorizada
-        long proximoNumero = await _context.NotasFiscais
+        int proximoNumero = (await _context.NotasFiscais
             .Where(n => n.EmpresaId == empresaId && n.Modelo == ModeloDocumentoFiscal.NFe)
-            .Select(n => (long?)n.Numero)
-            .MaxAsync(cancellationToken) ?? 1000;
-        proximoNumero++;
+            .Select(n => (int?)n.Numero)
+            .MaxAsync(cancellationToken) ?? 1000) + 1;
 
         var random = new Random();
         string chave = $"352610{proximoNumero:D9}55001{random.Next(10000000, 99999999)}1";
@@ -369,7 +367,7 @@ public class VoiceAssistantService : IVoiceAssistantService
             DataEmissao = DateTime.UtcNow,
             ClienteId = estado.ClienteId,
             PedidoVendaId = estado.PedidoCriadoId,
-            ValorTotal = estado.ValorTotal,
+            ValorTotalNota = estado.ValorTotal,
             Status = StatusNotaFiscal.Autorizada,
             ChaveAcesso = chave,
             ProtocoloAutorizacao = protocolo,
@@ -385,13 +383,14 @@ public class VoiceAssistantService : IVoiceAssistantService
             {
                 EmpresaId = empresaId,
                 ProdutoId = item.ProdutoId,
-                Descricao = item.ProdutoNome,
+                DescricaoProduto = item.ProdutoNome,
                 Quantidade = item.Quantidade,
                 ValorUnitario = item.ValorUnitario,
-                ValorTotal = item.ValorTotal,
+                ValorTotalBruto = item.ValorTotal,
+                ValorTotalLiquido = item.ValorTotal,
                 Ncm = "25232900",
                 Cfop = "5102",
-                CstCsosn = "102"
+                Csosn = "102"
             });
         }
 

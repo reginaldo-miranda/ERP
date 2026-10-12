@@ -126,7 +126,7 @@ public class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuer
                         n.Status == StatusNotaFiscal.Autorizada);
 
         var totalNotasMes = await notasFiscaisMes.CountAsync(cancellationToken);
-        var faturamentoFiscalMes = await notasFiscaisMes.SumAsync(n => (decimal?)n.ValorTotal, cancellationToken) ?? 0;
+        var faturamentoFiscalMes = await notasFiscaisMes.SumAsync(n => (decimal?)n.ValorTotalNota, cancellationToken) ?? 0;
 
         resultado.Kpis = new DashboardKpisDto
         {
@@ -190,8 +190,8 @@ public class GetDashboardKpisQueryHandler : IRequestHandler<GetDashboardKpisQuer
                         i.PedidoVenda.DataPedido >= data90DiasAtras)
             .Select(i => new
             {
-                Categoria = i.Produto.Categoria != null ? i.Produto.Categoria.Nome : "Geral",
-                Valor = i.ValorTotal
+                Categoria = i.Produto != null && i.Produto.Categoria != null ? i.Produto.Categoria.Nome : "Geral",
+                Valor = i.SubTotal
             })
             .ToListAsync(cancellationToken);
 
