@@ -1,0 +1,371 @@
+@page "/fiscal/notas"
+@page "/fiscal/notas-fiscais"
+@using ERP.Application.Fiscal.DTOs
+@using ERP.Application.Fiscal.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Notas Fiscais (NF-e / NFC-e) - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Class="mr-2" />
+            Notas Fiscais Eletrônicas
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gestão, emissão, cancelamento, cartas de correção e DANFE de NF-e (Modelo 55) e NFC-e (Modelo 65).
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarDados">
+            Atualizar
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirEmissaoDialog">
+            Emitir Nota Fiscal
+        </MudButton>
+    </div>
+</div>
+
+<!-- Cards de Indicadores -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Large" Color="Color.Primary" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL EMITIDAS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Primary">NF-e e NFC-e</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR FISCAL TOTAL</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_totalValorNotas.ToString("C2")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">Notas do período</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Color="Color.Success" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">AUTORIZADAS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_notasAutorizadasCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Success">Válidas na SEFAZ</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Large" Color="Color.Error" Class="mr-3" />
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CANCELADAS / REJEITADAS</MudText>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold">@_notasCanceladasOuRejeitadasCount</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Error">Invalidadas</MudText>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Card da Tabela e Filtros -->
+<MudCard Elevation="2">
+    <!-- Barra de Filtros -->
+    <div class="pa-4">
+        <MudGrid Spacing="2" Class="align-center">
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_busca"
+                              Placeholder="Buscar por número, chave ou destinatário..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium"
+                              Clearable="true"
+                              OnClearButtonClick="CarregarDados"
+                              Immediate="false"
+                              OnKeyUp="OnSearchKeyUp"
+                              Variant="Variant.Outlined"
+                              Dense="true" />
+            </MudItem>
+
+            <MudItem xs="6" sm="2">
+                <MudSelect T="ModeloDocumentoFiscal?" Label="Modelo" @bind-Value="_modeloFiltro"
+                           SelectedValuesChanged="CarregarDados" Dense="true" Variant="Variant.Outlined">
+                    <MudSelectItem T="ModeloDocumentoFiscal?" Value="@((ModeloDocumentoFiscal?)null)">Todos</MudSelectItem>
+                    <MudSelectItem T="ModeloDocumentoFiscal?" Value="@((ModeloDocumentoFiscal?)ModeloDocumentoFiscal.NFe)">NF-e (55)</MudSelectItem>
+                    <MudSelectItem T="ModeloDocumentoFiscal?" Value="@((ModeloDocumentoFiscal?)ModeloDocumentoFiscal.NFCe)">NFC-e (65)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="6" sm="2">
+                <MudSelect T="StatusNotaFiscal?" Label="Status" @bind-Value="_statusFiltro"
+                           SelectedValuesChanged="CarregarDados" Dense="true" Variant="Variant.Outlined">
+                    <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)null)">Todos</MudSelectItem>
+                    <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Autorizada)">Autorizada</MudSelectItem>
+                    <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Cancelada)">Cancelada</MudSelectItem>
+                    <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Rejeitada)">Rejeitada</MudSelectItem>
+                    <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Rascunho)">Rascunho</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="6" sm="2">
+                <MudDatePicker Label="Data Início" @bind-Date="_dataInicio" Dense="true" Variant="Variant.Outlined" Clearable="true" />
+            </MudItem>
+
+            <MudItem xs="6" sm="2">
+                <MudDatePicker Label="Data Fim" @bind-Date="_dataFim" Dense="true" Variant="Variant.Outlined" Clearable="true" />
+            </MudItem>
+        </MudGrid>
+    </div>
+
+    <!-- Tabela de Notas Fiscais -->
+    @if (_carregando)
+    {
+        <div class="d-flex justify-center pa-8">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        </div>
+    }
+    else if (!_notas.Any())
+    {
+        <div class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhuma nota fiscal encontrada</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Tente ajustar os filtros ou emita uma nova nota fiscal.</MudText>
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@_notas" Hover="true" Striped="true" Elevation="0" Dense="true">
+            <HeaderContent>
+                <MudTh>Doc.</MudTh>
+                <MudTh>Número / Série</MudTh>
+                <MudTh>Emissão</MudTh>
+                <MudTh>Destinatário</MudTh>
+                <MudTh class="text-right">Valor Total</MudTh>
+                <MudTh class="text-center">Status</MudTh>
+                <MudTh>Chave de Acesso</MudTh>
+                <MudTh class="text-center">Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Doc.">
+                    @if (context.Modelo == ModeloDocumentoFiscal.NFe)
+                    {
+                        <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">NF-e</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Outlined">NFC-e</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Número / Série" Class="font-weight-bold">
+                    @context.Numero.ToString("D6") / @context.Serie
+                </MudTd>
+                <MudTd DataLabel="Emissão">
+                    @context.DataEmissao.ToString("dd/MM/yyyy HH:mm")
+                </MudTd>
+                <MudTd DataLabel="Destinatário">
+                    <div>
+                        <div class="font-weight-bold">@(context.DestinatarioRazaoSocial ?? "Consumidor Final")</div>
+                        <div class="mud-text-secondary" style="font-size: 0.75rem;">@(context.DestinatarioCpfCnpj ?? "-")</div>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Valor Total" Class="text-right font-weight-bold" Style="color: var(--mud-palette-success);">
+                    @context.ValorTotalNota.ToString("C2")
+                </MudTd>
+                <MudTd DataLabel="Status" Class="text-center">
+                    @switch (context.Status)
+                    {
+                        case StatusNotaFiscal.Autorizada:
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">Autorizada</MudChip>
+                            break;
+                        case StatusNotaFiscal.Cancelada:
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Cancelada</MudChip>
+                            break;
+                        case StatusNotaFiscal.Rejeitada:
+                            <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">Rejeitada</MudChip>
+                            break;
+                        case StatusNotaFiscal.Denegada:
+                            <MudChip T="string" Color="Color.Dark" Size="Size.Small" Variant="Variant.Filled">Denegada</MudChip>
+                            break;
+                        default:
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">@context.Status</MudChip>
+                            break;
+                    }
+                </MudTd>
+                <MudTd DataLabel="Chave">
+                    <div class="d-flex align-center">
+                        <span style="font-family: monospace; font-size: 0.75rem;">
+                            @(context.ChaveAcesso.Length >= 8 ? $"...{context.ChaveAcesso[^8..]}" : context.ChaveAcesso)
+                        </span>
+                        <MudTooltip Text="Copiar Chave Completa">
+                            <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="@(() => CopiarChave(context.ChaveAcesso))" />
+                        </MudTooltip>
+                    </div>
+                </MudTd>
+                <MudTd DataLabel="Ações" Class="text-center">
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => AbrirDetalhes(context.Id))">
+                            Ver Detalhes
+                        </MudMenuItem>
+                        @if (context.Status == StatusNotaFiscal.Autorizada)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Print" Href="@($"/api/notas-fiscais/{context.Id}/danfe")" Target="_blank">
+                                Imprimir DANFE
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Code" Href="@($"/api/notas-fiscais/{context.Id}/xml")" Target="_blank">
+                                Baixar XML
+                            </MudMenuItem>
+                            @if (context.Modelo == ModeloDocumentoFiscal.NFe)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.EditNote" OnClick="@(() => AbrirCartaCorrecao(context))">
+                                    Carta de Correção (CC-e)
+                                </MudMenuItem>
+                            }
+                            <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => AbrirCancelamento(context))">
+                                Cancelar Nota Fiscal
+                            </MudMenuItem>
+                        }
+                    </MudMenu>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager PageSizeOptions="new int[] { 10, 20, 50 }" RowsPerPageString="Linhas por página:" InfoFormat="{first_item}-{last_item} de {all_items}" />
+            </PagerContent>
+        </MudTable>
+    }
+</MudCard>
+
+@code {
+    private bool _carregando = true;
+    private List<NotaFiscalDto> _notas = new();
+    private int _totalCount = 0;
+    private decimal _totalValorNotas = 0m;
+    private int _notasAutorizadasCount = 0;
+    private int _notasCanceladasOuRejeitadasCount = 0;
+
+    private string? _busca;
+    private ModeloDocumentoFiscal? _modeloFiltro;
+    private StatusNotaFiscal? _statusFiltro;
+    private DateTime? _dataInicio;
+    private DateTime? _dataFim;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            _carregando = true;
+
+            var query = new GetNotasFiscaisQuery(
+                Busca: _busca,
+                Modelo: _modeloFiltro,
+                Status: _statusFiltro,
+                DataInicio: _dataInicio,
+                DataFim: _dataFim,
+                Pagina: 1,
+                TamanhoPagina: 100
+            );
+
+            var resultado = await Mediator.Send(query);
+            _notas = resultado.Itens;
+            _totalCount = resultado.TotalCount;
+
+            _totalValorNotas = _notas.Sum(n => n.ValorTotalNota);
+            _notasAutorizadasCount = _notas.Count(n => n.Status == StatusNotaFiscal.Autorizada);
+            _notasCanceladasOuRejeitadasCount = _notas.Count(n => n.Status == StatusNotaFiscal.Cancelada || n.Status == StatusNotaFiscal.Rejeitada);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar notas fiscais: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirEmissaoDialog()
+    {
+        var dialog = await DialogService.ShowAsync<EmitirNotaFiscalDialog>("Emitir Nota Fiscal", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirDetalhes(int id)
+    {
+        var parameters = new DialogParameters { ["NotaFiscalId"] = id };
+        await DialogService.ShowAsync<NotaFiscalDetalhesDialog>("Detalhes da Nota Fiscal", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+    }
+
+    private async Task AbrirCancelamento(NotaFiscalDto nota)
+    {
+        var parameters = new DialogParameters
+        {
+            ["NotaFiscalId"] = nota.Id,
+            ["NumeroFormatado"] = $"{nota.Numero:D6}/{nota.Serie}",
+            ["ChaveAcesso"] = nota.ChaveAcesso
+        };
+
+        var dialog = await DialogService.ShowAsync<CancelarNotaDialog>("Cancelar Nota Fiscal", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+
+    private async Task AbrirCartaCorrecao(NotaFiscalDto nota)
+    {
+        var parameters = new DialogParameters
+        {
+            ["NotaFiscalId"] = nota.Id,
+            ["NumeroFormatado"] = $"{nota.Numero:D6}/{nota.Serie}",
+            ["ChaveAcesso"] = nota.ChaveAcesso
+        };
+
+        var dialog = await DialogService.ShowAsync<CartaCorrecaoDialog>("Carta de Correção Eletrônica", parameters, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await CarregarDados();
+        }
+    }
+
+    private async Task CopiarChave(string chave)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", chave);
+        Snackbar.Add("Chave de acesso copiada!", Severity.Info);
+    }
+}

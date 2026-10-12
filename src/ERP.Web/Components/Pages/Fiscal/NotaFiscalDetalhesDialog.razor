@@ -1,0 +1,380 @@
+@using ERP.Application.Fiscal.DTOs
+@using ERP.Application.Fiscal.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex justify-space-between align-center">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Primary" Class="mr-2" />
+                <div>
+                    <MudText Typo="Typo.h6">
+                        @(_detalhes?.Modelo == ModeloDocumentoFiscal.NFCe ? "NFC-e" : "NF-e") @(_detalhes != null ? $"{_detalhes.Numero:D6}/{_detalhes.Serie}" : "")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Série @_detalhes?.Serie | Emissão: @_detalhes?.DataEmissao.ToString("dd/MM/yyyy HH:mm")
+                    </MudText>
+                </div>
+            </div>
+            @if (_detalhes != null)
+            {
+                <div>
+                    @switch (_detalhes.Status)
+                    {
+                        case StatusNotaFiscal.Autorizada:
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">Autorizada</MudChip>
+                            break;
+                        case StatusNotaFiscal.Cancelada:
+                            <MudChip T="string" Color="Color.Error" Variant="Variant.Filled" Size="Size.Small">Cancelada</MudChip>
+                            break;
+                        case StatusNotaFiscal.Rejeitada:
+                            <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Size="Size.Small">Rejeitada</MudChip>
+                            break;
+                        case StatusNotaFiscal.Denegada:
+                            <MudChip T="string" Color="Color.Dark" Variant="Variant.Filled" Size="Size.Small">Denegada</MudChip>
+                            break;
+                        default:
+                            <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Size="Size.Small">@_detalhes.Status</MudChip>
+                            break;
+                    }
+                </div>
+            }
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_detalhes == null)
+        {
+            <MudAlert Severity="Severity.Error">Não foi possível carregar os detalhes da nota fiscal.</MudAlert>
+        }
+        else
+        {
+            <!-- Chave de Acesso Box -->
+            <MudPaper Elevation="0" Class="pa-3 mb-3 d-flex justify-space-between align-center" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                <div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">CHAVE DE ACESSO</MudText>
+                    <MudText Typo="Typo.body2" Class="font-weight-bold" Style="font-family: monospace; letter-spacing: 1px;">
+                        @FormatarChaveAcesso(_detalhes.ChaveAcesso)
+                    </MudText>
+                </div>
+                <MudTooltip Text="Copiar chave de acesso">
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" Size="Size.Small" OnClick="CopiarChaveAcesso" />
+                </MudTooltip>
+            </MudPaper>
+
+            @if (_detalhes.Status == StatusNotaFiscal.Cancelada)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-3" Dense="true">
+                    <b>Nota Fiscal Cancelada em @_detalhes.DataCancelamento?.ToString("dd/MM/yyyy HH:mm"):</b> @_detalhes.MotivoCancelamento
+                    @if (!string.IsNullOrWhiteSpace(_detalhes.ProtocoloCancelamento))
+                    {
+                        <span class="ml-2">(Protocolo: @_detalhes.ProtocoloCancelamento)</span>
+                    }
+                </MudAlert>
+            }
+
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+                <!-- Aba 1: Dados Gerais e Totais -->
+                <MudTabPanel Text="Dados &amp; Totais" Icon="@Icons.Material.Filled.Info">
+                    <div class="pa-3">
+                        <MudGrid Spacing="2">
+                            <!-- Destinatário -->
+                            <MudItem xs="12" md="6">
+                                <MudCard Elevation="1" Class="pa-3 h-100">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2 font-weight-bold">
+                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                                        Destinatário / Cliente
+                                    </MudText>
+                                    <MudText Typo="Typo.body2"><b>Nome / Razão Social:</b> @(_detalhes.DestinatarioRazaoSocial ?? "Consumidor Final")</MudText>
+                                    <MudText Typo="Typo.body2"><b>CPF / CNPJ:</b> @(_detalhes.DestinatarioCpfCnpj ?? "Não informado")</MudText>
+                                    @if (!string.IsNullOrWhiteSpace(_detalhes.DestinatarioInscricaoEstadual))
+                                    {
+                                        <MudText Typo="Typo.body2"><b>Inscrição Estadual:</b> @_detalhes.DestinatarioInscricaoEstadual</MudText>
+                                    }
+                                    <MudText Typo="Typo.body2"><b>Endereço:</b> @_detalhes.DestinatarioLogradouro, @_detalhes.DestinatarioNumero @(_detalhes.DestinatarioBairro != null ? $"- {_detalhes.DestinatarioBairro}" : "")</MudText>
+                                    <MudText Typo="Typo.body2"><b>Cidade / UF:</b> @_detalhes.DestinatarioMunicipio / @_detalhes.DestinatarioUf - CEP: @_detalhes.DestinatarioCep</MudText>
+                                    @if (!string.IsNullOrWhiteSpace(_detalhes.DestinatarioEmail))
+                                    {
+                                        <MudText Typo="Typo.body2"><b>E-mail:</b> @_detalhes.DestinatarioEmail</MudText>
+                                    }
+                                </MudCard>
+                            </MudItem>
+
+                            <!-- Dados SEFAZ -->
+                            <MudItem xs="12" md="6">
+                                <MudCard Elevation="1" Class="pa-3 h-100">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2 font-weight-bold">
+                                        <MudIcon Icon="@Icons.Material.Filled.CloudDone" Size="Size.Small" Class="mr-1" />
+                                        Protocolo &amp; SEFAZ
+                                    </MudText>
+                                    <MudText Typo="Typo.body2"><b>Natureza da Operação:</b> @_detalhes.NaturezaOperacao</MudText>
+                                    <MudText Typo="Typo.body2"><b>Ambiente:</b> @(_detalhes.Ambiente == AmbienteFiscal.Producao ? "Produção Oficial" : "Homologação / Testes")</MudText>
+                                    <MudText Typo="Typo.body2"><b>Status SEFAZ:</b> [@_detalhes.CodigoStatusSefaz] @_detalhes.MotivoStatusSefaz</MudText>
+                                    <MudText Typo="Typo.body2"><b>Protocolo de Autorização:</b> @(_detalhes.ProtocoloAutorizacao ?? "Pendente")</MudText>
+                                    <MudText Typo="Typo.body2"><b>Data Autorização:</b> @(_detalhes.DataAutorizacao?.ToString("dd/MM/yyyy HH:mm:ss") ?? "-")</MudText>
+                                    @if (_detalhes.PedidoVendaId.HasValue)
+                                    {
+                                        <MudText Typo="Typo.body2"><b>Pedido de Venda:</b> #@_detalhes.PedidoVendaId</MudText>
+                                    }
+                                </MudCard>
+                            </MudItem>
+
+                            <!-- Totais da Nota -->
+                            <MudItem xs="12">
+                                <MudCard Elevation="1" Class="pa-3 mt-2">
+                                    <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="mb-2 font-weight-bold">
+                                        <MudIcon Icon="@Icons.Material.Filled.Calculate" Size="Size.Small" Class="mr-1" />
+                                        Quadro de Totais e Tributos
+                                    </MudText>
+                                    <MudGrid Spacing="2">
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Total Produtos</MudText>
+                                            <MudText Typo="Typo.body1" Class="font-weight-bold">@_detalhes.ValorProdutos.ToString("C2")</MudText>
+                                        </MudItem>
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Desconto</MudText>
+                                            <MudText Typo="Typo.body1" Color="Color.Error">@_detalhes.ValorDesconto.ToString("C2")</MudText>
+                                        </MudItem>
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Frete</MudText>
+                                            <MudText Typo="Typo.body1">@_detalhes.ValorFrete.ToString("C2")</MudText>
+                                        </MudItem>
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DA NOTA</MudText>
+                                            <MudText Typo="Typo.h6" Color="Color.Success" Class="font-weight-bold">@_detalhes.ValorTotalNota.ToString("C2")</MudText>
+                                        </MudItem>
+
+                                        <!-- Tributos Federais e Estaduais -->
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Base ICMS / Valor ICMS</MudText>
+                                            <MudText Typo="Typo.body2">@_detalhes.BaseCalculoIcms.ToString("C2") / <b>@_detalhes.ValorIcms.ToString("C2")</b></MudText>
+                                        </MudItem>
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">PIS / COFINS</MudText>
+                                            <MudText Typo="Typo.body2">@_detalhes.ValorPis.ToString("C2") / @_detalhes.ValorCofins.ToString("C2")</MudText>
+                                        </MudItem>
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">IPI</MudText>
+                                            <MudText Typo="Typo.body2">@_detalhes.ValorIpi.ToString("C2")</MudText>
+                                        </MudItem>
+                                        <MudItem xs="6" sm="3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">Reforma Trib. (IBS/CBS)</MudText>
+                                            <MudText Typo="Typo.body2">@_detalhes.ValorIbs.ToString("C2") / @_detalhes.ValorCbs.ToString("C2")</MudText>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudCard>
+                            </MudItem>
+
+                            @if (!string.IsNullOrWhiteSpace(_detalhes.InformacoesComplementares))
+                            {
+                                <MudItem xs="12">
+                                    <MudCard Elevation="1" Class="pa-3 mt-1">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">INFORMAÇÕES COMPLEMENTARES / DADOS ADICIONAIS</MudText>
+                                        <MudText Typo="Typo.body2" Class="mt-1">@_detalhes.InformacoesComplementares</MudText>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </div>
+                </MudTabPanel>
+
+                <!-- Aba 2: Itens da Nota -->
+                <MudTabPanel Text="@($"Itens da Nota ({_detalhes.Itens.Count})")" Icon="@Icons.Material.Filled.ListAlt">
+                    <div class="pa-2">
+                        <MudTable Items="@_detalhes.Itens" Hover="true" Striped="true" Elevation="0" Dense="true">
+                            <HeaderContent>
+                                <MudTh>#</MudTh>
+                                <MudTh>Código</MudTh>
+                                <MudTh>Descrição</MudTh>
+                                <MudTh>NCM</MudTh>
+                                <MudTh>CFOP</MudTh>
+                                <MudTh>CST/CSOSN</MudTh>
+                                <MudTh class="text-right">Qtd</MudTh>
+                                <MudTh class="text-right">Vlr. Unit</MudTh>
+                                <MudTh class="text-right">Total Liq</MudTh>
+                                <MudTh class="text-right">ICMS (R$)</MudTh>
+                                <MudTh class="text-right">PIS/COFINS</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="#">@context.NumeroItem</MudTd>
+                                <MudTd DataLabel="Código">@context.CodigoProduto</MudTd>
+                                <MudTd DataLabel="Descrição"><b>@context.DescricaoProduto</b></MudTd>
+                                <MudTd DataLabel="NCM">@context.Ncm</MudTd>
+                                <MudTd DataLabel="CFOP">@context.Cfop</MudTd>
+                                <MudTd DataLabel="CST">@(context.Csosn ?? context.CstIcms)</MudTd>
+                                <MudTd DataLabel="Qtd" Class="text-right">@context.Quantidade @context.UnidadeMedida</MudTd>
+                                <MudTd DataLabel="Vlr Unit" Class="text-right">@context.ValorUnitario.ToString("C2")</MudTd>
+                                <MudTd DataLabel="Total Liq" Class="text-right font-weight-bold">@context.ValorTotalLiquido.ToString("C2")</MudTd>
+                                <MudTd DataLabel="ICMS" Class="text-right">@context.ValorIcms.ToString("C2")</MudTd>
+                                <MudTd DataLabel="PIS/COFINS" Class="text-right">@((context.ValorPis + context.ValorCofins).ToString("C2"))</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </div>
+                </MudTabPanel>
+
+                <!-- Aba 3: Eventos SEFAZ e CC-e -->
+                <MudTabPanel Text="@($"Eventos ({_detalhes.CartasCorrecao.Count + (_detalhes.Status == StatusNotaFiscal.Autorizada ? 1 : 0) + (_detalhes.Status == StatusNotaFiscal.Cancelada ? 1 : 0)})")" Icon="@Icons.Material.Filled.HistoryEdu">
+                    <div class="pa-3">
+                        <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+                            <MudTimelineItem Color="Color.Success" Size="Size.Small">
+                                <ItemContent>
+                                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Autorização de Uso</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @_detalhes.DataAutorizacao?.ToString("dd/MM/yyyy HH:mm:ss") - Protocolo: @_detalhes.ProtocoloAutorizacao
+                                    </MudText>
+                                    <MudText Typo="Typo.body2">Nota autorizada pela SEFAZ com sucesso.</MudText>
+                                </ItemContent>
+                            </MudTimelineItem>
+
+                            @foreach (var cce in _detalhes.CartasCorrecao)
+                            {
+                                <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                                    <ItemContent>
+                                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">
+                                            Carta de Correção #@cce.SequenciaEvento
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @cce.DataEvento.ToString("dd/MM/yyyy HH:mm:ss") - Protocolo: @cce.ProtocoloHomologacao
+                                        </MudText>
+                                        <MudPaper Elevation="0" Class="pa-2 mt-1" Style="background: var(--mud-palette-background-grey);">
+                                            <MudText Typo="Typo.body2">@cce.CorrecaoTexto</MudText>
+                                        </MudPaper>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+
+                            @if (_detalhes.Status == StatusNotaFiscal.Cancelada)
+                            {
+                                <MudTimelineItem Color="Color.Error" Size="Size.Small">
+                                    <ItemContent>
+                                        <MudText Typo="Typo.subtitle2" Color="Color.Error" Class="font-weight-bold">Cancelamento Homologado</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @_detalhes.DataCancelamento?.ToString("dd/MM/yyyy HH:mm:ss") - Protocolo: @_detalhes.ProtocoloCancelamento
+                                        </MudText>
+                                        <MudText Typo="Typo.body2"><b>Motivo:</b> @_detalhes.MotivoCancelamento</MudText>
+                                    </ItemContent>
+                                </MudTimelineItem>
+                            }
+                        </MudTimeline>
+                    </div>
+                </MudTabPanel>
+
+                <!-- Aba 4: XML do Documento -->
+                <MudTabPanel Text="XML Autorizado" Icon="@Icons.Material.Filled.Code">
+                    <div class="pa-3">
+                        @{
+                            var xmlAutorizado = _detalhes.Xmls.FirstOrDefault(x => x.TipoXml == TipoXmlNotaFiscal.DistribuicaoProc)
+                                             ?? _detalhes.Xmls.FirstOrDefault(x => x.TipoXml == TipoXmlNotaFiscal.Retorno)
+                                             ?? _detalhes.Xmls.FirstOrDefault();
+                        }
+                        @if (xmlAutorizado != null)
+                        {
+                            <div class="d-flex justify-space-between align-center mb-2">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Tipo: @xmlAutorizado.TipoXml | Gerado em: @xmlAutorizado.DataGeracao.ToString("dd/MM/yyyy HH:mm:ss")
+                                </MudText>
+                                <div>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.ContentCopy"
+                                               OnClick="@(() => CopiarTexto(xmlAutorizado.XmlConteudo))"
+                                               Class="mr-2">
+                                        Copiar XML
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Download"
+                                               Href="@($"/api/notas-fiscais/{_detalhes.Id}/xml")"
+                                               Target="_blank">
+                                        Baixar Arquivo .XML
+                                    </MudButton>
+                                </div>
+                            </div>
+                            <pre style="background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; max-height: 380px; overflow: auto; font-size: 11px; font-family: 'Courier New', monospace;">@xmlAutorizado.XmlConteudo</pre>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info">Nenhum XML armazenado para esta nota fiscal.</MudAlert>
+                        }
+                    </div>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Fechar">Fechar</MudButton>
+        @if (_detalhes != null && _detalhes.Status == StatusNotaFiscal.Autorizada)
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.Print"
+                       Href="@($"/api/notas-fiscais/{_detalhes.Id}/danfe")"
+                       Target="_blank">
+                Imprimir DANFE (PDF)
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int NotaFiscalId { get; set; }
+
+    private bool _carregando = true;
+    private NotaFiscalDetalhesDto? _detalhes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDetalhes();
+    }
+
+    private async Task CarregarDetalhes()
+    {
+        try
+        {
+            _carregando = true;
+            _detalhes = await Mediator.Send(new GetNotaFiscalDetalhesQuery(NotaFiscalId));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar detalhes: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void Fechar() => MudDialog.Close();
+
+    private async Task CopiarChaveAcesso()
+    {
+        if (_detalhes != null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _detalhes.ChaveAcesso);
+            Snackbar.Add("Chave de acesso copiada para a área de transferência!", Severity.Info);
+        }
+    }
+
+    private async Task CopiarTexto(string texto)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", texto);
+        Snackbar.Add("Conteúdo copiado com sucesso!", Severity.Info);
+    }
+
+    private static string FormatarChaveAcesso(string chave)
+    {
+        if (string.IsNullOrWhiteSpace(chave) || chave.Length != 44) return chave;
+        return string.Join(" ", Enumerable.Range(0, 11).Select(i => chave.Substring(i * 4, 4)));
+    }
+}

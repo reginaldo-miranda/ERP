@@ -1,0 +1,110 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Fiscal.Commands
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.EditNote" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Carta de Correção Eletrônica (CC-e)</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Info" Class="mb-3" Dense="true">
+            A Carta de Correção (CC-e) destina-se a regularizar erros em campos da NF-e, desde que o erro <b>não esteja relacionado</b> a:
+            variáveis que determinam o valor do imposto (base de cálculo, alíquota, valor), dados cadastrais que impliquem mudança de remetente/destinatário ou data de emissão/saída.
+        </MudAlert>
+
+        <MudText Typo="Typo.body2" Class="mb-2">
+            <b>Nota Fiscal:</b> @NumeroFormatado<br />
+            <b>Chave de Acesso:</b> <span style="font-family: monospace;">@ChaveAcesso</span>
+        </MudText>
+
+        <MudTextField @bind-Value="_correcao"
+                      Label="Texto da Correção *"
+                      Placeholder="Descreva a retificação detalhada (mínimo 15 caracteres, máx 1000)..."
+                      Lines="4"
+                      Variant="Variant.Outlined"
+                      Counter="1000"
+                      Immediate="true"
+                      HelperText="@($"Caracteres: {_correcao.Length}/1000 (mínimo 15)")" />
+
+        @if (!string.IsNullOrWhiteSpace(_erro))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2" Dense="true">
+                @_erro
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Voltar</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   OnClick="TransmitirCCe"
+                   Disabled="_processando || _correcao.Trim().Length < 15">
+            @if (_processando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Transmitindo CC-e à SEFAZ...</span>
+            }
+            else
+            {
+                <span>Transmitir Carta de Correção</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int NotaFiscalId { get; set; }
+    [Parameter] public string NumeroFormatado { get; set; } = string.Empty;
+    [Parameter] public string ChaveAcesso { get; set; } = string.Empty;
+
+    private string _correcao = string.Empty;
+    private bool _processando = false;
+    private string? _erro;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task TransmitirCCe()
+    {
+        if (string.IsNullOrWhiteSpace(_correcao) || _correcao.Trim().Length < 15)
+        {
+            _erro = "O texto da correção deve conter no mínimo 15 caracteres.";
+            return;
+        }
+
+        try
+        {
+            _processando = true;
+            _erro = null;
+
+            var command = new EnviarCartaCorrecaoCommand(NotaFiscalId, _correcao.Trim());
+            var resultado = await Mediator.Send(command);
+
+            if (resultado.Sucesso)
+            {
+                Snackbar.Add($"Carta de Correção registrada com sucesso! Protocolo: {resultado.Protocolo}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                _erro = $"SEFAZ: [{resultado.CodigoStatus}] {resultado.MotivoStatus}";
+                Snackbar.Add(_erro, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _erro = $"Erro ao registrar CC-e: {ex.Message}";
+            Snackbar.Add(_erro, Severity.Error);
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+}

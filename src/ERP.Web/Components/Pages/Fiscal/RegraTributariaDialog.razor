@@ -1,0 +1,266 @@
+@using ERP.Application.Fiscal.Commands
+@using ERP.Application.Fiscal.DTOs
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Gavel" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(Regra?.Id > 0 ? "Editar Regra Tributária" : "Nova Regra Tributária")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+            <!-- Aba 1: Identificação & Abrangência -->
+            <MudTabPanel Text="Identificação &amp; Escopo" Icon="@Icons.Material.Filled.FilterList">
+                <div class="pa-3">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_command.Descricao" Label="Descrição da Regra *"
+                                          Placeholder="Ex: Venda Estadual Mercadoria Simples Nacional"
+                                          Variant="Variant.Outlined" Dense="true" Required="true" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="TipoOperacaoFiscal" Label="Tipo de Operação *" @bind-Value="_command.TipoOperacao" Variant="Variant.Outlined" Dense="true">
+                                <MudSelectItem T="TipoOperacaoFiscal" Value="TipoOperacaoFiscal.Saida">Saída (Venda / Remessa)</MudSelectItem>
+                                <MudSelectItem T="TipoOperacaoFiscal" Value="TipoOperacaoFiscal.Entrada">Entrada (Compra / Devolução)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_command.CfopCodigo" Label="CFOP *"
+                                          Placeholder="Ex: 5102, 6102, 5405"
+                                          Variant="Variant.Outlined" Dense="true" Required="true" MaxLength="4" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudTextField @bind-Value="_command.NcmCodigo" Label="NCM Específico (Opcional)"
+                                          Placeholder="Deixe em branco para todos"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="8" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudTextField @bind-Value="_command.UfOrigem" Label="UF Origem"
+                                          Placeholder="** para qualquer"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="2" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudTextField @bind-Value="_command.UfDestino" Label="UF Destino"
+                                          Placeholder="** para qualquer"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="2" />
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+
+            <!-- Aba 2: ICMS & ICMS-ST -->
+            <MudTabPanel Text="ICMS &amp; ST" Icon="@Icons.Material.Filled.Receipt">
+                <div class="pa-3">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_command.Csosn" Label="CSOSN (Simples Nacional)"
+                                          Placeholder="Ex: 101, 102, 103, 500, 900"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="4" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_command.CstIcms" Label="CST ICMS (Regime Normal)"
+                                          Placeholder="Ex: 00, 10, 20, 40, 60, 90"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="3" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudNumericField T="decimal" Label="Alíquota ICMS (%)" @bind-Value="_command.AliquotaIcms"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudNumericField T="decimal" Label="Redução Base ICMS (%)" @bind-Value="_command.ReducaoBaseIcms"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="4">
+                            <MudNumericField T="decimal" Label="Alíquota ICMS ST (%)" @bind-Value="_command.AliquotaIcmsSt"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudNumericField T="decimal" Label="MVA ICMS ST (%)" @bind-Value="_command.MvaIcmsSt"
+                                            Min="0" Max="1000" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudNumericField T="decimal" Label="Redução Base ST (%)" @bind-Value="_command.ReducaoBaseIcmsSt"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+
+            <!-- Aba 3: PIS, COFINS & IPI -->
+            <MudTabPanel Text="PIS, COFINS &amp; IPI" Icon="@Icons.Material.Filled.Percent">
+                <div class="pa-3">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="6" sm="6">
+                            <MudTextField @bind-Value="_command.CstPis" Label="CST PIS"
+                                          Placeholder="Ex: 01, 04, 07, 49, 99"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="2" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudNumericField T="decimal" Label="Alíquota PIS (%)" @bind-Value="_command.AliquotaPis"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudTextField @bind-Value="_command.CstCofins" Label="CST COFINS"
+                                          Placeholder="Ex: 01, 04, 07, 49, 99"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="2" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudNumericField T="decimal" Label="Alíquota COFINS (%)" @bind-Value="_command.AliquotaCofins"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudTextField @bind-Value="_command.CstIpi" Label="CST IPI"
+                                          Placeholder="Ex: 50, 52, 99"
+                                          Variant="Variant.Outlined" Dense="true" MaxLength="2" />
+                        </MudItem>
+
+                        <MudItem xs="6" sm="6">
+                            <MudNumericField T="decimal" Label="Alíquota IPI (%)" @bind-Value="_command.AliquotaIpi"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+
+            <!-- Aba 4: Reforma Tributária (IBS/CBS) -->
+            <MudTabPanel Text="Reforma Tributária" Icon="@Icons.Material.Filled.Update">
+                <div class="pa-3">
+                    <MudAlert Severity="Severity.Info" Class="mb-3" Dense="true">
+                        Projeção e transição tributária conforme a Emenda Constitucional 132/2023 (IBS estadual/municipal e CBS federal).
+                    </MudAlert>
+
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="decimal" Label="Alíquota Estimada IBS (%)" @bind-Value="_command.AliquotaIbs"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="decimal" Label="Alíquota Estimada CBS (%)" @bind-Value="_command.AliquotaCbs"
+                                            Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_command.ObservacoesFiscais" Label="Observações Legais / Enquadramento Fiscal"
+                                          Placeholder="Texto a constar nas informações complementares da nota fiscal..."
+                                          Lines="2" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+                    </MudGrid>
+                </div>
+            </MudTabPanel>
+        </MudTabs>
+
+        @if (!string.IsNullOrWhiteSpace(_erro))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">
+                @_erro
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="Salvar" Disabled="_salvando">
+            @if (_salvando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar Regra</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public RegraTributariaDto? Regra { get; set; }
+
+    private SalvarRegraTributariaCommand _command = new();
+    private bool _salvando = false;
+    private string? _erro;
+
+    protected override void OnInitialized()
+    {
+        if (Regra != null)
+        {
+            _command = new SalvarRegraTributariaCommand
+            {
+                Id = Regra.Id,
+                Descricao = Regra.Descricao,
+                TipoOperacao = Regra.TipoOperacao,
+                NcmCodigo = Regra.NcmCodigo,
+                CfopCodigo = Regra.CfopCodigo,
+                UfOrigem = Regra.UfOrigem,
+                UfDestino = Regra.UfDestino,
+                CstIcms = Regra.CstIcms,
+                Csosn = Regra.Csosn,
+                AliquotaIcms = Regra.AliquotaIcms,
+                ReducaoBaseIcms = Regra.ReducaoBaseIcms,
+                AliquotaIcmsSt = Regra.AliquotaIcmsSt,
+                MvaIcmsSt = Regra.MvaIcmsSt,
+                ReducaoBaseIcmsSt = Regra.ReducaoBaseIcmsSt,
+                CstPis = Regra.CstPis,
+                AliquotaPis = Regra.AliquotaPis,
+                CstCofins = Regra.CstCofins,
+                AliquotaCofins = Regra.AliquotaCofins,
+                CstIpi = Regra.CstIpi,
+                AliquotaIpi = Regra.AliquotaIpi,
+                AliquotaIbs = Regra.AliquotaIbs,
+                AliquotaCbs = Regra.AliquotaCbs,
+                ObservacoesFiscais = Regra.ObservacoesFiscais
+            };
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_command.Descricao) || string.IsNullOrWhiteSpace(_command.CfopCodigo))
+        {
+            _erro = "Preencha a descrição e o CFOP da regra.";
+            return;
+        }
+
+        try
+        {
+            _salvando = true;
+            _erro = null;
+
+            var resultado = await Mediator.Send(_command);
+            Snackbar.Add("Regra tributária salva com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(resultado));
+        }
+        catch (Exception ex)
+        {
+            _erro = $"Erro ao salvar: {ex.Message}";
+            Snackbar.Add(_erro, Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

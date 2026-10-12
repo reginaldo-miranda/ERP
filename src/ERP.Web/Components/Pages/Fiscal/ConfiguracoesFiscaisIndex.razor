@@ -1,0 +1,577 @@
+@page "/fiscal/configuracoes"
+@page "/fiscal/regras"
+@using ERP.Application.Fiscal.Commands
+@using ERP.Application.Fiscal.DTOs
+@using ERP.Application.Fiscal.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Configurações Fiscais &amp; Regras Tributárias - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.SettingsSuggest" Class="mr-2" />
+            Configurações Fiscais
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gerenciamento de regras de impostos, regime tributário (CRT), séries, certificados digitais A1 e tabelas fiscais.
+        </MudText>
+    </div>
+</div>
+
+<MudCard Elevation="2">
+    <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+        <!-- Aba 1: Regras Tributárias -->
+        <MudTabPanel Text="Regras de Tributação" Icon="@Icons.Material.Filled.Gavel" BadgeData="@_regras.Count" BadgeColor="Color.Primary">
+            <div class="pa-4">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Motor de Regras Fiscais</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaRegra">
+                        Nova Regra Tributária
+                    </MudButton>
+                </div>
+
+                @if (_carregandoRegras)
+                {
+                    <div class="d-flex justify-center pa-8">
+                        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                    </div>
+                }
+                else if (!_regras.Any())
+                {
+                    <div class="pa-8 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Gavel" Size="Size.Large" Color="Color.Default" Class="mb-2" />
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">Nenhuma regra cadastrada</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Cadastre regras para automatizar o cálculo de ICMS, PIS, COFINS e IPI nas vendas.</MudText>
+                    </div>
+                }
+                else
+                {
+                    <MudTable Items="@_regras" Hover="true" Striped="true" Elevation="0" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Descrição</MudTh>
+                            <MudTh>Operação</MudTh>
+                            <MudTh>CFOP</MudTh>
+                            <MudTh>NCM</MudTh>
+                            <MudTh>UF Destino</MudTh>
+                            <MudTh>CST / CSOSN</MudTh>
+                            <MudTh class="text-right">Aliq. ICMS</MudTh>
+                            <MudTh class="text-right">Aliq. PIS</MudTh>
+                            <MudTh class="text-right">Aliq. COFINS</MudTh>
+                            <MudTh class="text-center">Ações</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Descrição" Class="font-weight-bold">@context.Descricao</MudTd>
+                            <MudTd DataLabel="Operação">
+                                @if (context.TipoOperacao == TipoOperacaoFiscal.Saida)
+                                {
+                                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Variant="Variant.Outlined">Saída</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Secondary" Size="Size.Small" Variant="Variant.Outlined">Entrada</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="CFOP"><b>@context.CfopCodigo</b></MudTd>
+                            <MudTd DataLabel="NCM">@(string.IsNullOrWhiteSpace(context.NcmCodigo) ? "Todos (**)" : context.NcmCodigo)</MudTd>
+                            <MudTd DataLabel="UF">@context.UfDestino</MudTd>
+                            <MudTd DataLabel="CST">@(context.Csosn ?? context.CstIcms)</MudTd>
+                            <MudTd DataLabel="ICMS" Class="text-right">@context.AliquotaIcms.ToString("N1")%</MudTd>
+                            <MudTd DataLabel="PIS" Class="text-right">@context.AliquotaPis.ToString("N1")%</MudTd>
+                            <MudTd DataLabel="COFINS" Class="text-right">@context.AliquotaCofins.ToString("N1")%</MudTd>
+                            <MudTd DataLabel="Ações" Class="text-center">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditarRegra(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => ExcluirRegra(context))" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </div>
+        </MudTabPanel>
+
+        <!-- Aba 2: Regime Tributário e Séries -->
+        <MudTabPanel Text="Regime &amp; Parâmetros" Icon="@Icons.Material.Filled.Store">
+            <div class="pa-4" style="max-width: 900px;">
+                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-3">Enquadramento Tributário e Numeração SEFAZ</MudText>
+
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="RegimeTributarioEmpresa" Label="Regime Tributário (CRT) *" @bind-Value="_regimeCommand.Regime" Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem T="RegimeTributarioEmpresa" Value="RegimeTributarioEmpresa.SimplesNacional">Simples Nacional</MudSelectItem>
+                            <MudSelectItem T="RegimeTributarioEmpresa" Value="RegimeTributarioEmpresa.SimplesNacionalExcesso">Simples Nacional (Sublimite Excedido)</MudSelectItem>
+                            <MudSelectItem T="RegimeTributarioEmpresa" Value="RegimeTributarioEmpresa.RegimeNormal">Regime Normal (Lucro Presumido / Real)</MudSelectItem>
+                            <MudSelectItem T="RegimeTributarioEmpresa" Value="RegimeTributarioEmpresa.MEI">Microempreendedor Individual (MEI)</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="AmbienteFiscal" Label="Ambiente de Emissão *" @bind-Value="_regimeCommand.Ambiente" Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem T="AmbienteFiscal" Value="AmbienteFiscal.Homologacao">Homologação / Simulação (Ambiente de Testes)</MudSelectItem>
+                            <MudSelectItem T="AmbienteFiscal" Value="AmbienteFiscal.Producao">Produção Oficial SEFAZ (Validade Jurídica)</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <!-- Séries e Números -->
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int" Label="Série NF-e (55)" @bind-Value="_regimeCommand.SerieNFePadrao" Min="1" Max="999" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int" Label="Último Nº NF-e" @bind-Value="_regimeCommand.UltimoNumeroNFe" Min="0" Variant="Variant.Outlined" Dense="true" HelperText="Próx = este + 1" />
+                    </MudItem>
+
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int" Label="Série NFC-e (65)" @bind-Value="_regimeCommand.SerieNFCePadrao" Min="1" Max="999" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int" Label="Último Nº NFC-e" @bind-Value="_regimeCommand.UltimoNumeroNFCe" Min="0" Variant="Variant.Outlined" Dense="true" HelperText="Próx = este + 1" />
+                    </MudItem>
+
+                    <!-- Configurações NFC-e CSC -->
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_regimeCommand.IdCscToken" Label="Id Token CSC (NFC-e)" Placeholder="Ex: 000001" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="8">
+                        <MudTextField @bind-Value="_regimeCommand.CodigoCsc" Label="Código CSC Alfanumérico (NFC-e)" Placeholder="Código de Segurança do Contribuinte fornecido pela SEFAZ" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudNumericField T="decimal?" Label="Alíquota Crédito Simples Nacional (%)" @bind-Value="_regimeCommand.AliquotaCreditoSimples"
+                                        Min="0" Max="100" Format="N2" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_regimeCommand.MensagemPadraoNotas" Label="Mensagem Padrão no Rodapé das Notas"
+                                      Placeholder="Texto legal fixo em Dados Adicionais..." Lines="2" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+                </MudGrid>
+
+                <div class="mt-4">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="SalvarRegime" Disabled="_salvandoRegime">
+                        @if (_salvandoRegime)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Salvando...</span>
+                        }
+                        else
+                        {
+                            <span>Salvar Parâmetros Fiscais</span>
+                        }
+                    </MudButton>
+                </div>
+            </div>
+        </MudTabPanel>
+
+        <!-- Aba 3: Certificado Digital A1 -->
+        <MudTabPanel Text="Certificado Digital A1" Icon="@Icons.Material.Filled.Badge">
+            <div class="pa-4" style="max-width: 900px;">
+                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-3">Assinatura Digital ICP-Brasil (A1 em arquivo .PFX)</MudText>
+
+                @if (_certificadoAtual != null)
+                {
+                    <MudCard Elevation="1" Class="pa-4 mb-4" Style="border-left: 6px solid var(--mud-palette-success);">
+                        <div class="d-flex justify-space-between align-center mb-2">
+                            <div class="d-flex align-center">
+                                <MudIcon Icon="@Icons.Material.Filled.VerifiedUser" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                                <div>
+                                    <MudText Typo="Typo.h6" Class="font-weight-bold">@_certificadoAtual.RazaoSocialTitular</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">CNPJ/CPF: @_certificadoAtual.CnpjOuCpfTitular</MudText>
+                                </div>
+                            </div>
+                            <div>
+                                @if (!_certificadoAtual.EstaExpirado)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Variant="Variant.Filled">
+                                        Válido (@_certificadoAtual.DiasParaExpirar dias restantes)
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Error" Variant="Variant.Filled">
+                                        Expirado em @_certificadoAtual.ValidadeFim.ToString("dd/MM/yyyy")
+                                    </MudChip>
+                                }
+                            </div>
+                        </div>
+
+                        <MudDivider Class="my-2" />
+
+                        <MudGrid Spacing="1">
+                            <MudItem xs="12" sm="4">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">EMISSÃO / VENCIMENTO</MudText>
+                                <MudText Typo="Typo.body2">@_certificadoAtual.ValidadeInicio.ToString("dd/MM/yyyy") até @_certificadoAtual.ValidadeFim.ToString("dd/MM/yyyy")</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">AUTORIDADE CERTIFICADORA (AC)</MudText>
+                                <MudText Typo="Typo.body2">@_certificadoAtual.Emissor</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="4">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">THUMBPRINT</MudText>
+                                <MudText Typo="Typo.body2" Style="font-family: monospace;">@_certificadoAtual.Thumbprint</MudText>
+                            </MudItem>
+                        </MudGrid>
+
+                        <div class="mt-3 text-right">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Filled.Delete" OnClick="RemoverCertificado">
+                                Remover Certificado
+                            </MudButton>
+                        </div>
+                    </MudCard>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mb-4">
+                        Nenhum certificado A1 configurado. O sistema utilizará o motor de <b>Simulação/Homologação</b> para testes e dev.
+                        Para transmitir em produção com validade jurídica na SEFAZ, instale o certificado digital A1 (.pfx).
+                    </MudAlert>
+                }
+
+                <!-- Upload de Novo Certificado -->
+                <MudCard Elevation="1" Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">Instalar / Atualizar Certificado A1</MudText>
+
+                    <MudGrid Spacing="2" Class="align-center">
+                        <MudItem xs="12" sm="6">
+                            <MudFileUpload T="IBrowserFile" FilesChanged="OnFileSelected" Accept=".pfx,.p12">
+                                <ActivatorContent>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload">
+                                        @(_arquivoPfx != null ? _arquivoPfx.Name : "Selecionar Arquivo .PFX ou .P12")
+                                    </MudButton>
+                                </ActivatorContent>
+                            </MudFileUpload>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_senhaCertificado" Label="Senha do Certificado *"
+                                          InputType="InputType.Password" Variant="Variant.Outlined" Dense="true" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <div class="mt-3">
+                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Security"
+                                   OnClick="UploadCertificado" Disabled="_enviandoCertificado || _arquivoPfx == null || string.IsNullOrWhiteSpace(_senhaCertificado)">
+                            @if (_enviandoCertificado)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Criptografando com AES-256 e Instalando...</span>
+                            }
+                            else
+                            {
+                                <span>Instalar Certificado A1</span>
+                            }
+                        </MudButton>
+                    </div>
+                </MudCard>
+            </div>
+        </MudTabPanel>
+
+        <!-- Aba 4: Consulta NCM & CFOP -->
+        <MudTabPanel Text="Tabelas NCM &amp; CFOP" Icon="@Icons.Material.Filled.List">
+            <div class="pa-4">
+                <MudGrid Spacing="3">
+                    <!-- Consulta NCM -->
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="1" Class="pa-3">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" Class="mr-1" />
+                                Catálogo NCM (Nomenclatura Comum do Mercosul)
+                            </MudText>
+                            <MudTextField @bind-Value="_buscaNcm" Placeholder="Pesquisar código ou descrição de NCM..."
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                          Variant="Variant.Outlined" Dense="true" Class="mb-2" OnKeyUp="OnBuscaNcmKeyUp" />
+
+                            <MudTable Items="@_ncms" Hover="true" Elevation="0" Dense="true">
+                                <HeaderContent>
+                                    <MudTh>Código</MudTh>
+                                    <MudTh>Descrição</MudTh>
+                                    <MudTh class="text-right">IPI (%)</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd Class="font-weight-bold" Style="font-family: monospace;">@context.Codigo</MudTd>
+                                    <MudTd>@context.Descricao</MudTd>
+                                    <MudTd Class="text-right">@context.AliquotaIpi.ToString("N1")%</MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Consulta CFOP -->
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="1" Class="pa-3">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" Class="mr-1" />
+                                Catálogo CFOP (Código Fiscal de Operações)
+                            </MudText>
+                            <MudTextField @bind-Value="_buscaCfop" Placeholder="Pesquisar CFOP (ex: 5102, venda)..."
+                                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                                          Variant="Variant.Outlined" Dense="true" Class="mb-2" OnKeyUp="OnBuscaCfopKeyUp" />
+
+                            <MudTable Items="@_cfops" Hover="true" Elevation="0" Dense="true">
+                                <HeaderContent>
+                                    <MudTh>CFOP</MudTh>
+                                    <MudTh>Descrição</MudTh>
+                                    <MudTh>Tipo</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd Class="font-weight-bold" Style="font-family: monospace;">@context.Codigo</MudTd>
+                                    <MudTd>@context.Descricao</MudTd>
+                                    <MudTd>
+                                        @(context.TipoOperacao == TipoOperacaoFiscal.Saida ? "Saída" : "Entrada")
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+            </div>
+        </MudTabPanel>
+    </MudTabs>
+</MudCard>
+
+@code {
+    private bool _carregandoRegras = true;
+    private List<RegraTributariaDto> _regras = new();
+
+    private SalvarRegimeTributarioCommand _regimeCommand = new();
+    private bool _salvandoRegime = false;
+
+    private CertificadoDigitalDto? _certificadoAtual;
+    private IBrowserFile? _arquivoPfx;
+    private string _senhaCertificado = string.Empty;
+    private bool _enviandoCertificado = false;
+
+    private string? _buscaNcm;
+    private List<NcmDto> _ncms = new();
+
+    private string? _buscaCfop;
+    private List<CfopDto> _cfops = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(
+            CarregarRegras(),
+            CarregarRegime(),
+            CarregarCertificado(),
+            CarregarNcms(),
+            CarregarCfops()
+        );
+    }
+
+    private async Task CarregarRegras()
+    {
+        try
+        {
+            _carregandoRegras = true;
+            _regras = await Mediator.Send(new GetRegrasTributariasQuery());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar regras: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregandoRegras = false;
+        }
+    }
+
+    private async Task CarregarRegime()
+    {
+        try
+        {
+            var dto = await Mediator.Send(new GetRegimeTributarioQuery());
+            _regimeCommand = new SalvarRegimeTributarioCommand
+            {
+                Regime = dto.Regime,
+                Ambiente = dto.Ambiente,
+                SerieNFePadrao = dto.SerieNFePadrao,
+                UltimoNumeroNFe = dto.UltimoNumeroNFe,
+                SerieNFCePadrao = dto.SerieNFCePadrao,
+                UltimoNumeroNFCe = dto.UltimoNumeroNFCe,
+                IdCscToken = dto.IdCscToken,
+                CodigoCsc = dto.CodigoCsc,
+                AliquotaCreditoSimples = dto.AliquotaCreditoSimples,
+                IncentivadorCultural = dto.IncentivadorCultural,
+                PermiteCreditoIcms = dto.PermiteCreditoIcms,
+                MensagemPadraoNotas = dto.MensagemPadraoNotas
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar regime tributário: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SalvarRegime()
+    {
+        try
+        {
+            _salvandoRegime = true;
+            await Mediator.Send(_regimeCommand);
+            Snackbar.Add("Parâmetros fiscais salvos com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar regime: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvandoRegime = false;
+        }
+    }
+
+    private async Task CarregarCertificado()
+    {
+        try
+        {
+            _certificadoAtual = await Mediator.Send(new GetCertificadoDigitalQuery());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar certificado digital: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnFileSelected(IBrowserFile file)
+    {
+        _arquivoPfx = file;
+    }
+
+    private async Task UploadCertificado()
+    {
+        if (_arquivoPfx == null || string.IsNullOrWhiteSpace(_senhaCertificado))
+        {
+            Snackbar.Add("Selecione o arquivo .PFX e informe a senha.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            _enviandoCertificado = true;
+
+            using var ms = new MemoryStream();
+            await _arquivoPfx.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(ms);
+            byte[] bytes = ms.ToArray();
+
+            var dto = new SalvarCertificadoDigitalDto
+            {
+                ArquivoBytes = bytes,
+                Senha = _senhaCertificado
+            };
+
+            _certificadoAtual = await Mediator.Send(new SalvarCertificadoCommand(dto));
+            Snackbar.Add("Certificado A1 instalado e criptografado com sucesso!", Severity.Success);
+            _arquivoPfx = null;
+            _senhaCertificado = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao instalar certificado: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _enviandoCertificado = false;
+        }
+    }
+
+    private async Task RemoverCertificado()
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Remover Certificado Digital",
+            "Deseja realmente remover o certificado digital A1 da empresa? O sistema voltará a utilizar o modo de simulação.",
+            yesText: "Remover", cancelText: "Cancelar");
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new RemoverCertificadoCommand());
+                _certificadoAtual = null;
+                Snackbar.Add("Certificado digital removido com sucesso.", Severity.Info);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao remover certificado: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task NovaRegra()
+    {
+        var dialog = await DialogService.ShowAsync<RegraTributariaDialog>("Nova Regra Tributária", new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await CarregarRegras();
+        }
+    }
+
+    private async Task EditarRegra(RegraTributariaDto regra)
+    {
+        var parameters = new DialogParameters { ["Regra"] = regra };
+        var dialog = await DialogService.ShowAsync<RegraTributariaDialog>("Editar Regra Tributária", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var result = await dialog.Result;
+        if (!result.Canceled)
+        {
+            await CarregarRegras();
+        }
+    }
+
+    private async Task ExcluirRegra(RegraTributariaDto regra)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Excluir Regra Tributária",
+            $"Deseja realmente excluir a regra '{regra.Descricao}'?",
+            yesText: "Excluir", cancelText: "Cancelar");
+
+        if (confirmar == true)
+        {
+            try
+            {
+                await Mediator.Send(new ExcluirRegraTributariaCommand(regra.Id));
+                Snackbar.Add("Regra tributária excluída com sucesso.", Severity.Success);
+                await CarregarRegras();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao excluir: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task CarregarNcms()
+    {
+        try
+        {
+            _ncms = await Mediator.Send(new GetNcmsQuery(_buscaNcm));
+        }
+        catch { }
+    }
+
+    private async Task OnBuscaNcmKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CarregarNcms();
+        }
+    }
+
+    private async Task CarregarCfops()
+    {
+        try
+        {
+            _cfops = await Mediator.Send(new GetCfopsQuery(_buscaCfop));
+        }
+        catch { }
+    }
+
+    private async Task OnBuscaCfopKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await CarregarCfops();
+        }
+    }
+}

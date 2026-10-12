@@ -1,0 +1,108 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Fiscal.Commands
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Class="mr-2" />
+            <MudText Typo="Typo.h6">Cancelar Nota Fiscal @NumeroFormatado</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudAlert Severity="Severity.Warning" Class="mb-3" Dense="true">
+            O cancelamento da NF-e é irreversível e deve respeitar o prazo legal da SEFAZ (geralmente até 24 horas após a concessão da autorização).
+        </MudAlert>
+
+        <MudText Typo="Typo.body2" Class="mb-2">
+            <b>Chave de Acesso:</b> <span style="font-family: monospace;">@ChaveAcesso</span>
+        </MudText>
+
+        <MudTextField @bind-Value="_justificativa"
+                      Label="Justificativa do Cancelamento *"
+                      Placeholder="Informe o motivo detalhado do cancelamento (mínimo 15 caracteres)..."
+                      Lines="3"
+                      Variant="Variant.Outlined"
+                      Counter="255"
+                      Immediate="true"
+                      HelperText="@($"Caracteres: {_justificativa.Length}/255 (mínimo 15)")" />
+
+        @if (!string.IsNullOrWhiteSpace(_erro))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2" Dense="true">
+                @_erro
+            </MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Voltar</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Error"
+                   StartIcon="@Icons.Material.Filled.DeleteForever"
+                   OnClick="ConfirmarCancelamento"
+                   Disabled="_processando || _justificativa.Trim().Length < 15">
+            @if (_processando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Transmitindo à SEFAZ...</span>
+            }
+            else
+            {
+                <span>Confirmar Cancelamento</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int NotaFiscalId { get; set; }
+    [Parameter] public string NumeroFormatado { get; set; } = string.Empty;
+    [Parameter] public string ChaveAcesso { get; set; } = string.Empty;
+
+    private string _justificativa = string.Empty;
+    private bool _processando = false;
+    private string? _erro;
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task ConfirmarCancelamento()
+    {
+        if (string.IsNullOrWhiteSpace(_justificativa) || _justificativa.Trim().Length < 15)
+        {
+            _erro = "A justificativa deve conter no mínimo 15 caracteres.";
+            return;
+        }
+
+        try
+        {
+            _processando = true;
+            _erro = null;
+
+            var command = new CancelarNotaFiscalCommand(NotaFiscalId, _justificativa.Trim());
+            var resultado = await Mediator.Send(command);
+
+            if (resultado.Sucesso)
+            {
+                Snackbar.Add($"Nota Fiscal cancelada com sucesso! Protocolo: {resultado.Protocolo}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+            {
+                _erro = $"SEFAZ: [{resultado.CodigoStatus}] {resultado.MotivoStatus}";
+                Snackbar.Add(_erro, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _erro = $"Erro ao cancelar nota: {ex.Message}";
+            Snackbar.Add(_erro, Severity.Error);
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+}

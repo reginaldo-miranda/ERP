@@ -1,0 +1,376 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Fiscal.Commands
+@using ERP.Application.Fiscal.DTOs
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Vendas
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IApplicationDbContext Context
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.SendAndArchive" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Emissão de Documento Fiscal (SEFAZ)</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudGrid Spacing="2">
+                <!-- Seleção do Tipo de Origem -->
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" Label="Origem da Emissão" @bind-Value="_origemTipo" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem T="int" Value="1">A partir de Pedido de Venda</MudSelectItem>
+                        <MudSelectItem T="int" Value="2">Emissão Direta / Avulsa</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="ModeloDocumentoFiscal" Label="Modelo do Documento *" @bind-Value="_modelo" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem T="ModeloDocumentoFiscal" Value="ModeloDocumentoFiscal.NFe">NF-e (Modelo 55 - Mercantil A4)</MudSelectItem>
+                        <MudSelectItem T="ModeloDocumentoFiscal" Value="ModeloDocumentoFiscal.NFCe">NFC-e (Modelo 65 - Consumidor Bobina)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                @if (_origemTipo == 1)
+                {
+                    <MudItem xs="12">
+                        <MudSelect T="int?" Label="Selecione o Pedido de Venda *" @bind-Value="_pedidoVendaId"
+                                   @bind-Value:after="OnPedidoSelecionado" Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem T="int?" Value="@((int?)null)">-- Selecione um Pedido --</MudSelectItem>
+                            @foreach (var p in _pedidosDisponiveis)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)p.Id)">
+                                    Pedido @p.Numero - @(p.Cliente?.Nome ?? "Cliente não informado") (@p.ValorTotal.ToString("C2"))
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    @if (_pedidoSelecionado != null)
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-background-grey); border-radius: 8px;">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="font-weight-bold">Dados do Pedido</MudText>
+                                <MudText Typo="Typo.body2"><b>Cliente:</b> @(_pedidoSelecionado.Cliente?.Nome ?? "Consumidor")</MudText>
+                                <MudText Typo="Typo.body2"><b>CPF/CNPJ:</b> @(_pedidoSelecionado.Cliente?.CpfCnpj ?? "Não informado")</MudText>
+                                <MudText Typo="Typo.body2"><b>Itens do Pedido:</b> @_pedidoSelecionado.Itens.Count produto(s)</MudText>
+                                <MudText Typo="Typo.body2"><b>Valor Total:</b> <span class="font-weight-bold" style="color: var(--mud-palette-success);">@_pedidoSelecionado.ValorTotal.ToString("C2")</span></MudText>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                }
+                else
+                {
+                    <!-- Emissão Avulsa -->
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int?" Label="Cliente Cadastrado" @bind-Value="_clienteId"
+                                   @bind-Value:after="OnClienteSelecionado" Variant="Variant.Outlined" Dense="true">
+                            <MudSelectItem T="int?" Value="@((int?)null)">Consumidor Final (Não Cadastrado)</MudSelectItem>
+                            @foreach (var c in _clientes)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome (@c.CpfCnpj)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_destinatarioRazaoSocial" Label="Nome / Razão Social Destinatário" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_destinatarioCpfCnpj" Label="CPF / CNPJ Destinatário" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_destinatarioUf" Label="UF Destino *" Variant="Variant.Outlined" Dense="true" MaxLength="2" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudTextField @bind-Value="_destinatarioMunicipio" Label="Município" Variant="Variant.Outlined" Dense="true" />
+                    </MudItem>
+
+                    <!-- Adicionar Itens Avulsos -->
+                    <MudItem xs="12">
+                        <div class="d-flex justify-space-between align-center my-2">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Itens da Nota Fiscal</MudText>
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarItemAvulso">
+                                Adicionar Produto
+                            </MudButton>
+                        </div>
+                    </MudItem>
+
+                    @foreach (var item in _itensAvulsos)
+                    {
+                        <MudItem xs="12">
+                            <MudPaper Elevation="0" Class="pa-2 mb-2" Style="background: var(--mud-palette-background-grey); border-radius: 6px;">
+                                <MudGrid Spacing="1" Class="align-center">
+                                    <MudItem xs="12" sm="4">
+                                        <MudSelect T="int?" Label="Produto" @bind-Value="item.ProdutoId"
+                                                   @bind-Value:after="@(() => AtualizarDadosProduto(item))" Dense="true" Variant="Variant.Outlined">
+                                            @foreach (var p in _produtos)
+                                            {
+                                                <MudSelectItem T="int?" Value="@((int?)p.Id)">@p.Nome (@p.Codigo)</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </MudItem>
+                                    <MudItem xs="4" sm="2">
+                                        <MudNumericField T="decimal" Label="Qtd" @bind-Value="item.Quantidade" Min="0.001m" Dense="true" Variant="Variant.Outlined" />
+                                    </MudItem>
+                                    <MudItem xs="4" sm="2">
+                                        <MudNumericField T="decimal" Label="Preço Unit." @bind-Value="item.ValorUnitario" Min="0m" Format="N2" Dense="true" Variant="Variant.Outlined" />
+                                    </MudItem>
+                                    <MudItem xs="3" sm="3">
+                                        <MudText Typo="Typo.body2" Class="font-weight-bold text-right pt-2">
+                                            @((item.Quantidade * item.ValorUnitario).ToString("C2"))
+                                        </MudText>
+                                    </MudItem>
+                                    <MudItem xs="1" sm="1" Class="text-right">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoverItemAvulso(item))" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                }
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_naturezaOperacao" Label="Natureza da Operação *" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_informacoesComplementares" Label="Informações Complementares / Observações do Contribuinte"
+                                  Lines="2" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+            </MudGrid>
+
+            @if (!string.IsNullOrWhiteSpace(_erro))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3" Dense="true">
+                    @_erro
+                </MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   OnClick="EmitirNota"
+                   Disabled="_processando || (_origemTipo == 1 && !_pedidoVendaId.HasValue) || (_origemTipo == 2 && !_itensAvulsos.Any())">
+            @if (_processando)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Assinando e Transmitindo...</span>
+            }
+            else
+            {
+                <span>Emitir Documento Fiscal</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public int? PedidoVendaIdInicial { get; set; }
+
+    private bool _carregando = true;
+    private bool _processando = false;
+    private string? _erro;
+
+    private int _origemTipo = 1;
+    private ModeloDocumentoFiscal _modelo = ModeloDocumentoFiscal.NFe;
+    private string _naturezaOperacao = "VENDA DE MERCADORIAS";
+    private string? _informacoesComplementares;
+
+    private int? _pedidoVendaId;
+    private PedidoVenda? _pedidoSelecionado;
+    private List<PedidoVenda> _pedidosDisponiveis = new();
+
+    private int? _clienteId;
+    private string? _destinatarioCpfCnpj;
+    private string? _destinatarioRazaoSocial;
+    private string? _destinatarioMunicipio;
+    private string _destinatarioUf = "SP";
+
+    private List<Cliente> _clientes = new();
+    private List<Produto> _produtos = new();
+    private List<CalculoItemInputDto> _itensAvulsos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+        if (PedidoVendaIdInicial.HasValue)
+        {
+            _origemTipo = 1;
+            _pedidoVendaId = PedidoVendaIdInicial.Value;
+            await OnPedidoSelecionado();
+        }
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            _carregando = true;
+
+            _pedidosDisponiveis = await Context.PedidosVenda.AsNoTracking()
+                .Include(p => p.Cliente)
+                .Include(p => p.Itens)
+                .Where(p => p.Status == StatusPedidoVenda.Aprovado || p.Status == StatusPedidoVenda.Faturado)
+                .OrderByDescending(p => p.DataPedido)
+                .Take(50)
+                .ToListAsync();
+
+            _clientes = await Context.Clientes.AsNoTracking()
+                .OrderBy(c => c.Nome)
+                .Take(50)
+                .ToListAsync();
+
+            _produtos = await Context.Produtos.AsNoTracking()
+                .Where(p => p.Ativo)
+                .OrderBy(p => p.Nome)
+                .Take(100)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnPedidoSelecionado()
+    {
+        if (_pedidoVendaId.HasValue && _pedidoVendaId > 0)
+        {
+            _pedidoSelecionado = await Context.PedidosVenda.AsNoTracking()
+                .Include(p => p.Cliente)
+                .Include(p => p.Itens)
+                    .ThenInclude(i => i.Produto)
+                .FirstOrDefaultAsync(p => p.Id == _pedidoVendaId.Value);
+        }
+        else
+        {
+            _pedidoSelecionado = null;
+        }
+    }
+
+    private void OnClienteSelecionado()
+    {
+        var cli = _clientes.FirstOrDefault(c => c.Id == _clienteId);
+        if (cli != null)
+        {
+            _destinatarioRazaoSocial = cli.Nome;
+            _destinatarioCpfCnpj = cli.CpfCnpj;
+        }
+    }
+
+    private void AdicionarItemAvulso()
+    {
+        var prod = _produtos.FirstOrDefault();
+        if (prod != null)
+        {
+            _itensAvulsos.Add(new CalculoItemInputDto
+            {
+                ProdutoId = prod.Id,
+                Codigo = prod.Codigo,
+                Descricao = prod.Nome,
+                Ncm = prod.Ncm ?? "00000000",
+                Cfop = _destinatarioUf == "SP" ? "5102" : "6102",
+                UnidadeMedida = "UN",
+                Quantidade = 1m,
+                ValorUnitario = prod.PrecoVenda,
+                OrigemMercadoria = 0
+            });
+        }
+    }
+
+    private void AtualizarDadosProduto(CalculoItemInputDto item)
+    {
+        var prod = _produtos.FirstOrDefault(p => p.Id == item.ProdutoId);
+        if (prod != null)
+        {
+            item.Codigo = prod.Codigo;
+            item.Descricao = prod.Nome;
+            item.Ncm = prod.Ncm ?? "00000000";
+            item.ValorUnitario = prod.PrecoVenda;
+        }
+    }
+
+    private void RemoverItemAvulso(CalculoItemInputDto item)
+    {
+        _itensAvulsos.Remove(item);
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task EmitirNota()
+    {
+        try
+        {
+            _processando = true;
+            _erro = null;
+
+            var command = new EmitirNotaFiscalCommand
+            {
+                Modelo = _modelo,
+                NaturezaOperacao = _naturezaOperacao.Trim(),
+                TipoOperacao = TipoOperacaoFiscal.Saida,
+                InformacoesComplementares = _informacoesComplementares,
+                TransmitirImediatamente = true
+            };
+
+            if (_origemTipo == 1)
+            {
+                command.PedidoVendaId = _pedidoVendaId;
+            }
+            else
+            {
+                command.ClienteId = _clienteId;
+                command.DestinatarioRazaoSocial = _destinatarioRazaoSocial;
+                command.DestinatarioCpfCnpj = _destinatarioCpfCnpj;
+                command.DestinatarioMunicipio = _destinatarioMunicipio;
+                command.DestinatarioUf = _destinatarioUf;
+                command.Itens = _itensAvulsos;
+            }
+
+            var resultado = await Mediator.Send(command);
+
+            if (resultado.Sucesso)
+            {
+                Snackbar.Add($"Documento fiscal emitido com sucesso! Chave: {resultado.ChaveAcesso}", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(resultado));
+            }
+            else
+            {
+                _erro = $"SEFAZ: [{resultado.CodigoStatus}] {resultado.MotivoStatus}";
+                Snackbar.Add(_erro, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _erro = $"Falha na emissão: {ex.Message}";
+            Snackbar.Add(_erro, Severity.Error);
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+}

@@ -7,6 +7,7 @@
 @using ERP.Domain.Core.Enums
 @using MediatR
 @using Microsoft.EntityFrameworkCore
+@using ERP.Web.Components.Pages.Fiscal
 @inject IMediator Mediator
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -167,6 +168,7 @@
                             <MudTh class="text-right">CMV (Custo)</MudTh>
                             <MudTh class="text-right">Lucro Bruto</MudTh>
                             <MudTh class="text-center">Status</MudTh>
+                            <MudTh class="text-center">Ações</MudTh>
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="Nº Faturamento" Class="font-weight-bold">@context.Numero</MudTd>
@@ -188,6 +190,18 @@
                                 else
                                 {
                                     <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">Cancelado</MudChip>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Ações" Class="text-center">
+                                @if (context.Status == StatusFaturamento.Emitido)
+                                {
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.ReceiptLong"
+                                               OnClick="@(() => EmitirNotaFiscal(context.PedidoVendaId))">
+                                        Emitir NF-e
+                                    </MudButton>
                                 }
                             </MudTd>
                         </RowTemplate>
@@ -273,5 +287,14 @@
                 Snackbar.Add($"Erro ao faturar: {ex.Message}", Severity.Error);
             }
         }
+    }
+
+    private async Task EmitirNotaFiscal(int? pedidoVendaId)
+    {
+        if (!pedidoVendaId.HasValue) return;
+        var parameters = new DialogParameters { ["PedidoVendaIdInicial"] = pedidoVendaId.Value };
+        var dialog = await DialogService.ShowAsync<EmitirNotaFiscalDialog>(
+            "Emitir Nota Fiscal", parameters, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        await dialog.Result;
     }
 }
