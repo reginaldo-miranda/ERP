@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @using ERP.Web.Services
+@using ERP.Web.Components.Shared
 @inject CustomAuthStateProvider AuthState
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
@@ -87,6 +88,8 @@ else
         <MudMainContent Class="pa-6">
             @Body
         </MudMainContent>
+
+        <VoiceAssistantDrawer />
     </MudLayout>
 }
 

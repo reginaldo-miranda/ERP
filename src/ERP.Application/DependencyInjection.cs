@@ -19,6 +19,9 @@ public static class DependencyInjection
         // FluentValidation
         services.AddValidatorsFromAssembly(assembly);
 
+        // Assistente Inteligente de Voz
+        services.AddScoped<ERP.Application.Vendas.Voice.IVoiceAssistantService, ERP.Application.Vendas.Voice.VoiceAssistantService>();
+
         return services;
     }
 }
