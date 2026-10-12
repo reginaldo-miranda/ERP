@@ -20,7 +20,7 @@
 </div>
 
 <!-- Drawer Lateral do Assistente -->
-<MudDrawer @bind-Open="_drawerAberto" Anchor="Anchor.Right" Elevation="5" Variant="DrawerVariant.Temporary" Width="440px">
+<MudDrawer @bind-Open="_drawerAberto" Anchor="Anchor.Right" Elevation="5" Variant="DrawerVariant.Temporary" Width="460px">
     <div class="d-flex flex-column h-100" style="background: var(--mud-palette-background);">
         
         <!-- Header do Drawer -->
@@ -35,7 +35,7 @@
                 </div>
             </div>
             <div class="d-flex align-center gap-1">
-                <MudTooltip Text="@(_falarRespostas ? "Desativar voz do assistente" : "Ativar voz do assistente")">
+                <MudTooltip Text="@(_falarRespostas ? "Desativar áudio do assistente" : "Ativar áudio do assistente")">
                     <MudIconButton Icon="@(_falarRespostas ? Icons.Material.Filled.VolumeUp : Icons.Material.Filled.VolumeOff)" 
                                    Color="@(_falarRespostas ? Color.Primary : Color.Default)" 
                                    Size="Size.Small" 
@@ -74,12 +74,121 @@
                 else if (_estaOuvindo)
                 {
                     <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
-                        Ex.: "faça um pedido para José Maria, 30 dias..."
+                        Ex.: "faça um pedido para José Maria" ou "10 sacos de cimento"
                     </MudText>
                 }
             </MudPaper>
 
-            <!-- Card de Rascunho do Pedido em Tempo Real -->
+            <!-- ========================================== -->
+            <!-- ETAPA: CLIENTE NÃO ENCONTRADO / CADASTRO -->
+            <!-- ========================================== -->
+            @if (_mostrarFormCliente)
+            {
+                <MudPaper Elevation="3" Class="pa-4 mb-4 border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">
+                            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Small" Class="mr-1" />
+                            Cadastrar Novo Cliente
+                        </MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _mostrarFormCliente = false)" />
+                    </div>
+                    <MudTextField @bind-Value="_novoClienteNome" Label="Nome do Cliente" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="_novoClienteTelefone" Label="Telefone / WhatsApp" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="_novoClienteCpf" Label="CPF" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" />
+                    <div class="d-flex justify-end gap-2">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@(() => _mostrarFormCliente = false)">Cancelar</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="SalvarNovoCliente" Disabled="@string.IsNullOrWhiteSpace(_novoClienteNome)">Salvar e Continuar</MudButton>
+                    </div>
+                </MudPaper>
+            }
+            else if (_estado.Status == VoiceSessionStatus.AguardandoCliente && !string.IsNullOrWhiteSpace(_estado.TermoClienteNaoEncontrado))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+                    <div><b>Cliente não encontrado:</b> "@_estado.TermoClienteNaoEncontrado"</div>
+                    <MudText Typo="Typo.caption" Class="mt-1 d-block">Diga outro nome no microfone ou faça o cadastro rápido:</MudText>
+                    <div class="mt-2">
+                        <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Small" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="AbrirFormCliente">
+                            Cadastrar Cliente "@_estado.TermoClienteNaoEncontrado"
+                        </MudButton>
+                    </div>
+                </MudAlert>
+            }
+            else if (_estado.Status == VoiceSessionStatus.AguardandoCliente && _estado.CandidatosClientes.Any())
+            {
+                <MudPaper Elevation="3" Class="pa-3 mb-4 border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />
+                        Selecione o Cliente (diga o número ou clique):
+                    </MudText>
+                    <div class="d-flex flex-column gap-2">
+                        @for (int i = 0; i < _estado.CandidatosClientes.Count; i++)
+                        {
+                            var cli = _estado.CandidatosClientes[i];
+                            int idx = i;
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true" Class="justify-start text-left pa-2" OnClick="@(() => SelecionarClienteManual(cli.Id))">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mr-2">@(idx + 1)</MudChip>
+                                <div>
+                                    <div class="font-weight-bold">@cli.Nome</div>
+                                    @if (!string.IsNullOrWhiteSpace(cli.Telefone))
+                                    {
+                                        <div class="text-muted" style="font-size: 0.75rem;">Tel: @cli.Telefone</div>
+                                    }
+                                </div>
+                            </MudButton>
+                        }
+                    </div>
+                </MudPaper>
+            }
+
+            <!-- ========================================== -->
+            <!-- ETAPA: ESCOLHA DE PRODUTOS ENCONTRADOS     -->
+            <!-- ========================================== -->
+            @if (_estado.Status == VoiceSessionStatus.AguardandoEscolhaProduto && _estado.CandidatosProdutos.Any())
+            {
+                <MudPaper Elevation="3" Class="pa-3 mb-4 border-l-4" Style="border-left-color: var(--mud-palette-secondary) !important;">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">
+                            <MudIcon Icon="@Icons.Material.Filled.FormatListNumbered" Size="Size.Small" Class="mr-1" />
+                            Qual produto você deseja? (@_estado.CandidatosProdutos.Count opções)
+                        </MudText>
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small" OnClick="CancelarEscolhaProduto">Cancelar</MudButton>
+                    </div>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2 d-block">
+                        Quantidade pendente: <b>@_estado.QuantidadePendente</b>. Diga o número da opção ou clique:
+                    </MudText>
+                    <div class="d-flex flex-column gap-2">
+                        @for (int i = 0; i < _estado.CandidatosProdutos.Count; i++)
+                        {
+                            var prod = _estado.CandidatosProdutos[i];
+                            int idx = i;
+                            <MudButton Variant="Variant.Filled" Color="Color.Surface" Elevation="1" FullWidth="true" Class="justify-space-between pa-2 border" OnClick="@(() => SelecionarProdutoManual(prod.Id))">
+                                <div class="d-flex align-center">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Class="mr-2 font-weight-bold">@(idx + 1)</MudChip>
+                                    <div class="text-left">
+                                        <div class="font-weight-bold">@prod.Nome</div>
+                                        <div class="text-muted" style="font-size: 0.75rem;">Cód: @prod.Codigo | @prod.UnidadeMedida</div>
+                                    </div>
+                                </div>
+                                <div class="font-weight-bold text-success ml-2">
+                                    @prod.PrecoVenda.ToString("C2")
+                                </div>
+                            </MudButton>
+                        }
+                    </div>
+                </MudPaper>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_estado.TermoProdutoNaoEncontrado))
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-4">
+                    <b>Produto não encontrado:</b> "@_estado.TermoProdutoNaoEncontrado".
+                    <div style="font-size: 0.8rem;">Diga o nome novamente ou consulte os produtos cadastrados.</div>
+                </MudAlert>
+            }
+
+            <!-- ========================================== -->
+            <!-- CARD DE RASCUNHO DO PEDIDO EM TEMPO REAL   -->
+            <!-- ========================================== -->
             @if (_estado.Status != VoiceSessionStatus.AguardandoComando)
             {
                 <MudCard Elevation="3" Class="mb-4 border-l-4" Style="border-left-color: var(--mud-palette-primary) !important;">
@@ -95,7 +204,7 @@
                                 </MudChip>
                             </div>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                Cliente: <b>@(_estado.ClienteNome ?? "Não definido")</b> | Pagto: <b>@_estado.CondicaoPagamento</b>
+                                Cliente: <b>@(_estado.ClienteNome ?? "Não selecionado")</b> | Pagto: <b>@_estado.CondicaoPagamento</b>
                             </MudText>
                         </CardHeaderContent>
                     </MudCardHeader>
@@ -106,18 +215,41 @@
                             <MudSimpleTable Dense="true" Hover="true" Elevation="0">
                                 <thead>
                                     <tr>
-                                        <th>Qtd</th>
+                                        <th style="width: 100px;">Qtd</th>
                                         <th>Produto</th>
                                         <th style="text-align: right;">Total</th>
+                                        <th style="width: 32px; text-align: center;"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var item in _estado.Itens)
                                     {
                                         <tr>
-                                            <td><b>@item.Quantidade</b></td>
-                                            <td>@item.ProdutoNome</td>
-                                            <td style="text-align: right;">@item.ValorTotal.ToString("C2")</td>
+                                            <td style="white-space: nowrap;">
+                                                <div class="d-flex align-center gap-1">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Remove" 
+                                                                   Size="Size.Small" 
+                                                                   Style="width: 20px; height: 20px; padding: 0;" 
+                                                                   OnClick="@(() => AlterarQtdItem(item.ProdutoId, -1))" />
+                                                    <span><b>@item.Quantidade</b></span>
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                                                   Size="Size.Small" 
+                                                                   Style="width: 20px; height: 20px; padding: 0;" 
+                                                                   OnClick="@(() => AlterarQtdItem(item.ProdutoId, 1))" />
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div><b>@item.ProdutoNome</b></div>
+                                                <div class="text-muted" style="font-size: 0.7rem;">@item.ValorUnitario.ToString("C2") un</div>
+                                            </td>
+                                            <td style="text-align: right; font-weight: bold;">@item.ValorTotal.ToString("C2")</td>
+                                            <td style="text-align: center;">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                               Color="Color.Error" 
+                                                               Size="Size.Small" 
+                                                               Style="width: 24px; height: 24px; padding: 0;" 
+                                                               OnClick="@(() => RemoverItem(item.ProdutoId))" />
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -131,12 +263,12 @@
                         else
                         {
                             <div class="text-center py-3">
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">Aguardando itens... Diga: "10 unidades de Cimento..."</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Nenhum item adicionado ainda. Diga o nome do produto e a quantidade.</MudText>
                             </div>
                         }
 
                         <!-- Ações Rápidas por Botão de Acordo com o Estado -->
-                        @if (_estado.Status == VoiceSessionStatus.CriandoPedidoAguardandoItens && _estado.Itens.Any())
+                        @if ((_estado.Status == VoiceSessionStatus.CriandoPedidoAguardandoItens || _estado.Status == VoiceSessionStatus.AguardandoEscolhaProduto) && _estado.Itens.Any())
                         {
                             <MudButton Variant="Variant.Filled" 
                                        Color="Color.Primary" 
@@ -239,6 +371,12 @@
     private string _textoDigitado = string.Empty;
     private string? _linkDanfe;
 
+    // Cadastro Rápido de Cliente
+    private bool _mostrarFormCliente;
+    private string _novoClienteNome = string.Empty;
+    private string _novoClienteTelefone = string.Empty;
+    private string _novoClienteCpf = string.Empty;
+
     private VoiceSessionState _estado = new();
     private List<VoiceChatMessageDto> _mensagens = new();
     private DotNetObjectReference<VoiceAssistantDrawer>? _dotNetRef;
@@ -248,7 +386,7 @@
         _mensagens.Add(new VoiceChatMessageDto
         {
             Remetente = "Assistente",
-            Texto = "Olá! Sou o seu Assistente de Voz do ERP. Diga algo como: 'ERP, faça um pedido de venda para o cliente José Maria da Silva, pagamento 30 dias'."
+            Texto = "Olá! Sou o seu Copilot de Voz do ERP. Diga algo como: 'ERP, faça um pedido de venda' para começarmos."
         });
     }
 
@@ -331,7 +469,6 @@
 
     private async Task ProcessarComando(string comando)
     {
-        // 1. Adicionar mensagem do usuário
         _mensagens.Add(new VoiceChatMessageDto
         {
             Remetente = "Usuario",
@@ -341,19 +478,16 @@
 
         try
         {
-            // 2. Processar com o serviço
             var resultado = await VoiceService.ProcessarComandoVozAsync(_estado, comando);
             _estado = resultado.Estado;
             _linkDanfe = resultado.LinkDanfe;
 
-            // 3. Adicionar resposta do assistente
             _mensagens.Add(new VoiceChatMessageDto
             {
                 Remetente = "Assistente",
                 Texto = resultado.MensagemResposta
             });
 
-            // 4. Falar de volta se habilitado
             if (_falarRespostas && resultado.DeveFalar && !string.IsNullOrWhiteSpace(resultado.MensagemResposta))
             {
                 await JS.InvokeVoidAsync("voiceAssistant.speak", resultado.MensagemResposta);
@@ -370,6 +504,73 @@
         }
         finally
         {
+            StateHasChanged();
+        }
+    }
+
+    // Ações Manuais da Interface
+    private async Task SelecionarClienteManual(int clienteId)
+    {
+        var res = await VoiceService.SelecionarClienteCandidatoAsync(_estado, clienteId);
+        _estado = res.Estado;
+        _mensagens.Add(new VoiceChatMessageDto { Remetente = "Assistente", Texto = res.MensagemResposta });
+        if (_falarRespostas && res.DeveFalar) await JS.InvokeVoidAsync("voiceAssistant.speak", res.MensagemResposta);
+        StateHasChanged();
+    }
+
+    private void AbrirFormCliente()
+    {
+        _novoClienteNome = _estado.TermoClienteNaoEncontrado ?? string.Empty;
+        _novoClienteTelefone = string.Empty;
+        _novoClienteCpf = string.Empty;
+        _mostrarFormCliente = true;
+    }
+
+    private async Task SalvarNovoCliente()
+    {
+        if (string.IsNullOrWhiteSpace(_novoClienteNome)) return;
+
+        var res = await VoiceService.CadastrarClienteRapidoAsync(_estado, _novoClienteNome, _novoClienteTelefone, _novoClienteCpf);
+        _estado = res.Estado;
+        _mostrarFormCliente = false;
+        _mensagens.Add(new VoiceChatMessageDto { Remetente = "Assistente", Texto = res.MensagemResposta });
+        if (_falarRespostas && res.DeveFalar) await JS.InvokeVoidAsync("voiceAssistant.speak", res.MensagemResposta);
+        StateHasChanged();
+    }
+
+    private async Task SelecionarProdutoManual(int produtoId)
+    {
+        var res = await VoiceService.SelecionarProdutoCandidatoAsync(_estado, produtoId, _estado.QuantidadePendente);
+        _estado = res.Estado;
+        _mensagens.Add(new VoiceChatMessageDto { Remetente = "Assistente", Texto = res.MensagemResposta });
+        if (_falarRespostas && res.DeveFalar) await JS.InvokeVoidAsync("voiceAssistant.speak", res.MensagemResposta);
+        StateHasChanged();
+    }
+
+    private void CancelarEscolhaProduto()
+    {
+        _estado.Status = VoiceSessionStatus.CriandoPedidoAguardandoItens;
+        _estado.CandidatosProdutos.Clear();
+        _mensagens.Add(new VoiceChatMessageDto { Remetente = "Assistente", Texto = "Seleção de produto cancelada." });
+        StateHasChanged();
+    }
+
+    private async Task RemoverItem(int produtoId)
+    {
+        var res = await VoiceService.RemoverItemPedidoAsync(_estado, produtoId);
+        _estado = res.Estado;
+        _mensagens.Add(new VoiceChatMessageDto { Remetente = "Assistente", Texto = res.MensagemResposta });
+        StateHasChanged();
+    }
+
+    private async Task AlterarQtdItem(int produtoId, decimal delta)
+    {
+        var item = _estado.Itens.FirstOrDefault(i => i.ProdutoId == produtoId);
+        if (item != null)
+        {
+            decimal novaQtd = item.Quantidade + delta;
+            var res = await VoiceService.AlterarQuantidadeItemAsync(_estado, produtoId, novaQtd);
+            _estado = res.Estado;
             StateHasChanged();
         }
     }
@@ -407,6 +608,7 @@
     private void ReiniciarSessao()
     {
         _estado = new VoiceSessionState();
+        _mostrarFormCliente = false;
         _mensagens.Add(new VoiceChatMessageDto
         {
             Remetente = "Assistente",
@@ -417,7 +619,9 @@
 
     private Color ObterCorStatusSessao(VoiceSessionStatus status) => status switch
     {
+        VoiceSessionStatus.AguardandoCliente => Color.Warning,
         VoiceSessionStatus.CriandoPedidoAguardandoItens => Color.Info,
+        VoiceSessionStatus.AguardandoEscolhaProduto => Color.Secondary,
         VoiceSessionStatus.PedidoConcluidoAguardandoNfe => Color.Warning,
         VoiceSessionStatus.NfeEmitida => Color.Success,
         VoiceSessionStatus.Encerrado => Color.Dark,

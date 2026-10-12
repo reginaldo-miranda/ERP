@@ -3,10 +3,29 @@ namespace ERP.Application.Vendas.Voice;
 public enum VoiceSessionStatus
 {
     AguardandoComando = 0,
-    CriandoPedidoAguardandoItens = 1,
-    PedidoConcluidoAguardandoNfe = 2,
-    NfeEmitida = 3,
-    Encerrado = 4
+    AguardandoCliente = 1,
+    CriandoPedidoAguardandoItens = 2,
+    AguardandoEscolhaProduto = 3,
+    PedidoConcluidoAguardandoNfe = 4,
+    NfeEmitida = 5,
+    Encerrado = 6
+}
+
+public class VoiceProductCandidateDto
+{
+    public int Id { get; set; }
+    public string Codigo { get; set; } = string.Empty;
+    public string Nome { get; set; } = string.Empty;
+    public decimal PrecoVenda { get; set; }
+    public string UnidadeMedida { get; set; } = "UN";
+}
+
+public class VoiceClientCandidateDto
+{
+    public int Id { get; set; }
+    public string Nome { get; set; } = string.Empty;
+    public string? CpfCnpj { get; set; }
+    public string? Telefone { get; set; }
 }
 
 public class VoiceOrderItemDto
@@ -28,6 +47,14 @@ public class VoiceSessionState
     public string? CondicaoPagamento { get; set; } = "30 dias";
     public int DiasVencimento { get; set; } = 30;
     public List<VoiceOrderItemDto> Itens { get; set; } = new();
+    
+    // Candidatos para desambiguação e seleção
+    public List<VoiceProductCandidateDto> CandidatosProdutos { get; set; } = new();
+    public decimal QuantidadePendente { get; set; } = 1;
+    public List<VoiceClientCandidateDto> CandidatosClientes { get; set; } = new();
+    public string? TermoClienteNaoEncontrado { get; set; }
+    public string? TermoProdutoNaoEncontrado { get; set; }
+
     public int? PedidoCriadoId { get; set; }
     public string? PedidoCriadoNumero { get; set; }
     public decimal ValorTotal => Itens.Sum(i => i.ValorTotal);
@@ -51,3 +78,4 @@ public class VoiceProcessResult
     public int? NotaFiscalId { get; set; }
     public string? LinkDanfe { get; set; }
 }
+
