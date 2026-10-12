@@ -7,22 +7,23 @@ using ERP.Domain.Core.Entities.Vendas;
 using ERP.Domain.Core.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.RegularExpressions;
 
 namespace ERP.Application.Vendas.Voice;
 
 public class VoiceAssistantService : IVoiceAssistantService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ICurrentEmpresaService _currentEmpresaService;
     private readonly IMediator _mediator;
 
     public VoiceAssistantService(
-        IApplicationDbContext context,
+        IServiceScopeFactory scopeFactory,
         ICurrentEmpresaService currentEmpresaService,
         IMediator mediator)
     {
-        _context = context;
+        _scopeFactory = scopeFactory;
         _currentEmpresaService = currentEmpresaService;
         _mediator = mediator;
     }
@@ -225,9 +226,12 @@ public class VoiceAssistantService : IVoiceAssistantService
         string nomeCliente,
         CancellationToken cancellationToken)
     {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
         var termo = nomeCliente.Trim().ToLower();
 
-        var clientesEncontrados = await _context.Clientes
+        var clientesEncontrados = await context.Clientes
             .Where(c => c.EmpresaId == empresaId && c.Ativo && EF.Functions.Like(c.Nome.ToLower(), $"%{termo}%"))
             .Take(5)
             .ToListAsync(cancellationToken);
@@ -306,8 +310,11 @@ public class VoiceAssistantService : IVoiceAssistantService
             };
         }
 
-        // 3. Buscar no banco de dados por aproximação
-        var produtosQuery = _context.Produtos
+        // 3. Buscar no banco de dados por aproximação usando escopo isolado
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
+        var produtosQuery = context.Produtos
             .Include(p => p.UnidadeMedida)
             .Where(p => p.EmpresaId == empresaId && p.Ativo);
 
@@ -327,7 +334,6 @@ public class VoiceAssistantService : IVoiceAssistantService
 
             if (palavras.Any())
             {
-                // Busca produtos onde o nome contenha qualquer uma das palavras significativas
                 var candidatosGerais = await produtosQuery.Take(50).ToListAsync(cancellationToken);
                 produtos = candidatosGerais
                     .Where(p => palavras.Any(w => p.Nome.Contains(w, StringComparison.OrdinalIgnoreCase)))
@@ -471,7 +477,6 @@ public class VoiceAssistantService : IVoiceAssistantService
         }
         else
         {
-            // Tentar por índice
             int idx = ObterIndiceOpcao(texto);
             if (idx >= 0 && idx < estado.Itens.Count)
             {
@@ -479,7 +484,6 @@ public class VoiceAssistantService : IVoiceAssistantService
             }
             else
             {
-                // Tentar por nome do produto
                 itemRemover = estado.Itens.FirstOrDefault(i => texto.Contains(NormalizarTexto(i.ProdutoNome)));
             }
         }
@@ -510,7 +514,10 @@ public class VoiceAssistantService : IVoiceAssistantService
         CancellationToken cancellationToken = default)
     {
         int empresaId = _currentEmpresaService.EmpresaId ?? 1;
-        var produto = await _context.Produtos
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
+        var produto = await context.Produtos
             .Include(p => p.UnidadeMedida)
             .FirstOrDefaultAsync(p => p.Id == produtoId && p.EmpresaId == empresaId, cancellationToken);
 
@@ -533,7 +540,10 @@ public class VoiceAssistantService : IVoiceAssistantService
         CancellationToken cancellationToken = default)
     {
         int empresaId = _currentEmpresaService.EmpresaId ?? 1;
-        var cliente = await _context.Clientes
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
+        var cliente = await context.Clientes
             .FirstOrDefaultAsync(c => c.Id == clienteId && c.EmpresaId == empresaId, cancellationToken);
 
         if (cliente == null)
@@ -605,6 +615,8 @@ public class VoiceAssistantService : IVoiceAssistantService
         CancellationToken cancellationToken = default)
     {
         int empresaId = _currentEmpresaService.EmpresaId ?? 1;
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
         var novoCliente = new Cliente
         {
@@ -618,8 +630,8 @@ public class VoiceAssistantService : IVoiceAssistantService
             CriadoEm = DateTime.UtcNow
         };
 
-        _context.Clientes.Add(novoCliente);
-        await _context.SaveChangesAsync(cancellationToken);
+        context.Clientes.Add(novoCliente);
+        await context.SaveChangesAsync(cancellationToken);
 
         estado.ClienteId = novoCliente.Id;
         estado.ClienteNome = novoCliente.Nome;
@@ -662,11 +674,14 @@ public class VoiceAssistantService : IVoiceAssistantService
             };
         }
 
-        var deposito = await _context.Depositos.FirstOrDefaultAsync(d => d.EmpresaId == empresaId && d.Ativo, cancellationToken);
-        var formaPagamento = await _context.FormasPagamento.FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Ativa, cancellationToken);
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
+        var deposito = await context.Depositos.FirstOrDefaultAsync(d => d.EmpresaId == empresaId && d.Ativo, cancellationToken);
+        var formaPagamento = await context.FormasPagamento.FirstOrDefaultAsync(f => f.EmpresaId == empresaId && f.Ativa, cancellationToken);
 
         int ano = DateTime.UtcNow.Year;
-        int countAno = await _context.PedidosVenda.CountAsync(p => p.EmpresaId == empresaId && p.DataPedido.Year == ano, cancellationToken);
+        int countAno = await context.PedidosVenda.CountAsync(p => p.EmpresaId == empresaId && p.DataPedido.Year == ano, cancellationToken);
         string numero = $"PED-{ano}-{(countAno + 1):D4}";
 
         var pedido = new PedidoVenda
@@ -701,8 +716,8 @@ public class VoiceAssistantService : IVoiceAssistantService
             });
         }
 
-        _context.PedidosVenda.Add(pedido);
-        await _context.SaveChangesAsync(cancellationToken);
+        context.PedidosVenda.Add(pedido);
+        await context.SaveChangesAsync(cancellationToken);
 
         estado.PedidoCriadoId = pedido.Id;
         estado.PedidoCriadoNumero = pedido.Numero;
@@ -730,7 +745,10 @@ public class VoiceAssistantService : IVoiceAssistantService
             };
         }
 
-        int proximoNumero = (await _context.NotasFiscais
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
+
+        int proximoNumero = (await context.NotasFiscais
             .Where(n => n.EmpresaId == empresaId && n.Modelo == ModeloDocumentoFiscal.NFe)
             .Select(n => (int?)n.Numero)
             .MaxAsync(cancellationToken) ?? 1000) + 1;
@@ -774,8 +792,8 @@ public class VoiceAssistantService : IVoiceAssistantService
             });
         }
 
-        _context.NotasFiscais.Add(nota);
-        await _context.SaveChangesAsync(cancellationToken);
+        context.NotasFiscais.Add(nota);
+        await context.SaveChangesAsync(cancellationToken);
 
         estado.Status = VoiceSessionStatus.NfeEmitida;
 
@@ -803,7 +821,6 @@ public class VoiceAssistantService : IVoiceAssistantService
             }
         }
 
-        // Numerais por extenso comuns
         if (texto.Contains("duas") || texto.Contains("dois")) return 2;
         if (texto.Contains("tres") || texto.Contains("três")) return 3;
         if (texto.Contains("quatro")) return 4;
@@ -838,7 +855,6 @@ public class VoiceAssistantService : IVoiceAssistantService
             t = t.Replace(r, " ");
         }
 
-        // Remover números
         t = Regex.Replace(t, @"\b\d+(?:[.,]\d+)?\b", " ").Trim();
         t = Regex.Replace(t, @"\s+", " ").Trim();
         return t;
@@ -846,11 +862,10 @@ public class VoiceAssistantService : IVoiceAssistantService
 
     private static int ObterIndiceOpcao(string texto)
     {
-        // 1, 2, 3, etc.
         var m = Regex.Match(texto, @"\b(\d+)\b");
         if (m.Success && int.TryParse(m.Groups[1].Value, out int num))
         {
-            return num - 1; // Base 0
+            return num - 1;
         }
 
         if (texto.Contains("primeir") || texto.Contains("opcao um") || texto.Contains("opção um") || texto.Contains("o um")) return 0;
