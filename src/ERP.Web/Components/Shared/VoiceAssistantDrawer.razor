@@ -77,6 +77,10 @@
                         Ex.: "faça um pedido para José Maria" ou "10 sacos de cimento"
                     </MudText>
                 }
+
+                <div class="mt-2 pt-2 border-t d-flex align-center justify-center" style="width: 100%;">
+                    <MudSwitch T="bool" Value="_modoMaosLivres" ValueChanged="OnMaosLivresToggled" Color="Color.Primary" Size="Size.Small" Label="Mãos Livres (Conversa Contínua)" />
+                </div>
             </MudPaper>
 
             <!-- ========================================== -->
@@ -377,6 +381,9 @@
     private string _novoClienteTelefone = string.Empty;
     private string _novoClienteCpf = string.Empty;
 
+    // Conversa Contínua / Mãos Livres
+    private bool _modoMaosLivres = true;
+
     private VoiceSessionState _estado = new();
     private List<VoiceChatMessageDto> _mensagens = new();
     private DotNetObjectReference<VoiceAssistantDrawer>? _dotNetRef;
@@ -395,8 +402,15 @@
         if (firstRender)
         {
             _dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("voiceAssistant.init", _dotNetRef);
+            await JS.InvokeVoidAsync("voiceAssistant.init", _dotNetRef, _modoMaosLivres);
         }
+    }
+
+    private async Task OnMaosLivresToggled(bool valor)
+    {
+        _modoMaosLivres = valor;
+        await JS.InvokeVoidAsync("voiceAssistant.setHandsFree", _modoMaosLivres);
+        StateHasChanged();
     }
 
     private async Task AlternarDrawer()
@@ -424,7 +438,7 @@
 
     private async Task PararEscuta()
     {
-        await JS.InvokeVoidAsync("voiceAssistant.stopListening");
+        await JS.InvokeVoidAsync("voiceAssistant.stopListening", true);
     }
 
     [JSInvokable]

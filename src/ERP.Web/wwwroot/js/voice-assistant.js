@@ -2,13 +2,21 @@ window.voiceAssistant = {
     recognition: null,
     dotNetRef: null,
     isListening: false,
+    handsFreeMode: true,
+    userExplicitlyStopped: false,
+    resumeTimeoutId: null,
 
     isSupported: function () {
         return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     },
 
-    init: function (dotNetRef) {
+    setHandsFree: function (enabled) {
+        this.handsFreeMode = !!enabled;
+    },
+
+    init: function (dotNetRef, handsFree) {
         this.dotNetRef = dotNetRef;
+        this.handsFreeMode = handsFree !== undefined ? !!handsFree : true;
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             console.warn("Reconhecimento de fala (Web Speech API) não suportado neste navegador.");
@@ -39,16 +47,26 @@ window.voiceAssistant = {
             };
 
             this.recognition.onerror = (event) => {
-                console.error("Speech recognition error:", event.error);
+                console.warn("Speech recognition error:", event.error);
                 this.isListening = false;
+
+                // Em modo mãos livres, se for 'no-speech' (pausa do usuário), retoma a escuta suavemente
+                if (event.error === 'no-speech') {
+                    if (this.handsFreeMode && !this.userExplicitlyStopped && (!window.speechSynthesis || !window.speechSynthesis.speaking)) {
+                        this.scheduleAutoResume(600);
+                        return;
+                    }
+                }
+
                 let mensagem = event.error;
                 if (event.error === 'not-allowed') {
-                    mensagem = 'Permissão do microfone negada. Verifique as permissões do navegador e do macOS (Ajustes do Sistema > Privacidade e Segurança > Microfone).';
+                    mensagem = 'Permissão do microfone negada. Verifique as permissões do navegador e do sistema operacional.';
                 } else if (event.error === 'no-speech') {
-                    mensagem = 'Nenhum som detectado. Tente falar novamente.';
+                    mensagem = 'Nenhum som detectado. Pode falar novamente.';
                 } else if (event.error === 'network') {
                     mensagem = 'Erro de conexão com o serviço de reconhecimento de voz.';
                 }
+
                 if (this.dotNetRef) {
                     this.dotNetRef.invokeMethodAsync('OnSpeechError', mensagem);
                 }
@@ -81,16 +99,20 @@ window.voiceAssistant = {
     },
 
     startListening: async function () {
-        if (!this.recognition) {
-            if (this.dotNetRef) {
-                this.dotNetRef.invokeMethodAsync('OnSpeechError', 'Reconhecimento de fala não disponível. Utilize o Google Chrome.');
-            }
+        if (!this.recognition) return;
+        this.userExplicitlyStopped = false;
+        if (this.resumeTimeoutId) {
+            clearTimeout(this.resumeTimeoutId);
+            this.resumeTimeoutId = null;
+        }
+
+        // Se o assistente estiver falando no momento, não inicia para não capturar o próprio áudio
+        if (window.speechSynthesis && window.speechSynthesis.speaking) {
             return;
         }
 
         if (this.isListening) return;
 
-        // Solicita permissão explícita de microfone ao navegador/sistema operacional
         try {
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -99,7 +121,7 @@ window.voiceAssistant = {
         } catch (err) {
             console.error("Permissão de microfone negada no getUserMedia:", err);
             if (this.dotNetRef) {
-                this.dotNetRef.invokeMethodAsync('OnSpeechError', 'Microfone bloqueado! Autorize o microfone no navegador ou em Ajustes do Sistema do macOS.');
+                this.dotNetRef.invokeMethodAsync('OnSpeechError', 'Microfone bloqueado! Autorize o microfone no navegador.');
             }
             return;
         }
@@ -111,7 +133,15 @@ window.voiceAssistant = {
         }
     },
 
-    stopListening: function () {
+    stopListening: function (userInitiated = true) {
+        if (userInitiated) {
+            this.userExplicitlyStopped = true;
+            if (this.resumeTimeoutId) {
+                clearTimeout(this.resumeTimeoutId);
+                this.resumeTimeoutId = null;
+            }
+        }
+
         if (!this.recognition) return;
         if (!this.isListening) return;
 
@@ -122,17 +152,51 @@ window.voiceAssistant = {
         }
     },
 
+    scheduleAutoResume: function (delayMs = 500) {
+        if (!this.handsFreeMode || this.userExplicitlyStopped) return;
+        if (this.resumeTimeoutId) {
+            clearTimeout(this.resumeTimeoutId);
+        }
+        this.resumeTimeoutId = setTimeout(() => {
+            if (this.handsFreeMode && !this.userExplicitlyStopped && !this.isListening) {
+                this.startListening();
+            }
+        }, delayMs);
+    },
+
     speak: function (text) {
         if (!window.speechSynthesis) return;
+
+        // Pausa temporariamente a escuta para não capturar a própria fala do assistente
+        this.stopListening(false);
+
         try {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'pt-BR';
             utterance.rate = 1.05;
             utterance.pitch = 1.0;
+
+            utterance.onend = () => {
+                // Assim que o assistente termina de falar: reabre o microfone automaticamente!
+                if (this.handsFreeMode && !this.userExplicitlyStopped) {
+                    this.scheduleAutoResume(450);
+                }
+            };
+
+            utterance.onerror = (e) => {
+                console.warn("Erro na síntese de voz:", e);
+                if (this.handsFreeMode && !this.userExplicitlyStopped) {
+                    this.scheduleAutoResume(400);
+                }
+            };
+
             window.speechSynthesis.speak(utterance);
         } catch (e) {
             console.error("Erro na síntese de voz:", e);
+            if (this.handsFreeMode && !this.userExplicitlyStopped) {
+                this.scheduleAutoResume(400);
+            }
         }
     }
 };
