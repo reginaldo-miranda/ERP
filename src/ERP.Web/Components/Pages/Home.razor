@@ -1,126 +1,428 @@
 @page "/"
+@using ERP.Application.Dashboard.DTOs
+@using ERP.Application.Dashboard.Queries
+@using MediatR
 @using MudBlazor
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
 
-<PageTitle>Dashboard — ERP Multi-Empresa</PageTitle>
+<PageTitle>Dashboard Executivo — ERP Multi-Empresa</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-1 font-weight-bold">Dashboard</MudText>
-<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">Visão geral em tempo real da empresa matriz.</MudText>
+<div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="mr-2" />
+            Dashboard Executivo
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Visão consolidada em tempo real — @DateTime.Now.ToString("dd 'de' MMMM 'de' yyyy")
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" 
+                   Color="Color.Primary" 
+                   StartIcon="@Icons.Material.Filled.Refresh" 
+                   OnClick="CarregarDados" 
+                   Disabled="@_carregando">
+            Atualizar Indicadores
+        </MudButton>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Secondary" 
+                   StartIcon="@Icons.Material.Filled.Assessment" 
+                   Href="/relatorios">
+            Central de Relatórios
+        </MudButton>
+    </div>
+</div>
 
-<MudGrid Class="mb-6">
-    <!-- Card 1: Vendas Hoje -->
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #10B981;">
-            <div class="d-flex justify-space-between align-center">
+@if (_carregando)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+}
+
+@if (_dados != null)
+{
+    @* Alertas Dinâmicos *@
+    @if (_dados.Alertas.Any())
+    {
+        <MudGrid Class="mb-4">
+            @foreach (var alerta in _dados.Alertas)
+            {
+                <MudItem xs="12" md="@(_dados.Alertas.Count > 1 ? 6 : 12)">
+                    <MudAlert Severity="@ObterSeveridade(alerta.Tipo)" 
+                              Variant="Variant.Filled" 
+                              Dense="true" 
+                              Class="cursor-pointer"
+                              Icon="@ObterIconeAlerta(alerta.Tipo)"
+                              OnClick="@(() => NavegarPara(alerta.Link))">
+                        <b>@alerta.Titulo</b>: @alerta.Mensagem
+                    </MudAlert>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    @* Cards de KPIs Principais *@
+    <MudGrid Class="mb-6">
+        <!-- Card 1: Vendas Hoje / Mês -->
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4 h-100 d-flex flex-column justify-space-between" Style="border-left: 5px solid var(--mud-palette-success);">
                 <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">VENDAS DO DIA</MudText>
-                    <MudText Typo="Typo.h5" Class="font-weight-bold">R$ 15.420,00</MudText>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold text-uppercase">Vendas do Dia</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" />
+                    </div>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold my-1" Color="Color.Success">
+                        @_dados.Kpis.VendasHoje.ToString("C2")
+                    </MudText>
                 </div>
-                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Success" Size="Size.Large" />
-            </div>
-            <MudText Typo="Typo.caption" Color="Color.Success" Class="mt-2 d-block">+12.5% em relação a ontem</MudText>
-        </MudPaper>
-    </MudItem>
+                <div class="pt-2 border-t mt-2">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Mês: <b>@_dados.Kpis.VendasMes.ToString("C2")</b>
+                        @if (_dados.Kpis.PercentualVariacaoVendas != 0)
+                        {
+                            <span class="@(_dados.Kpis.PercentualVariacaoVendas >= 0 ? "text-success font-weight-bold" : "text-error font-weight-bold") ml-1">
+                                (@(_dados.Kpis.PercentualVariacaoVendas > 0 ? "+" : "")@_dados.Kpis.PercentualVariacaoVendas%)
+                            </span>
+                        }
+                    </MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
 
-    <!-- Card 2: Contas a Receber -->
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #3B82F6;">
-            <div class="d-flex justify-space-between align-center">
+        <!-- Card 2: Contas a Receber -->
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4 h-100 d-flex flex-column justify-space-between" Style="border-left: 5px solid var(--mud-palette-info);">
                 <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">A RECEBER HOJE</MudText>
-                    <MudText Typo="Typo.h5" Class="font-weight-bold">R$ 4.250,00</MudText>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold text-uppercase">A Receber Hoje</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Info" />
+                    </div>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold my-1" Color="Color.Info">
+                        @_dados.Kpis.ContasReceberHoje.ToString("C2")
+                    </MudText>
                 </div>
-                <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet" Color="Color.Info" Size="Size.Large" />
-            </div>
-            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">5 duplicatas a receber</MudText>
-        </MudPaper>
-    </MudItem>
+                <div class="pt-2 border-t mt-2 d-flex justify-space-between align-center">
+                    <MudText Typo="Typo.caption" Color="@(_dados.Kpis.ContasReceberVencidas > 0 ? Color.Warning : Color.Secondary)">
+                        Vencidos: <b>@_dados.Kpis.ContasReceberVencidas.ToString("C2")</b> (@_dados.Kpis.QuantidadeReceberVencidas)
+                    </MudText>
+                    <MudLink Href="/financeiro/contas-receber" Typo="Typo.caption" Color="Color.Info">Ver</MudLink>
+                </div>
+            </MudPaper>
+        </MudItem>
 
-    <!-- Card 3: Contas a Pagar -->
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #F59E0B;">
-            <div class="d-flex justify-space-between align-center">
+        <!-- Card 3: Contas a Pagar -->
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4 h-100 d-flex flex-column justify-space-between" Style="border-left: 5px solid var(--mud-palette-warning);">
                 <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">A PAGAR HOJE</MudText>
-                    <MudText Typo="Typo.h5" Class="font-weight-bold">R$ 2.100,00</MudText>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold text-uppercase">A Pagar Hoje</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Warning" />
+                    </div>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold my-1" Color="Color.Warning">
+                        @_dados.Kpis.ContasPagarHoje.ToString("C2")
+                    </MudText>
                 </div>
-                <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Color="Color.Warning" Size="Size.Large" />
-            </div>
-            <MudText Typo="Typo.caption" Color="Color.Warning" Class="mt-2 d-block">2 fornecedores a pagar</MudText>
-        </MudPaper>
-    </MudItem>
+                <div class="pt-2 border-t mt-2 d-flex justify-space-between align-center">
+                    <MudText Typo="Typo.caption" Color="@(_dados.Kpis.ContasPagarVencidas > 0 ? Color.Error : Color.Secondary)">
+                        Vencidos: <b>@_dados.Kpis.ContasPagarVencidas.ToString("C2")</b> (@_dados.Kpis.QuantidadePagarVencidas)
+                    </MudText>
+                    <MudLink Href="/financeiro/contas-pagar" Typo="Typo.caption" Color="Color.Warning">Ver</MudLink>
+                </div>
+            </MudPaper>
+        </MudItem>
 
-    <!-- Card 4: Estoque Baixo -->
-    <MudItem xs="12" sm="6" md="3">
-        <MudPaper Elevation="3" Class="pa-4 flex-grow-1" Style="border-left: 4px solid #EF4444;">
-            <div class="d-flex justify-space-between align-center">
+        <!-- Card 4: Estoque Crítico & Fiscal -->
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4 h-100 d-flex flex-column justify-space-between" Style="@($"border-left: 5px solid {(_dados.Kpis.ProdutosEstoqueCritico > 0 ? "var(--mud-palette-error)" : "var(--mud-palette-primary)")};")">
                 <div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">ESTOQUE CRÍTICO</MudText>
-                    <MudText Typo="Typo.h5" Class="font-weight-bold">3 Itens</MudText>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold text-uppercase">Estoque Crítico</MudText>
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="@(_dados.Kpis.ProdutosEstoqueCritico > 0 ? Color.Error : Color.Primary)" />
+                    </div>
+                    <MudText Typo="Typo.h5" Class="font-weight-bold my-1" Color="@(_dados.Kpis.ProdutosEstoqueCritico > 0 ? Color.Error : Color.Primary)">
+                        @_dados.Kpis.ProdutosEstoqueCritico Itens
+                    </MudText>
                 </div>
-                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
-            </div>
-            <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2 d-block">Abaixo do estoque mínimo</MudText>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+                <div class="pt-2 border-t mt-2 d-flex justify-space-between align-center">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        NF-e Mês: <b>@_dados.Kpis.TotalNotasFiscaisMes emitidas</b>
+                    </MudText>
+                    <MudLink Href="/estoque/posicao" Typo="Typo.caption" Color="Color.Primary">Estoque</MudLink>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
 
-<MudGrid>
-    <!-- Ações Rápidas -->
-    <MudItem xs="12" md="6">
-        <MudCard Elevation="3">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Ações Rápidas</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
+    @* Gráficos MudBlazor *@
+    <MudGrid Class="mb-6">
+        <!-- Gráfico 1: Vendas vs Compras (Últimos 6 meses) -->
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4 h-100">
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <div>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Evolução: Vendas vs Compras</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Comparativo semestral de faturamento comercial e entradas de insumos</MudText>
+                    </div>
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small" Variant="Variant.Outlined">Últimos 6 Meses</MudChip>
+                </div>
+                @if (_chartEvolucaoSeries.Any() && _chartEvolucaoLabels.Length > 0)
+                {
+                    <MudChart T="double" 
+                              ChartType="ChartType.Bar" 
+                              ChartSeries="@_chartEvolucaoSeries" 
+                              XAxisLabels="@_chartEvolucaoLabels" 
+                              Width="100%" 
+                              Height="320px" />
+                }
+                else
+                {
+                    <div class="d-flex justify-center align-center py-12">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Sem movimentações suficientes no período.</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Gráfico 2: Faturamento por Categoria (Donut) -->
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 h-100 d-flex flex-column">
+                <div class="d-flex justify-space-between align-center mb-4">
+                    <div>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Vendas por Categoria</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Proporção dos últimos 90 dias</MudText>
+                    </div>
+                    <MudIcon Icon="@Icons.Material.Filled.PieChart" Color="Color.Primary" />
+                </div>
+                @if (_donutData.Length > 0 && _donutLabels.Length > 0)
+                {
+                    <div class="flex-grow-1 d-flex justify-center align-center">
+                        <MudChart T="double" 
+                                  ChartType="ChartType.Donut" 
+                                  InputData="@_donutData" 
+                                  InputLabels="@_donutLabels" 
+                                  Width="100%" 
+                                  Height="280px" />
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex justify-center align-center py-12 flex-grow-1">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhuma venda faturada no período.</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Seção Inferior: Pedidos Recentes & Ações Rápidas *@
+    <MudGrid>
+        <!-- Tabela: Pedidos Recentes -->
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <div>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">Últimos Pedidos de Venda</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Movimentação recente de vendas no sistema</MudText>
+                    </div>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" EndIcon="@Icons.Material.Filled.ArrowForward" Href="/vendas/pedidos">
+                        Ver Todos
+                    </MudButton>
+                </div>
+
+                @if (_dados.PedidosRecentes.Any())
+                {
+                    <MudTable Items="@_dados.PedidosRecentes" Hover="true" Dense="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Número</MudTh>
+                            <MudTh>Data</MudTh>
+                            <MudTh>Cliente</MudTh>
+                            <MudTh Style="text-align: right;">Valor</MudTh>
+                            <MudTh Style="text-align: center;">Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Número"><b>@context.Numero</b></MudTd>
+                            <MudTd DataLabel="Data">@context.Data.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                            <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                            <MudTd DataLabel="Valor" Style="text-align: right;"><b>@context.ValorTotal.ToString("C2")</b></MudTd>
+                            <MudTd DataLabel="Status" Style="text-align: center;">
+                                <MudChip T="string" Size="Size.Small" Color="@ObterCorStatus(context.Status)">
+                                    @context.Status
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <div class="text-center py-6">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Nenhum pedido de venda registrado até o momento.</MudText>
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Ações Rápidas e Acessos Diretos -->
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 h-100">
+                <MudText Typo="Typo.h6" Class="font-weight-bold mb-1">Ações Rápidas</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-4 d-block">Atalhos para as operações mais frequentes</MudText>
+
                 <MudGrid>
                     <MudItem xs="6">
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" FullWidth="true" Href="/vendas/pedidos">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary" 
+                                   StartIcon="@Icons.Material.Filled.AddShoppingCart" 
+                                   FullWidth="true" 
+                                   Href="/vendas/pedidos">
                             Novo Pedido
                         </MudButton>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PersonAdd" FullWidth="true" Href="/cadastros/clientes">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Success" 
+                                   StartIcon="@Icons.Material.Filled.PersonAdd" 
+                                   FullWidth="true" 
+                                   Href="/cadastros/clientes">
                             Novo Cliente
                         </MudButton>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.CompareArrows" FullWidth="true" Href="/financeiro/conciliacao">
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Warning" 
+                                   StartIcon="@Icons.Material.Filled.ReceiptLong" 
+                                   FullWidth="true" 
+                                   Href="/fiscal/notas">
+                            Emitir NF-e
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Info" 
+                                   StartIcon="@Icons.Material.Filled.CompareArrows" 
+                                   FullWidth="true" 
+                                   Href="/financeiro/conciliacao">
                             Conciliar OFX
                         </MudButton>
                     </MudItem>
                     <MudItem xs="6">
-                        <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Filled.ReceiptLong" FullWidth="true" Href="/fiscal/notas">
-                            Emitir NF-e
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Tertiary" 
+                                   StartIcon="@Icons.Material.Filled.Storage" 
+                                   FullWidth="true" 
+                                   Href="/estoque/posicao">
+                            Estoque
+                        </MudButton>
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Secondary" 
+                                   StartIcon="@Icons.Material.Filled.Assessment" 
+                                   FullWidth="true" 
+                                   Href="/relatorios">
+                            Relatórios
                         </MudButton>
                     </MudItem>
                 </MudGrid>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
 
-    <!-- Status de Módulos e Integração -->
-    <MudItem xs="12" md="6">
-        <MudCard Elevation="3">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h6">Status de Integrações</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudList T="string">
-                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
-                        <MudText Typo="Typo.body2"><b>Banco de Dados PostgreSQL:</b> Conectado (localhost:5432)</MudText>
-                    </MudListItem>
-                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
-                        <MudText Typo="Typo.body2"><b>Fila de Integração Contábil:</b> Ativa (0 eventos com erro)</MudText>
-                    </MudListItem>
-                    <MudListItem Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">
-                        <MudText Typo="Typo.body2"><b>Autenticação & Permissões:</b> ASP.NET Identity + JWT ativo</MudText>
-                    </MudListItem>
-                </MudList>
-            </MudCardContent>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+                <MudDivider Class="my-4" />
+
+                <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-2">Visão Rápida da Matriz</MudText>
+                <div class="d-flex align-center gap-2 mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Base de Dados PostgreSQL Ativa</MudText>
+                </div>
+                <div class="d-flex align-center gap-2 mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Multi-tenancy e Isolamento por Empresa Ativo</MudText>
+                </div>
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.caption">Comunicação e Certificado Digital SEFAZ Apto</MudText>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardResumoCompletoDto? _dados;
+    private bool _carregando = true;
+
+    private List<ChartSeries<double>> _chartEvolucaoSeries = new();
+    private string[] _chartEvolucaoLabels = Array.Empty<string>();
+
+    private double[] _donutData = Array.Empty<double>();
+    private string[] _donutLabels = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarDados();
+    }
+
+    private async Task CarregarDados()
+    {
+        try
+        {
+            _carregando = true;
+            _dados = await Mediator.Send(new GetDashboardKpisQuery());
+
+            if (_dados != null)
+            {
+                // Gráfico Evolução
+                _chartEvolucaoLabels = _dados.Evolucao.Meses;
+                _chartEvolucaoSeries = new List<ChartSeries<double>>
+                {
+                    new() { Name = "Vendas", Data = _dados.Evolucao.SerieVendas },
+                    new() { Name = "Compras", Data = _dados.Evolucao.SerieCompras }
+                };
+
+                // Gráfico Donut Categoria
+                _donutData = _dados.FaturamentoPorCategoria.Valores;
+                _donutLabels = _dados.FaturamentoPorCategoria.Categorias;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar indicadores do dashboard: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private Severity ObterSeveridade(string tipo) => tipo switch
+    {
+        "error" => Severity.Error,
+        "warning" => Severity.Warning,
+        "success" => Severity.Success,
+        _ => Severity.Info
+    };
+
+    private string ObterIconeAlerta(string tipo) => tipo switch
+    {
+        "error" => Icons.Material.Filled.Error,
+        "warning" => Icons.Material.Filled.Warning,
+        "success" => Icons.Material.Filled.CheckCircle,
+        _ => Icons.Material.Filled.Info
+    };
+
+    private Color ObterCorStatus(string status) => status switch
+    {
+        "Faturado" => Color.Success,
+        "Aprovado" => Color.Info,
+        "Pendente" => Color.Warning,
+        "Cancelado" => Color.Error,
+        _ => Color.Default
+    };
+
+    private void NavegarPara(string? link)
+    {
+        if (!string.IsNullOrWhiteSpace(link))
+        {
+            Navigation.NavigateTo(link);
+        }
+    }
+}

@@ -1,0 +1,797 @@
+@page "/relatorios"
+@using ERP.Application.Relatorios.DTOs
+@using ERP.Application.Relatorios.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using MudBlazor
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Central de Relatórios — ERP Multi-Empresa</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
+    <div>
+        <MudText Typo="Typo.h4" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Assessment" Class="mr-2" />
+            Central de Relatórios &amp; Inteligência
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Emissão de relatórios analíticos, consolidados e exportação em PDF e planilha CSV.
+        </MudText>
+    </div>
+</div>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" Color="Color.Primary">
+    
+    <!-- ABA 1: VENDAS -->
+    <MudTabPanel Text="Vendas" Icon="@Icons.Material.Filled.ShoppingCart">
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDateRangePicker Label="Período das Vendas" @bind-DateRange="_periodoVendas" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudSelect T="StatusPedidoVenda?" Label="Status do Pedido" @bind-Value="_statusVenda" Clearable="true">
+                        <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)null)">Todos (Exceto Cancelados)</MudSelectItem>
+                        <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Pendente)">Pendente</MudSelectItem>
+                        <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Aprovado)">Aprovado</MudSelectItem>
+                        <MudSelectItem T="StatusPedidoVenda?" Value="@((StatusPedidoVenda?)StatusPedidoVenda.Faturado)">Faturado</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="4" Class="d-flex align-center justify-end gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="CarregarVendas" Disabled="@_carregandoVendas">
+                        Filtrar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportarVendasCsv" Disabled="@(_carregandoVendas || _dadosVendas == null)">
+                        CSV
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="ExportarVendasPdf" Disabled="@(_carregandoVendas || _dadosVendas == null)">
+                        PDF
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_carregandoVendas)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (_dadosVendas != null)
+        {
+            <!-- Cards de Totais Vendas -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL DE PEDIDOS</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">@_dadosVendas.TotalPedidos</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">FATURAMENTO TOTAL</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_dadosVendas.ValorTotalFaturado.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL DESCONTOS</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Warning">@_dadosVendas.ValorTotalDescontos.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-tertiary) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TICKET MÉDIO</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Tertiary">@_dadosVendas.TicketMedio.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabela Vendas -->
+            <MudTable Items="@_dadosVendas.Itens" Hover="true" Dense="true" Elevation="1" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Número</MudTh>
+                    <MudTh>Data</MudTh>
+                    <MudTh>Cliente</MudTh>
+                    <MudTh>Vendedor</MudTh>
+                    <MudTh>Forma Pagto</MudTh>
+                    <MudTh Style="text-align: right;">Itens</MudTh>
+                    <MudTh Style="text-align: right;">Total</MudTh>
+                    <MudTh Style="text-align: center;">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Número"><b>@context.Numero</b></MudTd>
+                    <MudTd DataLabel="Data">@context.DataPedido.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                    <MudTd DataLabel="Vendedor">@context.VendedorNome</MudTd>
+                    <MudTd DataLabel="Forma Pagto">@context.FormaPagamento</MudTd>
+                    <MudTd DataLabel="Itens" Style="text-align: right;">@context.QuantidadeItens</MudTd>
+                    <MudTd DataLabel="Total" Style="text-align: right;"><b>@context.ValorTotal.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="Status" Style="text-align: center;">
+                        <MudChip T="string" Size="Size.Small" Color="@ObterCorStatus(context.Status)">@context.Status</MudChip>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    <!-- ABA 2: FINANCEIRO -->
+    <MudTabPanel Text="Financeiro" Icon="@Icons.Material.Filled.AttachMoney">
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDateRangePicker Label="Período de Vencimento" @bind-DateRange="_periodoFinanceiro" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="string" Label="Operação" @bind-Value="_tipoFinanceiro">
+                        <MudSelectItem Value="@("Todos")">Todos (Receber e Pagar)</MudSelectItem>
+                        <MudSelectItem Value="@("Receber")">Contas a Receber</MudSelectItem>
+                        <MudSelectItem Value="@("Pagar")">Contas a Pagar</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="StatusContaFinanceira?" Label="Status" @bind-Value="_statusFinanceiro" Clearable="true">
+                        <MudSelectItem T="StatusContaFinanceira?" Value="@((StatusContaFinanceira?)null)">Todos</MudSelectItem>
+                        <MudSelectItem T="StatusContaFinanceira?" Value="@((StatusContaFinanceira?)StatusContaFinanceira.Pendente)">Pendente</MudSelectItem>
+                        <MudSelectItem T="StatusContaFinanceira?" Value="@((StatusContaFinanceira?)StatusContaFinanceira.ParcialmentePaga)">Parcial</MudSelectItem>
+                        <MudSelectItem T="StatusContaFinanceira?" Value="@((StatusContaFinanceira?)StatusContaFinanceira.Paga)">Liquidado</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="3" Class="d-flex align-center justify-end gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="CarregarFinanceiro" Disabled="@_carregandoFinanceiro">
+                        Filtrar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportarFinanceiroCsv" Disabled="@(_carregandoFinanceiro || _dadosFinanceiro == null)">
+                        CSV
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="ExportarFinanceiroPdf" Disabled="@(_carregandoFinanceiro || _dadosFinanceiro == null)">
+                        PDF
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_carregandoFinanceiro)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (_dadosFinanceiro != null)
+        {
+            <!-- Cards de Totais Financeiro -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="2">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TÍTULOS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@_dadosFinanceiro.QuantidadeTitulos</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-primary) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">VALOR ORIGINAL</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@_dadosFinanceiro.TotalOriginal.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL BAIXADO</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_dadosFinanceiro.TotalBaixado.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">EM ABERTO</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Warning">@_dadosFinanceiro.TotalEmAberto.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-error) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL VENCIDO</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Error">@_dadosFinanceiro.TotalVencido.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabela Financeiro -->
+            <MudTable Items="@_dadosFinanceiro.Itens" Hover="true" Dense="true" Elevation="1" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Tipo</MudTh>
+                    <MudTh>Doc.</MudTh>
+                    <MudTh>Vencimento</MudTh>
+                    <MudTh>Cliente / Fornecedor</MudTh>
+                    <MudTh>Descrição</MudTh>
+                    <MudTh Style="text-align: right;">Original</MudTh>
+                    <MudTh Style="text-align: right;">Baixado</MudTh>
+                    <MudTh Style="text-align: right;">Saldo</MudTh>
+                    <MudTh Style="text-align: center;">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Tipo">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Tipo == "Receber" ? Color.Success : Color.Warning)" Variant="Variant.Outlined">
+                            @context.Tipo
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Doc.">@context.Documento</MudTd>
+                    <MudTd DataLabel="Vencimento" Style="@(context.Vencido ? "color: var(--mud-palette-error); font-weight: bold;" : "")">
+                        @context.DataVencimento.ToString("dd/MM/yyyy")
+                        @if (context.Vencido)
+                        {
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" Color="Color.Error" Class="ml-1" />
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Cliente/Fornecedor">@context.PessoaNome</MudTd>
+                    <MudTd DataLabel="Descrição">@context.Descricao</MudTd>
+                    <MudTd DataLabel="Original" Style="text-align: right;">@context.ValorOriginal.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Baixado" Style="text-align: right; color: var(--mud-palette-success);">@context.ValorBaixado.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Saldo" Style="text-align: right;"><b>@context.SaldoRestante.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="Status" Style="text-align: center;">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Status == "Paga" ? Color.Success : context.Vencido ? Color.Error : Color.Default)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    <!-- ABA 3: ESTOQUE & CURVA ABC -->
+    <MudTabPanel Text="Estoque &amp; Curva ABC" Icon="@Icons.Material.Filled.Inventory2">
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="6" Class="d-flex align-center">
+                    <MudCheckBox T="bool" @bind-Value="_somenteCriticosEstoque" Label="Filtrar apenas itens em Estoque Crítico (abaixo do mínimo)" Color="Color.Error" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="6" Class="d-flex align-center justify-end gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="CarregarEstoque" Disabled="@_carregandoEstoque">
+                        Filtrar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportarEstoqueCsv" Disabled="@(_carregandoEstoque || _dadosEstoque == null)">
+                        CSV
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="ExportarEstoquePdf" Disabled="@(_carregandoEstoque || _dadosEstoque == null)">
+                        PDF
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_carregandoEstoque)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (_dadosEstoque != null)
+        {
+            <!-- Cards Totais Estoque -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">ITENS CADASTRADOS</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">@_dadosEstoque.TotalItens</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">VALOR CUSTO ESTOQUE</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_dadosEstoque.ValorTotalCustoEstoque.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-tertiary) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">POTENCIAL DE VENDA</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Tertiary">@_dadosEstoque.ValorTotalPotencialVenda.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-error) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">PRODUTOS CRÍTICOS</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Error">@_dadosEstoque.TotalProdutosCriticos</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabela Estoque -->
+            <MudTable Items="@_dadosEstoque.Itens" Hover="true" Dense="true" Elevation="1" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Código</MudTh>
+                    <MudTh>Produto</MudTh>
+                    <MudTh>Categoria</MudTh>
+                    <MudTh Style="text-align: center;">UN</MudTh>
+                    <MudTh Style="text-align: right;">Saldo Físico</MudTh>
+                    <MudTh Style="text-align: right;">Custo Unit.</MudTh>
+                    <MudTh Style="text-align: right;">Total Custo</MudTh>
+                    <MudTh Style="text-align: right;">Preço Venda</MudTh>
+                    <MudTh Style="text-align: center;">Curva ABC</MudTh>
+                    <MudTh Style="text-align: center;">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Código"><b>@context.Codigo</b></MudTd>
+                    <MudTd DataLabel="Produto">@context.Nome</MudTd>
+                    <MudTd DataLabel="Categoria">@context.Categoria</MudTd>
+                    <MudTd DataLabel="UN" Style="text-align: center;">@context.UnidadeMedida</MudTd>
+                    <MudTd DataLabel="Saldo Físico" Style="text-align: right;"><b>@context.SaldoFisico.ToString("N0")</b></MudTd>
+                    <MudTd DataLabel="Custo Unit." Style="text-align: right;">@context.CustoMedio.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Total Custo" Style="text-align: right; color: var(--mud-palette-success);"><b>@context.ValorTotalCusto.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="Preço Venda" Style="text-align: right;">@context.PrecoVenda.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Curva ABC" Style="text-align: center;">
+                        <MudChip T="string" Size="Size.Small" Color="@ObterCorAbc(context.ClassificacaoAbc)">
+                            Classe @context.ClassificacaoAbc (@context.PercentualRepresentatividade%)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status" Style="text-align: center;">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.StatusEstoque == "Crítico" ? Color.Error : Color.Success)">
+                            @context.StatusEstoque
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    <!-- ABA 4: COMPRAS -->
+    <MudTabPanel Text="Compras" Icon="@Icons.Material.Filled.Store">
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="6">
+                    <MudDateRangePicker Label="Período das Entradas" @bind-DateRange="_periodoCompras" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="6" Class="d-flex align-center justify-end gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="CarregarCompras" Disabled="@_carregandoCompras">
+                        Filtrar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportarComprasCsv" Disabled="@(_carregandoCompras || _dadosCompras == null)">
+                        CSV
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="ExportarComprasPdf" Disabled="@(_carregandoCompras || _dadosCompras == null)">
+                        PDF
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_carregandoCompras)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (_dadosCompras != null)
+        {
+            <!-- Cards Totais Compras -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">ENTRADAS REGISTRADAS</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Info">@_dadosCompras.TotalEntradas</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL EM COMPRAS</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Success">@_dadosCompras.ValorTotalCompras.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL FRETE</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Warning">@_dadosCompras.ValorTotalFrete.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-tertiary) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">MÉDIA POR COMPRA</MudText>
+                        <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Tertiary">@_dadosCompras.MediaPorCompra.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabela Compras -->
+            <MudTable Items="@_dadosCompras.Itens" Hover="true" Dense="true" Elevation="1" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Entrada</MudTh>
+                    <MudTh>Data</MudTh>
+                    <MudTh>Fornecedor</MudTh>
+                    <MudTh>NF Fornecedor</MudTh>
+                    <MudTh Style="text-align: right;">Produtos</MudTh>
+                    <MudTh Style="text-align: right;">Frete</MudTh>
+                    <MudTh Style="text-align: right;">Total</MudTh>
+                    <MudTh Style="text-align: center;">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Entrada"><b>@context.Numero</b></MudTd>
+                    <MudTd DataLabel="Data">@context.DataEntrada.ToString("dd/MM/yyyy")</MudTd>
+                    <MudTd DataLabel="Fornecedor">@context.FornecedorNome</MudTd>
+                    <MudTd DataLabel="NF Fornecedor">@context.NumeroNotaFiscal</MudTd>
+                    <MudTd DataLabel="Produtos" Style="text-align: right;">@context.ValorProdutos.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Frete" Style="text-align: right;">@context.ValorFrete.ToString("C2")</MudTd>
+                    <MudTd DataLabel="Total" Style="text-align: right;"><b>@context.ValorTotal.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="Status" Style="text-align: center;">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">@context.Status</MudChip>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    <!-- ABA 5: FISCAL -->
+    <MudTabPanel Text="Fiscal &amp; Impostos" Icon="@Icons.Material.Filled.ReceiptLong">
+        <MudPaper Class="pa-4 mb-4" Elevation="1">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDateRangePicker Label="Período das Notas" @bind-DateRange="_periodoFiscal" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudSelect T="ModeloDocumentoFiscal?" Label="Modelo de Nota" @bind-Value="_modeloFiscal" Clearable="true">
+                        <MudSelectItem T="ModeloDocumentoFiscal?" Value="@((ModeloDocumentoFiscal?)null)">Todos os Modelos</MudSelectItem>
+                        <MudSelectItem T="ModeloDocumentoFiscal?" Value="@((ModeloDocumentoFiscal?)ModeloDocumentoFiscal.NFe)">NF-e (Mod. 55)</MudSelectItem>
+                        <MudSelectItem T="ModeloDocumentoFiscal?" Value="@((ModeloDocumentoFiscal?)ModeloDocumentoFiscal.NFCe)">NFC-e (Mod. 65)</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudSelect T="StatusNotaFiscal?" Label="Status" @bind-Value="_statusFiscal" Clearable="true">
+                        <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)null)">Todos</MudSelectItem>
+                        <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Autorizada)">Autorizada</MudSelectItem>
+                        <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Cancelada)">Cancelada</MudSelectItem>
+                        <MudSelectItem T="StatusNotaFiscal?" Value="@((StatusNotaFiscal?)StatusNotaFiscal.Rejeitada)">Rejeitada</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="12" md="3" Class="d-flex align-center justify-end gap-2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Search" OnClick="CarregarFiscal" Disabled="@_carregandoFiscal">
+                        Filtrar
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.FileDownload" OnClick="ExportarFiscalCsv" Disabled="@(_carregandoFiscal || _dadosFiscal == null)">
+                        CSV
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.PictureAsPdf" OnClick="ExportarFiscalPdf" Disabled="@(_carregandoFiscal || _dadosFiscal == null)">
+                        PDF
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        @if (_carregandoFiscal)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="mb-4" />
+        }
+
+        @if (_dadosFiscal != null)
+        {
+            <!-- Cards Totais Fiscal -->
+            <MudGrid Class="mb-4">
+                <MudItem xs="12" sm="6" md="2">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-info) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">DOCUMENTOS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@_dadosFiscal.TotalNotas</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-success) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">VALOR TOTAL NOTAS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_dadosFiscal.ValorTotalDocumentos.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-primary) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TOTAL ICMS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@_dadosFiscal.TotalIcms.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="2">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-warning) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">PIS + COFINS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@((_dadosFiscal.TotalPis + _dadosFiscal.TotalCofins).ToString("C2"))</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-3 border-l-4" Style="border-left-color: var(--mud-palette-error) !important;">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="font-weight-bold">TRIBUTOS TOTAIS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Error">@_dadosFiscal.TotalTributosConsolidados.ToString("C2")</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Tabela Fiscal -->
+            <MudTable Items="@_dadosFiscal.Itens" Hover="true" Dense="true" Elevation="1" RowsPerPage="10">
+                <HeaderContent>
+                    <MudTh>Mod.</MudTh>
+                    <MudTh>Série/Nº</MudTh>
+                    <MudTh>Emissão</MudTh>
+                    <MudTh>Destinatário</MudTh>
+                    <MudTh Style="text-align: right;">Total Nota</MudTh>
+                    <MudTh Style="text-align: right;">ICMS</MudTh>
+                    <MudTh Style="text-align: right;">PIS/COFINS</MudTh>
+                    <MudTh Style="text-align: center;">Status</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Mod.">
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                            @(context.Modelo == "55" ? "NF-e" : "NFC-e")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Série/Nº"><b>@context.Serie / @context.Numero</b></MudTd>
+                    <MudTd DataLabel="Emissão">@context.DataEmissao.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                    <MudTd DataLabel="Destinatário">@context.DestinatarioNome</MudTd>
+                    <MudTd DataLabel="Total Nota" Style="text-align: right;"><b>@context.ValorTotal.ToString("C2")</b></MudTd>
+                    <MudTd DataLabel="ICMS" Style="text-align: right;">@context.ValorIcms.ToString("C2")</MudTd>
+                    <MudTd DataLabel="PIS/COFINS" Style="text-align: right;">@((context.ValorPis + context.ValorCofins).ToString("C2"))</MudTd>
+                    <MudTd DataLabel="Status" Style="text-align: center;">
+                        <MudChip T="string" Size="Size.Small" Color="@(context.Status == "Autorizada" ? Color.Success : context.Status == "Cancelada" ? Color.Error : Color.Warning)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+</MudTabs>
+
+@code {
+    // 1. Vendas
+    private RelatorioVendasResultDto? _dadosVendas;
+    private bool _carregandoVendas;
+    private DateRange _periodoVendas = ObterPeriodoPadrao();
+    private StatusPedidoVenda? _statusVenda;
+
+    // 2. Financeiro
+    private RelatorioFinanceiroResultDto? _dadosFinanceiro;
+    private bool _carregandoFinanceiro;
+    private DateRange _periodoFinanceiro = ObterPeriodoPadrao();
+    private string _tipoFinanceiro = "Todos";
+    private StatusContaFinanceira? _statusFinanceiro;
+
+    // 3. Estoque
+    private RelatorioEstoqueResultDto? _dadosEstoque;
+    private bool _carregandoEstoque;
+    private bool _somenteCriticosEstoque;
+
+    // 4. Compras
+    private RelatorioComprasResultDto? _dadosCompras;
+    private bool _carregandoCompras;
+    private DateRange _periodoCompras = ObterPeriodoPadrao();
+
+    // 5. Fiscal
+    private RelatorioFiscalResultDto? _dadosFiscal;
+    private bool _carregandoFiscal;
+    private DateRange _periodoFiscal = ObterPeriodoPadrao();
+    private ModeloDocumentoFiscal? _modeloFiscal;
+    private StatusNotaFiscal? _statusFiscal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarVendas();
+        await CarregarFinanceiro();
+        await CarregarEstoque();
+        await CarregarCompras();
+        await CarregarFiscal();
+    }
+
+    private static DateRange ObterPeriodoPadrao()
+    {
+        var agora = DateTime.Now;
+        return new DateRange(
+            new DateTime(agora.Year, agora.Month, 1),
+            new DateTime(agora.Year, agora.Month, DateTime.DaysInMonth(agora.Year, agora.Month))
+        );
+    }
+
+    #region Métodos de Carregamento
+    private async Task CarregarVendas()
+    {
+        if (_periodoVendas.Start == null || _periodoVendas.End == null) return;
+        try
+        {
+            _carregandoVendas = true;
+            _dadosVendas = await Mediator.Send(new GetRelatorioVendasQuery(
+                _periodoVendas.Start.Value,
+                _periodoVendas.End.Value,
+                null,
+                _statusVenda
+            ));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar relatório de vendas: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregandoVendas = false;
+        }
+    }
+
+    private async Task CarregarFinanceiro()
+    {
+        if (_periodoFinanceiro.Start == null || _periodoFinanceiro.End == null) return;
+        try
+        {
+            _carregandoFinanceiro = true;
+            _dadosFinanceiro = await Mediator.Send(new GetRelatorioFinanceiroQuery(
+                _periodoFinanceiro.Start.Value,
+                _periodoFinanceiro.End.Value,
+                _tipoFinanceiro,
+                _statusFinanceiro
+            ));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar relatório financeiro: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregandoFinanceiro = false;
+        }
+    }
+
+    private async Task CarregarEstoque()
+    {
+        try
+        {
+            _carregandoEstoque = true;
+            _dadosEstoque = await Mediator.Send(new GetRelatorioEstoqueQuery(
+                null,
+                _somenteCriticosEstoque
+            ));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar relatório de estoque: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregandoEstoque = false;
+        }
+    }
+
+    private async Task CarregarCompras()
+    {
+        if (_periodoCompras.Start == null || _periodoCompras.End == null) return;
+        try
+        {
+            _carregandoCompras = true;
+            _dadosCompras = await Mediator.Send(new GetRelatorioComprasQuery(
+                _periodoCompras.Start.Value,
+                _periodoCompras.End.Value
+            ));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar relatório de compras: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregandoCompras = false;
+        }
+    }
+
+    private async Task CarregarFiscal()
+    {
+        if (_periodoFiscal.Start == null || _periodoFiscal.End == null) return;
+        try
+        {
+            _carregandoFiscal = true;
+            _dadosFiscal = await Mediator.Send(new GetRelatorioFiscalQuery(
+                _periodoFiscal.Start.Value,
+                _periodoFiscal.End.Value,
+                _statusFiscal,
+                _modeloFiscal
+            ));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Erro ao carregar relatório fiscal: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _carregandoFiscal = false;
+        }
+    }
+    #endregion
+
+    #region Exportações
+    private async Task ExportarVendasCsv()
+    {
+        if (_periodoVendas.Start == null || _periodoVendas.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioVendasCsvQuery(_periodoVendas.Start.Value, _periodoVendas.End.Value, null, _statusVenda));
+        await BaixarArquivo(bytes, $"relatorio-vendas-{DateTime.Now:yyyyMMddHHmm}.csv", "text/csv");
+    }
+
+    private async Task ExportarVendasPdf()
+    {
+        if (_periodoVendas.Start == null || _periodoVendas.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioVendasPdfQuery(_periodoVendas.Start.Value, _periodoVendas.End.Value, null, _statusVenda));
+        await BaixarArquivo(bytes, $"relatorio-vendas-{DateTime.Now:yyyyMMddHHmm}.pdf", "application/pdf");
+    }
+
+    private async Task ExportarFinanceiroCsv()
+    {
+        if (_periodoFinanceiro.Start == null || _periodoFinanceiro.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioFinanceiroCsvQuery(_periodoFinanceiro.Start.Value, _periodoFinanceiro.End.Value, _tipoFinanceiro, _statusFinanceiro));
+        await BaixarArquivo(bytes, $"relatorio-financeiro-{DateTime.Now:yyyyMMddHHmm}.csv", "text/csv");
+    }
+
+    private async Task ExportarFinanceiroPdf()
+    {
+        if (_periodoFinanceiro.Start == null || _periodoFinanceiro.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioFinanceiroPdfQuery(_periodoFinanceiro.Start.Value, _periodoFinanceiro.End.Value, _tipoFinanceiro, _statusFinanceiro));
+        await BaixarArquivo(bytes, $"relatorio-financeiro-{DateTime.Now:yyyyMMddHHmm}.pdf", "application/pdf");
+    }
+
+    private async Task ExportarEstoqueCsv()
+    {
+        var bytes = await Mediator.Send(new ExportRelatorioEstoqueCsvQuery(null, _somenteCriticosEstoque));
+        await BaixarArquivo(bytes, $"relatorio-estoque-{DateTime.Now:yyyyMMddHHmm}.csv", "text/csv");
+    }
+
+    private async Task ExportarEstoquePdf()
+    {
+        var bytes = await Mediator.Send(new ExportRelatorioEstoquePdfQuery(null, _somenteCriticosEstoque));
+        await BaixarArquivo(bytes, $"relatorio-estoque-{DateTime.Now:yyyyMMddHHmm}.pdf", "application/pdf");
+    }
+
+    private async Task ExportarComprasCsv()
+    {
+        if (_periodoCompras.Start == null || _periodoCompras.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioComprasCsvQuery(_periodoCompras.Start.Value, _periodoCompras.End.Value));
+        await BaixarArquivo(bytes, $"relatorio-compras-{DateTime.Now:yyyyMMddHHmm}.csv", "text/csv");
+    }
+
+    private async Task ExportarComprasPdf()
+    {
+        if (_periodoCompras.Start == null || _periodoCompras.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioComprasPdfQuery(_periodoCompras.Start.Value, _periodoCompras.End.Value));
+        await BaixarArquivo(bytes, $"relatorio-compras-{DateTime.Now:yyyyMMddHHmm}.pdf", "application/pdf");
+    }
+
+    private async Task ExportarFiscalCsv()
+    {
+        if (_periodoFiscal.Start == null || _periodoFiscal.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioFiscalCsvQuery(_periodoFiscal.Start.Value, _periodoFiscal.End.Value, _statusFiscal, _modeloFiscal));
+        await BaixarArquivo(bytes, $"relatorio-fiscal-{DateTime.Now:yyyyMMddHHmm}.csv", "text/csv");
+    }
+
+    private async Task ExportarFiscalPdf()
+    {
+        if (_periodoFiscal.Start == null || _periodoFiscal.End == null) return;
+        var bytes = await Mediator.Send(new ExportRelatorioFiscalPdfQuery(_periodoFiscal.Start.Value, _periodoFiscal.End.Value, _statusFiscal, _modeloFiscal));
+        await BaixarArquivo(bytes, $"relatorio-fiscal-{DateTime.Now:yyyyMMddHHmm}.pdf", "application/pdf");
+    }
+
+    private async Task BaixarArquivo(byte[] conteudo, string nomeArquivo, string contentType)
+    {
+        var base64 = Convert.ToBase64String(conteudo);
+        await JS.InvokeVoidAsync("downloadFileFromBase64", base64, nomeArquivo, contentType);
+        Snackbar.Add($"Arquivo {nomeArquivo} baixado com sucesso!", Severity.Success);
+    }
+    #endregion
+
+    private Color ObterCorStatus(string status) => status switch
+    {
+        "Faturado" => Color.Success,
+        "Aprovado" => Color.Info,
+        "Pendente" => Color.Warning,
+        "Cancelado" => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color ObterCorAbc(string abc) => abc switch
+    {
+        "A" => Color.Success,
+        "B" => Color.Info,
+        _ => Color.Secondary
+    };
+}

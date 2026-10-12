@@ -717,14 +717,14 @@ decisão baseada em dados.
 
 ### 📦 Entregáveis
 
-- [ ] Dashboard principal com widgets configuráveis por permissão do usuário
-- [ ] Relatórios de Vendas (por período, cliente, produto, vendedor)
-- [ ] Relatórios Financeiros (contas a pagar/receber, fluxo de caixa)
-- [ ] Relatórios de Estoque (posição, movimentação, valorização, curva ABC)
-- [ ] Relatórios de Compras (por fornecedor, produto, período)
-- [ ] Relatórios Fiscais (notas emitidas, impostos por período)
-- [ ] Exportação para PDF e Excel (CSV/XLSX)
-- [ ] Gráficos interativos (MudBlazor Charts)
+- [x] Dashboard principal com widgets configuráveis por permissão do usuário
+- [x] Relatórios de Vendas (por período, cliente, produto, vendedor)
+- [x] Relatórios Financeiros (contas a pagar/receber, fluxo de caixa)
+- [x] Relatórios de Estoque (posição, movimentação, valorização, curva ABC)
+- [x] Relatórios de Compras (por fornecedor, produto, período)
+- [x] Relatórios Fiscais (notas emitidas, impostos por período)
+- [x] Exportação para PDF e Excel (CSV/XLSX)
+- [x] Gráficos interativos (MudBlazor Charts)
 
 ### 🖥️ Telas
 
