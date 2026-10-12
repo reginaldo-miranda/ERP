@@ -11,7 +11,7 @@
 <PageTitle>Serviços</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
-    <MudIcon Icon="Icons.Material.Filled.Build" Class="mr-2" />
+    <MudIcon Icon="@Icons.Material.Filled.Build" Class="mr-2" />
     Serviços
 </MudText>
 
@@ -19,11 +19,11 @@
     <MudGrid Class="mb-3">
         <MudItem xs="12" md="6">
             <MudTextField @bind-Value="_busca" Label="Buscar por nome ou código"
-                          Adornment="Adornment.End" AdornmentIcon="Icons.Material.Filled.Search"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
                           OnAdornmentClick="Buscar" OnKeyUp="@(async (e) => { if (e.Key == "Enter") await Buscar(); })" />
         </MudItem>
         <MudItem xs="12" md="6" Class="d-flex align-end justify-end">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Nav.NavigateTo("/cadastros/servicos/novo"))">Novo Serviço</MudButton>
         </MudItem>
     </MudGrid>
@@ -47,9 +47,9 @@
             </TemplateColumn>
             <TemplateColumn Title="Ações">
                 <CellTemplate>
-                    <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                    OnClick="@(() => Nav.NavigateTo($"/cadastros/servicos/{context.Item.Id}"))" />
-                    <MudIconButton Icon="Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                    OnClick="@(async () => await Desativar(context.Item.Id))" />
                 </CellTemplate>
             </TemplateColumn>

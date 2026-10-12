@@ -9,7 +9,7 @@
 <PageTitle>Unidades de Medida</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
-    <MudIcon Icon="Icons.Material.Filled.Straighten" Class="mr-2" />
+    <MudIcon Icon="@Icons.Material.Filled.Straighten" Class="mr-2" />
     Unidades de Medida
 </MudText>
 
@@ -17,9 +17,9 @@
     <MudTable Items="@_unidades" Dense="true" Hover="true" Loading="@_carregando" Filter="new Func<UnidadeMedidaDto, bool>(FiltrarUnidade)">
         <ToolBarContent>
             <MudTextField @bind-Value="_filtro" Placeholder="Buscar..." Adornment="Adornment.Start"
-                          AdornmentIcon="Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mr-4" />
+                          AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0 mr-4" />
             <MudSpacer />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="AbrirDialogNovo">Nova Unidade</MudButton>
         </ToolBarContent>
         <HeaderContent>
@@ -33,7 +33,7 @@
             <MudTd>@context.Descricao</MudTd>
             <MudTd><MudChip T="string" Color="@(context.Ativo ? Color.Success : Color.Default)" Size="Size.Small">@(context.Ativo ? "Ativo" : "Inativo")</MudChip></MudTd>
             <MudTd>
-                <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => AbrirDialogEditar(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => AbrirDialogEditar(context))" />
             </MudTd>
         </RowTemplate>
         <NoRecordsContent>

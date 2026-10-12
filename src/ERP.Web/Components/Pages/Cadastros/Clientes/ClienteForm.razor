@@ -15,7 +15,7 @@
 <PageTitle>@(Id.HasValue ? "Editar Cliente" : "Novo Cliente")</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
-    <MudIcon Icon="Icons.Material.Filled.PersonAdd" Class="mr-2" />
+    <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
     @(Id.HasValue ? "Editar Cliente" : "Novo Cliente")
 </MudText>
 
@@ -26,7 +26,7 @@
 else
 {
     <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true">
-        <MudTabPanel Text="Dados Gerais" Icon="Icons.Material.Filled.Person">
+        <MudTabPanel Text="Dados Gerais" Icon="@Icons.Material.Filled.Person">
             <MudPaper Class="pa-4 mt-2">
                 <MudGrid>
                     <MudItem xs="12" md="4">
@@ -78,7 +78,7 @@ else
             </MudPaper>
         </MudTabPanel>
 
-        <MudTabPanel Text="Endereços" Icon="Icons.Material.Filled.Home">
+        <MudTabPanel Text="Endereços" Icon="@Icons.Material.Filled.Home">
             <MudPaper Class="pa-4 mt-2">
                 @foreach (var end in _enderecos)
                 {
@@ -112,11 +112,11 @@ else
                             </MudGrid>
                         </MudCardContent>
                         <MudCardActions>
-                            <MudIconButton Icon="Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => _enderecos.Remove(end))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => _enderecos.Remove(end))" />
                         </MudCardActions>
                     </MudCard>
                 }
-                <MudButton StartIcon="Icons.Material.Filled.Add" OnClick="AdicionarEndereco">Adicionar Endereço</MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarEndereco">Adicionar Endereço</MudButton>
             </MudPaper>
         </MudTabPanel>
     </MudTabs>

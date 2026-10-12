@@ -16,12 +16,12 @@
 <div class="d-flex justify-space-between align-center mb-4">
     <div>
         <MudText Typo="Typo.h5" Class="font-weight-bold">
-            <MudIcon Icon="Icons.Material.Filled.MoneyOff" Class="mr-2" />
+            <MudIcon Icon="@Icons.Material.Filled.MoneyOff" Class="mr-2" />
             Contas a Pagar
         </MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">Gestão de obrigações, parcelamentos e liquidações com fornecedores.</MudText>
     </div>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add" OnClick="AbrirNovoTituloDialog">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AbrirNovoTituloDialog">
         Nova Conta a Pagar
     </MudButton>
 </div>
@@ -35,7 +35,7 @@
                 <MudText Typo="Typo.h5" Color="Color.Error" Class="font-weight-bold">@(_resumo?.TotalVencido.ToString("C2") ?? "R$ 0,00")</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@(_resumo?.QuantidadeVencidos ?? 0) título(s) em atraso</MudText>
             </div>
-            <MudIcon Icon="Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" Size="Size.Large" />
         </MudPaper>
     </MudItem>
 
@@ -46,7 +46,7 @@
                 <MudText Typo="Typo.h5" Color="Color.Warning" Class="font-weight-bold">@(_resumo?.TotalAVencer.ToString("C2") ?? "R$ 0,00")</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@(_resumo?.QuantidadeAVencer ?? 0) título(s) futuro(s)</MudText>
             </div>
-            <MudIcon Icon="Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" />
+            <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" />
         </MudPaper>
     </MudItem>
 
@@ -57,7 +57,7 @@
                 <MudText Typo="Typo.h5" Color="Color.Success" Class="font-weight-bold">@(_resumo?.TotalPagoNoMes.ToString("C2") ?? "R$ 0,00")</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">@(_resumo?.QuantidadePagosNoMes ?? 0) quitações realizadas</MudText>
             </div>
-            <MudIcon Icon="Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
         </MudPaper>
     </MudItem>
 
@@ -68,7 +68,7 @@
                 <MudText Typo="Typo.h5" Color="Color.Info" Class="font-weight-bold">@(_resumo?.TotalAberto.ToString("C2") ?? "R$ 0,00")</MudText>
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Saldo devedor total</MudText>
             </div>
-            <MudIcon Icon="Icons.Material.Filled.AccountBalance" Color="Color.Info" Size="Size.Large" />
+            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Info" Size="Size.Large" />
         </MudPaper>
     </MudItem>
 </MudGrid>
@@ -78,7 +78,7 @@
     <MudGrid Class="mb-3">
         <MudItem xs="12" md="3">
             <MudTextField @bind-Value="_busca" Label="Buscar por descrição ou nº doc" Adornment="Adornment.End"
-                          AdornmentIcon="Icons.Material.Filled.Search" OnAdornmentClick="BuscarAsync"
+                          AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="BuscarAsync"
                           OnKeyUp="@(async (e) => { if (e.Key == "Enter") await BuscarAsync(); })" />
         </MudItem>
 
@@ -112,7 +112,7 @@
 
         <MudItem xs="12" Class="d-flex justify-end">
             <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="LimparFiltrosAsync" Class="mr-2">Limpar</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.FilterAlt" OnClick="BuscarAsync">Filtrar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FilterAlt" OnClick="BuscarAsync">Filtrar</MudButton>
         </MudItem>
     </MudGrid>
 
@@ -134,7 +134,7 @@
                     @context.DataVencimento.ToString("dd/MM/yyyy")
                     @if (context.Vencida)
                     {
-                        <MudIcon Icon="Icons.Material.Filled.ErrorOutline" Size="Size.Small" Color="Color.Error" Class="ml-1 vertical-align-middle" />
+                        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Small" Color="Color.Error" Class="ml-1 vertical-align-middle" />
                     }
                 </MudText>
             </MudTd>
@@ -187,7 +187,7 @@
             <MudTd DataLabel="Ações" Class="text-center">
                 @if (context.Status != StatusContaFinanceira.Paga && context.Status != StatusContaFinanceira.Cancelada)
                 {
-                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" StartIcon="Icons.Material.Filled.Payment"
+                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Payment"
                                OnClick="@(() => AbrirBaixaDialog(context))" Class="mr-1">
                         Baixar
                     </MudButton>
@@ -195,7 +195,7 @@
                 @if (context.Status != StatusContaFinanceira.Cancelada && context.ValorPago == 0)
                 {
                     <MudTooltip Text="Cancelar Conta">
-                        <MudIconButton Icon="Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small"
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Error" Size="Size.Small"
                                        OnClick="@(() => CancelarContaAsync(context.Id))" />
                     </MudTooltip>
                 }

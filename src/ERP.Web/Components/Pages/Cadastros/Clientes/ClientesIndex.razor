@@ -12,7 +12,7 @@
 <PageTitle>Clientes</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
-    <MudIcon Icon="Icons.Material.Filled.People" Class="mr-2" />
+    <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
     Clientes
 </MudText>
 
@@ -20,7 +20,7 @@
     <MudGrid Class="mb-3">
         <MudItem xs="12" md="4">
             <MudTextField @bind-Value="_busca" Label="Buscar por nome, CPF/CNPJ ou e-mail" Adornment="Adornment.End"
-                          AdornmentIcon="Icons.Material.Filled.Search" OnAdornmentClick="Buscar"
+                          AdornmentIcon="@Icons.Material.Filled.Search" OnAdornmentClick="Buscar"
                           OnKeyUp="@(async (e) => { if (e.Key == "Enter") await Buscar(); })" />
         </MudItem>
         <MudItem xs="6" md="2">
@@ -39,7 +39,7 @@
         </MudItem>
         <MudItem xs="12" md="4" Class="d-flex align-end justify-end">
             <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Buscar" Class="mr-2">Filtrar</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="Icons.Material.Filled.Add"
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
                        OnClick="@(() => Nav.NavigateTo("/cadastros/clientes/novo"))">Novo Cliente</MudButton>
         </MudItem>
     </MudGrid>
@@ -67,9 +67,9 @@
             </TemplateColumn>
             <TemplateColumn Title="Ações">
                 <CellTemplate>
-                    <MudIconButton Icon="Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
                                    OnClick="@(() => Nav.NavigateTo($"/cadastros/clientes/{context.Item.Id}"))" />
-                    <MudIconButton Icon="Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                    OnClick="@(async () => await Desativar(context.Item.Id))" />
                 </CellTemplate>
             </TemplateColumn>

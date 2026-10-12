@@ -10,7 +10,7 @@
 <PageTitle>Categorias</PageTitle>
 
 <MudText Typo="Typo.h5" Class="mb-4">
-    <MudIcon Icon="Icons.Material.Filled.Category" Class="mr-2" />
+    <MudIcon Icon="@Icons.Material.Filled.Category" Class="mr-2" />
     Categorias
 </MudText>
 
@@ -19,7 +19,7 @@
         <MudPaper Class="pa-4">
             <div class="d-flex justify-space-between align-center mb-3">
                 <MudText Typo="Typo.subtitle1">📦 Produtos</MudText>
-                <MudButton StartIcon="Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
+                <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
                            OnClick="@(() => AbrirNova(TipoCategoria.Produto))">Nova</MudButton>
             </div>
             @foreach (var cat in _categoriasProdutos)
@@ -32,7 +32,7 @@
         <MudPaper Class="pa-4">
             <div class="d-flex justify-space-between align-center mb-3">
                 <MudText Typo="Typo.subtitle1">🔧 Serviços</MudText>
-                <MudButton StartIcon="Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
+                <MudButton StartIcon="@Icons.Material.Filled.Add" Size="Size.Small" Variant="Variant.Outlined"
                            OnClick="@(() => AbrirNova(TipoCategoria.Servico))">Nova</MudButton>
             </div>
             @foreach (var cat in _categoriasServicos)
