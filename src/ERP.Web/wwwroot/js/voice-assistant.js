@@ -12,13 +12,16 @@ window.voiceAssistant = {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             console.warn("Reconhecimento de fala (Web Speech API) não suportado neste navegador.");
+            if (this.dotNetRef) {
+                this.dotNetRef.invokeMethodAsync('OnSpeechError', 'Este navegador não suporta reconhecimento de voz nativo. Por favor, utilize o Google Chrome ou Microsoft Edge.');
+            }
             return false;
         }
 
         try {
             this.recognition = new SpeechRecognition();
             this.recognition.lang = 'pt-BR';
-            this.recognition.continuous = false; // Captura frase completa
+            this.recognition.continuous = false;
             this.recognition.interimResults = true;
 
             this.recognition.onstart = () => {
@@ -38,8 +41,16 @@ window.voiceAssistant = {
             this.recognition.onerror = (event) => {
                 console.error("Speech recognition error:", event.error);
                 this.isListening = false;
+                let mensagem = event.error;
+                if (event.error === 'not-allowed') {
+                    mensagem = 'Permissão do microfone negada. Verifique as permissões do navegador e do macOS (Ajustes do Sistema > Privacidade e Segurança > Microfone).';
+                } else if (event.error === 'no-speech') {
+                    mensagem = 'Nenhum som detectado. Tente falar novamente.';
+                } else if (event.error === 'network') {
+                    mensagem = 'Erro de conexão com o serviço de reconhecimento de voz.';
+                }
                 if (this.dotNetRef) {
-                    this.dotNetRef.invokeMethodAsync('OnSpeechError', event.error);
+                    this.dotNetRef.invokeMethodAsync('OnSpeechError', mensagem);
                 }
             };
 
@@ -69,9 +80,29 @@ window.voiceAssistant = {
         }
     },
 
-    startListening: function () {
-        if (!this.recognition) return;
+    startListening: async function () {
+        if (!this.recognition) {
+            if (this.dotNetRef) {
+                this.dotNetRef.invokeMethodAsync('OnSpeechError', 'Reconhecimento de fala não disponível. Utilize o Google Chrome.');
+            }
+            return;
+        }
+
         if (this.isListening) return;
+
+        // Solicita permissão explícita de microfone ao navegador/sistema operacional
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+            }
+        } catch (err) {
+            console.error("Permissão de microfone negada no getUserMedia:", err);
+            if (this.dotNetRef) {
+                this.dotNetRef.invokeMethodAsync('OnSpeechError', 'Microfone bloqueado! Autorize o microfone no navegador ou em Ajustes do Sistema do macOS.');
+            }
+            return;
+        }
 
         try {
             this.recognition.start();
