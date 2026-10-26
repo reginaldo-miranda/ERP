@@ -82,6 +82,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Compras.PedidoCompraItem> PedidoCompraItens => Set<ERP.Domain.Core.Entities.Compras.PedidoCompraItem>();
     public DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoria> EntradasMercadoria => Set<ERP.Domain.Core.Entities.Compras.EntradaMercadoria>();
     public DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem> EntradaMercadoriaItens => Set<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem>();
+    public DbSet<ERP.Domain.Core.Entities.Compras.ProdutoFornecedor> ProdutosFornecedores => Set<ERP.Domain.Core.Entities.Compras.ProdutoFornecedor>();
 
     // Fase 7 - Fiscal
     public DbSet<ERP.Domain.Core.Entities.Fiscal.Ncm> Ncms => Set<ERP.Domain.Core.Entities.Fiscal.Ncm>();

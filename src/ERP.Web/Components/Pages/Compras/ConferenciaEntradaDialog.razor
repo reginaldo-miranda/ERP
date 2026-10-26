@@ -11,13 +11,19 @@
 @using Microsoft.EntityFrameworkCore
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject IApplicationDbContext Context
 
 <MudDialog>
     <TitleContent>
-        <div class="d-flex align-center">
-            <MudIcon Icon="@Icons.Material.Filled.FactCheck" Color="Color.Primary" Class="mr-2" />
-            <MudText Typo="Typo.h6">Conferência Física & Recebimento de Mercadorias</MudText>
+        <div class="d-flex align-center justify-space-between w-100 pr-4">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.FactCheck" Color="Color.Primary" Class="mr-2" />
+                <MudText Typo="Typo.h6">Conferência Física & Recebimento de Mercadorias</MudText>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" StartIcon="@Icons.Material.Filled.UploadFile" OnClick="AbrirImportadorXml">
+                Importar XML da NF-e
+            </MudButton>
         </div>
     </TitleContent>
     <DialogContent>
@@ -29,6 +35,13 @@
         }
         else
         {
+            @if (!string.IsNullOrEmpty(_chaveAcessoNfe) && !string.IsNullOrEmpty(_xmlNfeOriginal))
+            {
+                <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3" Icon="@Icons.Material.Filled.FileDownloadDone">
+                    Entrada pré-preenchida a partir do XML da NF-e (Chave: @_chaveAcessoNfe). Revise os dados e confirme o recebimento físico.
+                </MudAlert>
+            }
+
             <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-4">
                 <!-- ABA 1: NOTA FISCAL & CABEÇALHO -->
                 <MudTabPanel Text="Nota Fiscal & Transporte" Icon="@Icons.Material.Filled.ReceiptLong">
@@ -137,8 +150,14 @@
                             <RowTemplate>
                                 <MudTd>
                                     <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ProdutoCodigo - @context.ProdutoNome</MudText>
-                                    <div class="d-flex gap-1 mt-1">
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
                                         <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@context.UnidadeMedida</MudChip>
+                                        @if (!string.IsNullOrEmpty(context.CodigoProdutoFornecedor))
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.QrCode">
+                                                Forn: @context.CodigoProdutoFornecedor
+                                            </MudChip>
+                                        }
                                         @if (context.ControlaLote)
                                         {
                                             <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">Lote Obrigatório</MudChip>
@@ -289,17 +308,28 @@
                                 </MudGrid>
 
                                 <!-- Projeção de Parcelas -->
-                                @if (ValorTotalFinal > 0 && _numeroParcelas > 0)
+                                @if (ValorTotalFinal > 0)
                                 {
                                     <div class="mt-4">
-                                        <MudText Typo="Typo.caption" Class="font-weight-bold d-block mb-1">PROJEÇÃO DAS PARCELAS A PAGAR:</MudText>
+                                        <div class="d-flex justify-space-between align-center mb-1">
+                                            <MudText Typo="Typo.caption" Class="font-weight-bold">
+                                                @(_parcelasDiretas.Any() && _usarDuplicatasDoXml ? "PARCELAS CONFORME DUPLICATAS DO XML:" : "PROJEÇÃO DAS PARCELAS A PAGAR:")
+                                            </MudText>
+                                            @if (_parcelasDiretas.Any())
+                                            {
+                                                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" OnClick="@(() => _usarDuplicatasDoXml = !_usarDuplicatasDoXml)">
+                                                    @(_usarDuplicatasDoXml ? "Recalcular Manualmente" : "Usar Duplicatas do XML")
+                                                </MudButton>
+                                            }
+                                        </div>
                                         <div class="d-flex flex-wrap gap-2">
                                             @{
                                                 var projecao = CalcularProjecaoParcelas();
+                                                int totalParc = projecao.Count;
                                                 foreach (var p in projecao)
                                                 {
-                                                    <MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
-                                                        Parc @p.Numero/@_numeroParcelas: @p.Valor.ToString("C2") (Venc: @p.Vencimento.ToString("dd/MM/yyyy"))
+                                                    <MudChip T="string" Variant="Variant.Outlined" Color="@(_parcelasDiretas.Any() && _usarDuplicatasDoXml ? Color.Success : Color.Primary)" Size="Size.Small">
+                                                        Parc @p.Numero/@totalParc: @p.Valor.ToString("C2") (Venc: @p.Vencimento.ToString("dd/MM/yyyy"))
                                                     </MudChip>
                                                 }
                                             }
@@ -332,6 +362,7 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public int? PedidoCompraIdInicial { get; set; }
+    [Parameter] public NfeXmlParseResultDto? DadosXmlInicial { get; set; }
 
     private bool _carregando = true;
     private bool _salvando = false;
@@ -347,6 +378,7 @@
     private int? _pedidoCompraId;
     private string? _conferenteNome;
     private string? _observacoes;
+    private string? _xmlNfeOriginal;
 
     // Valores adicionais
     private decimal _valorFrete = 0m;
@@ -361,6 +393,8 @@
     private int _numeroParcelas = 1;
     private int _intervaloDias = 30;
     private int _diasPrimeiroVencimento = 30;
+    private List<ParcelaEntradaDiretaDto> _parcelasDiretas = new();
+    private bool _usarDuplicatasDoXml = true;
 
     // Listas de apoio
     private List<Fornecedor> _fornecedores = new();
@@ -401,7 +435,12 @@
             if (_fornecedores.Any())
                 _fornecedorId = _fornecedores.First().Id;
 
-            if (PedidoCompraIdInicial.HasValue)
+            if (DadosXmlInicial != null)
+            {
+                CarregarDadosDoXml(DadosXmlInicial, PedidoCompraIdInicial);
+                await AtualizarPedidosDisponiveis(_fornecedorId);
+            }
+            else if (PedidoCompraIdInicial.HasValue)
             {
                 await CarregarDadosDoPedido(PedidoCompraIdInicial.Value);
             }
@@ -491,6 +530,112 @@
         }
     }
 
+    private async Task AbrirImportadorXml()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = false
+        };
+
+        var dialog = await DialogService.ShowAsync<ImportarXmlNfeDialog>("Importar XML da NF-e", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled && result.Data is ValueTuple<NfeXmlParseResultDto, int?> dados)
+        {
+            // Recarrega fornecedores e produtos para refletir novos cadastros realizados durante a importação do XML
+            _fornecedores = await Context.Fornecedores.AsNoTracking().Where(f => f.Ativo).OrderBy(f => f.RazaoSocial).ToListAsync();
+            _produtos = await Context.Produtos.AsNoTracking().Include(p => p.UnidadeMedida).Where(p => p.Ativo).OrderBy(p => p.Nome).ToListAsync();
+
+            CarregarDadosDoXml(dados.Item1, dados.Item2);
+
+            if (_fornecedorId > 0)
+            {
+                await AtualizarPedidosDisponiveis(_fornecedorId);
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private void CarregarDadosDoXml(NfeXmlParseResultDto xml, int? pedidoIdVinculado)
+    {
+        _numeroNotaFiscal = xml.NumeroNotaFiscal;
+        _serieNotaFiscal = xml.SerieNotaFiscal ?? "1";
+        _chaveAcessoNfe = xml.ChaveAcessoNfe;
+        _dataEmissao = xml.DataEmissao;
+        _dataEntrada = DateTime.Today;
+        _xmlNfeOriginal = xml.XmlConteudo;
+
+        // Se o fornecedor foi localizado ou cadastrado
+        if (xml.Fornecedor.FornecedorIdExistente.HasValue && xml.Fornecedor.FornecedorIdExistente.Value > 0)
+        {
+            _fornecedorId = xml.Fornecedor.FornecedorIdExistente.Value;
+        }
+
+        // Valores adicionais
+        _valorFrete = xml.ValorFrete;
+        _valorSeguro = xml.ValorSeguro;
+        _valorOutrasDespesas = xml.ValorOutrasDespesas;
+        _valorDesconto = xml.ValorDesconto;
+
+        // Pedido de compra vinculado
+        _pedidoCompraId = pedidoIdVinculado;
+
+        // Parcelas / Duplicatas
+        _parcelasDiretas.Clear();
+        if (xml.Duplicatas != null && xml.Duplicatas.Any())
+        {
+            foreach (var dup in xml.Duplicatas)
+            {
+                _parcelasDiretas.Add(new ParcelaEntradaDiretaDto(
+                    dup.NumeroDuplicata,
+                    dup.DataVencimento,
+                    dup.Valor
+                ));
+            }
+            _usarDuplicatasDoXml = true;
+            _numeroParcelas = xml.Duplicatas.Count;
+        }
+        else
+        {
+            _usarDuplicatasDoXml = false;
+        }
+
+        // Itens com casamento De-Para
+        _itens.Clear();
+        foreach (var itemXml in xml.Itens)
+        {
+            if (itemXml.ProdutoIdSugerido.HasValue)
+            {
+                var prod = _produtos.FirstOrDefault(p => p.Id == itemXml.ProdutoIdSugerido.Value);
+                _itens.Add(new ItemConferenciaModel
+                {
+                    PedidoCompraItemId = itemXml.PedidoCompraItemId,
+                    ProdutoId = itemXml.ProdutoIdSugerido.Value,
+                    ProdutoCodigo = prod?.Codigo ?? itemXml.ProdutoCodigoSugerido ?? itemXml.CodigoProdutoFornecedor,
+                    ProdutoNome = prod?.Nome ?? itemXml.ProdutoNomeSugerido ?? itemXml.DescricaoProdutoFornecedor,
+                    UnidadeMedida = prod?.UnidadeMedida?.Sigla ?? itemXml.UnidadeMedidaFornecedor ?? "UN",
+                    ControlaLote = prod?.ControlaLote ?? (!string.IsNullOrEmpty(itemXml.CodigoLote)),
+                    ControlaSerie = prod?.ControlaSerie ?? false,
+                    QuantidadePedida = itemXml.QuantidadePedida ?? itemXml.Quantidade,
+                    Quantidade = itemXml.Quantidade,
+                    CustoUnitario = itemXml.ValorUnitario,
+                    CodigoLote = itemXml.CodigoLote,
+                    DataValidadeLote = itemXml.DataValidadeLote ?? DateTime.Today.AddMonths(12),
+                    DataFabricacaoLote = itemXml.DataFabricacaoLote ?? DateTime.Today,
+                    CodigoProdutoFornecedor = itemXml.CodigoProdutoFornecedor,
+                    DescricaoProdutoFornecedor = itemXml.DescricaoProdutoFornecedor,
+                    UnidadeMedidaFornecedor = itemXml.UnidadeMedidaFornecedor
+                });
+            }
+        }
+
+        Snackbar.Add($"Dados do XML da NF-e nº {xml.NumeroNotaFiscal} carregados com sucesso! Revise os itens e os dados de conferência.", Severity.Success);
+    }
+
     private Task<IEnumerable<Produto>> BuscarProdutos(string valor, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(valor))
@@ -541,6 +686,13 @@
 
     private List<(int Numero, decimal Valor, DateTime Vencimento)> CalcularProjecaoParcelas()
     {
+        if (_usarDuplicatasDoXml && _parcelasDiretas.Any())
+        {
+            return _parcelasDiretas
+                .Select((p, idx) => (int.TryParse(p.Numero, out var n) ? n : idx + 1, p.Valor, p.DataVencimento))
+                .ToList();
+        }
+
         var lista = new List<(int, decimal, DateTime)>();
         int n = _numeroParcelas > 0 ? _numeroParcelas : 1;
         int intervalo = _intervaloDias > 0 ? _intervaloDias : 30;
@@ -608,6 +760,8 @@
         {
             _salvando = true;
 
+            var parcelasEnvio = (_usarDuplicatasDoXml && _parcelasDiretas.Any()) ? _parcelasDiretas : null;
+
             var dto = new RegistrarEntradaMercadoriaDto(
                 _pedidoCompraId,
                 _fornecedorId,
@@ -639,8 +793,13 @@
                     i.DataValidadeLote,
                     i.DataFabricacaoLote,
                     i.NumerosSerieTexto?.Trim(),
-                    null
-                )).ToList()
+                    null,
+                    i.CodigoProdutoFornecedor,
+                    i.DescricaoProdutoFornecedor,
+                    i.UnidadeMedidaFornecedor
+                )).ToList(),
+                _xmlNfeOriginal,
+                parcelasEnvio
             );
 
             var entradaId = await Mediator.Send(new RegistrarEntradaMercadoriaCommand(dto));
@@ -675,5 +834,8 @@
         public DateTime? DataFabricacaoLote { get; set; }
         public DateTime? DataValidadeLote { get; set; }
         public string? NumerosSerieTexto { get; set; }
+        public string? CodigoProdutoFornecedor { get; set; }
+        public string? DescricaoProdutoFornecedor { get; set; }
+        public string? UnidadeMedidaFornecedor { get; set; }
     }
 }

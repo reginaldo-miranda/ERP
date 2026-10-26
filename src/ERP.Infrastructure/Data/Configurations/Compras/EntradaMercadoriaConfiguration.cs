@@ -18,6 +18,7 @@ public class EntradaMercadoriaConfiguration : IEntityTypeConfiguration<EntradaMe
         builder.Property(e => e.ConferenteNome).HasMaxLength(150);
         builder.Property(e => e.Observacoes).HasMaxLength(1000);
         builder.Property(e => e.MotivoCancelamento).HasMaxLength(500);
+        builder.Property(e => e.XmlNfeOriginal).HasColumnType("text");
 
         builder.Property(e => e.ValorProdutos).HasPrecision(18, 2);
         builder.Property(e => e.ValorFrete).HasPrecision(18, 2);

@@ -230,6 +230,12 @@ public record EntradaMercadoriaDetalheDto(
     List<EntradaMercadoriaItemDto> Itens
 );
 
+public record ParcelaEntradaDiretaDto(
+    string? Numero,
+    DateTime DataVencimento,
+    decimal Valor
+);
+
 public record RegistrarEntradaMercadoriaDto(
     int? PedidoCompraId,
     int FornecedorId,
@@ -252,7 +258,9 @@ public record RegistrarEntradaMercadoriaDto(
     int NumeroParcelas,
     int IntervaloDias,
     int DiasPrimeiroVencimento,
-    List<RegistrarEntradaMercadoriaItemDto> Itens
+    List<RegistrarEntradaMercadoriaItemDto> Itens,
+    string? XmlNfeOriginal = null,
+    List<ParcelaEntradaDiretaDto>? ParcelasDiretas = null
 );
 
 public record RegistrarEntradaMercadoriaItemDto(
@@ -265,7 +273,10 @@ public record RegistrarEntradaMercadoriaItemDto(
     DateTime? DataValidadeLote,
     DateTime? DataFabricacaoLote,
     string? NumerosSerieTexto,
-    string? Observacao
+    string? Observacao,
+    string? CodigoProdutoFornecedor = null,
+    string? DescricaoProdutoFornecedor = null,
+    string? UnidadeMedidaFornecedor = null
 );
 
 #endregion

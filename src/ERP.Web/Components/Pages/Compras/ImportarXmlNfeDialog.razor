@@ -1,0 +1,580 @@
+@using ERP.Application.Cadastros.Produtos.Commands
+@using ERP.Application.Cadastros.Produtos.DTOs
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Compras.Commands
+@using ERP.Application.Compras.DTOs
+@using ERP.Application.Compras.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using MediatR
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IApplicationDbContext Context
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.UploadFile" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Importação de XML de NF-e (Entrada de Mercadorias)</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <!-- SEÇÃO DE UPLOAD DO ARQUIVO XML -->
+        <MudCard Elevation="0" Outlined="true" Class="pa-4 mb-3" Style="background-color: var(--mud-palette-background-grey); border-style: dashed; border-width: 2px;">
+            <div class="d-flex flex-column align-center justify-center text-center">
+                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Selecione o arquivo XML da Nota Fiscal Eletrônica</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                    Arquivos .xml no formato padrão SEFAZ (Layout 4.0 - nfeProc ou NFe) até 5MB
+                </MudText>
+
+                <MudFileUpload T="IBrowserFile" FilesChanged="OnArquivoXmlSelecionado" Accept=".xml">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FolderOpen" Disabled="_processandoXml">
+                            @if (_processandoXml)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                <span>Lendo XML...</span>
+                            }
+                            else
+                            {
+                                <span>Escolher Arquivo XML</span>
+                            }
+                        </MudButton>
+                    </ActivatorContent>
+                </MudFileUpload>
+
+                @if (!string.IsNullOrEmpty(_nomeArquivo))
+                {
+                    <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined" Class="mt-2" Icon="@Icons.Material.Filled.AttachFile">
+                        @_nomeArquivo (@(_tamanhoArquivoBytes / 1024) KB)
+                    </MudChip>
+                }
+            </div>
+        </MudCard>
+
+        <!-- MENSAGENS DE ERRO OU BLOQUEIO -->
+        @if (_resultado != null && !_resultado.PodeProsseguir)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Error" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">Importação Bloqueada</MudText>
+                        <MudText Typo="Typo.body2">@_resultado.MensagemErroBloqueante</MudText>
+                    </div>
+                </div>
+            </MudAlert>
+        }
+
+        <!-- RESULTADOS DO PARSER -->
+        @if (_resultado != null && _resultado.PodeProsseguir)
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-3">
+                <!-- ABA 1: CABEÇALHO & FORNECEDOR -->
+                <MudTabPanel Text="Nota Fiscal & Fornecedor" Icon="@Icons.Material.Filled.ReceiptLong">
+                    <MudGrid Spacing="2">
+                        <!-- DADOS DA NF -->
+                        <MudItem xs="12" sm="6">
+                            <MudPaper Elevation="1" Outlined="true" Class="pa-3 h-100">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="font-weight-bold mb-2">
+                                    DADOS DA NOTA FISCAL
+                                </MudText>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Número / Série:</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@_resultado.NumeroNotaFiscal (Série: @_resultado.SerieNotaFiscal)</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Data de Emissão:</MudText>
+                                    <MudText Typo="Typo.body2">@_resultado.DataEmissao.ToString("dd/MM/yyyy")</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Natureza da Operação:</MudText>
+                                    <MudText Typo="Typo.body2">@(_resultado.NaturezaOperacao ?? "Venda de Mercadorias")</MudText>
+                                </div>
+                                <div class="mt-2">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block font-weight-bold">CHAVE DE ACESSO (44 DÍGITOS):</MudText>
+                                    <MudText Typo="Typo.caption" Style="word-break: break-all; font-family: monospace;">@_resultado.ChaveAcessoNfe</MudText>
+                                </div>
+                            </MudPaper>
+                        </MudItem>
+
+                        <!-- VALORES TOTAIS -->
+                        <MudItem xs="12" sm="6">
+                            <MudPaper Elevation="1" Outlined="true" Class="pa-3 h-100">
+                                <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="font-weight-bold mb-2">
+                                    TOTAIS DO XML
+                                </MudText>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Total dos Produtos:</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@_resultado.ValorProdutos.ToString("C2")</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Frete / Seguro / Despesas:</MudText>
+                                    <MudText Typo="Typo.body2">+ @((_resultado.ValorFrete + _resultado.ValorSeguro + _resultado.ValorOutrasDespesas).ToString("C2"))</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Desconto da NF:</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Error">- @_resultado.ValorDesconto.ToString("C2")</MudText>
+                                </div>
+                                <MudDivider Class="my-2" />
+                                <div class="d-flex justify-space-between">
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold">Total da Nota Fiscal:</MudText>
+                                    <MudText Typo="Typo.subtitle1" Class="font-weight-bold" Color="Color.Primary">@_resultado.ValorTotalNota.ToString("C2")</MudText>
+                                </div>
+                            </MudPaper>
+                        </MudItem>
+
+                        <!-- STATUS DO FORNECEDOR -->
+                        <MudItem xs="12">
+                            <MudPaper Elevation="1" Outlined="true" Class="pa-3 mt-1">
+                                <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-2">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle2" Class="font-weight-bold">EMITENTE (FORNECEDOR)</MudText>
+                                        <MudText Typo="Typo.body1" Class="font-weight-bold">@_resultado.Fornecedor.RazaoSocial</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            CNPJ: @_resultado.Fornecedor.Cnpj @(!string.IsNullOrEmpty(_resultado.Fornecedor.InscricaoEstadual) ? $" | IE: {_resultado.Fornecedor.InscricaoEstadual}" : "")
+                                        </MudText>
+                                        @if (!string.IsNullOrEmpty(_resultado.Fornecedor.Cidade))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block">
+                                                Endereço: @_resultado.Fornecedor.Logradouro, @_resultado.Fornecedor.Numero - @_resultado.Fornecedor.Bairro, @_resultado.Fornecedor.Cidade/@_resultado.Fornecedor.Uf
+                                            </MudText>
+                                        }
+                                    </div>
+                                    <div>
+                                        @if (_resultado.Fornecedor.JaCadastrado)
+                                        {
+                                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Icon="@Icons.Material.Filled.CheckCircle">
+                                                Fornecedor Cadastrado
+                                            </MudChip>
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex flex-column align-end">
+                                                <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled" Icon="@Icons.Material.Filled.PersonAdd">
+                                                    Fornecedor Não Cadastrado
+                                                </MudChip>
+                                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" Class="mt-1" StartIcon="@Icons.Material.Filled.Save" OnClick="CadastrarFornecedorAgora" Disabled="_cadastrandoFornecedor">
+                                                    @if (_cadastrandoFornecedor)
+                                                    {
+                                                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                                        <span>Cadastrando...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Cadastrar Fornecedor Agora</span>
+                                                    }
+                                                </MudButton>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </MudPaper>
+                        </MudItem>
+
+                        <!-- DESTINATÁRIO -->
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Success" Dense="true" Variant="Variant.Outlined">
+                                Destinatário Validado: <strong>@_resultado.Destinatario.RazaoSocial</strong> (CNPJ: @_resultado.Destinatario.CnpjCpf) correspondente à empresa ativa.
+                            </MudAlert>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- ABA 2: ITENS & DE-PARA DE PRODUTOS -->
+                <MudTabPanel Text="@($"Itens da Nota ({_resultado.Itens.Count})")" Icon="@Icons.Material.Filled.Inventory2">
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                        O ERP identificou automaticamente os produtos por De-Para histórico ou Código de Barras (EAN). Itens sem correspondência podem ser vinculados manualmente ou criados no catálogo interno. O vínculo ficará salvo para as próximas compras!
+                    </MudAlert>
+
+                    <MudTable Items="_resultado.Itens" Dense="true" Hover="true" Elevation="1">
+                        <HeaderContent>
+                            <MudTh>#</MudTh>
+                            <MudTh>Código / Descrição no XML (Fornecedor)</MudTh>
+                            <MudTh Style="text-align: right;">Qtd / Un</MudTh>
+                            <MudTh Style="text-align: right;">Custo Unit.</MudTh>
+                            <MudTh Style="text-align: right;">Subtotal</MudTh>
+                            <MudTh>Lote / Validade</MudTh>
+                            <MudTh Style="min-width: 250px;">Produto Interno Correspondente (De-Para) *</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.NumeroItem</MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.DescricaoProdutoFornecedor</MudText>
+                                <div class="d-flex gap-1 mt-1 flex-wrap">
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Cód: @context.CodigoProdutoFornecedor</MudChip>
+                                    @if (!string.IsNullOrEmpty(context.CodigoBarrasEan))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Info">EAN: @context.CodigoBarrasEan</MudChip>
+                                    }
+                                    @if (!string.IsNullOrEmpty(context.Ncm))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">NCM: @context.Ncm</MudChip>
+                                    }
+                                </div>
+                            </MudTd>
+                            <MudTd Style="text-align: right;">
+                                <MudText Typo="Typo.body2" Class="font-weight-bold">@context.Quantidade.ToString("N2")</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.UnidadeMedidaFornecedor</MudText>
+                            </MudTd>
+                            <MudTd Style="text-align: right;">
+                                @context.ValorUnitario.ToString("C2")
+                            </MudTd>
+                            <MudTd Style="text-align: right;">
+                                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="Color.Primary">
+                                    @context.ValorTotal.ToString("C2")
+                                </MudText>
+                            </MudTd>
+                            <MudTd>
+                                @if (!string.IsNullOrEmpty(context.CodigoLote))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">
+                                        Lote: @context.CodigoLote
+                                    </MudChip>
+                                    @if (context.DataValidadeLote.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="d-block">Val: @context.DataValidadeLote.Value.ToString("dd/MM/yyyy")</MudText>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">-</MudText>
+                                }
+                            </MudTd>
+                            <MudTd>
+                                <div class="d-flex flex-column gap-1">
+                                    @if (context.ProdutoIdSugerido.HasValue)
+                                    {
+                                        <div class="d-flex align-center justify-space-between">
+                                            <div>
+                                                <MudText Typo="Typo.body2" Class="font-weight-bold" Color="Color.Success">
+                                                    @context.ProdutoCodigoSugerido - @context.ProdutoNomeSugerido
+                                                </MudText>
+                                                @if (context.OrigemMapeamento == OrigemMapeamentoProduto.DeParaFornecedor)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                                                        De-Para Memorizado
+                                                    </MudChip>
+                                                }
+                                                else if (context.OrigemMapeamento == OrigemMapeamentoProduto.CodigoBarrasEan)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                                                        Por Código de Barras (EAN)
+                                                    </MudChip>
+                                                }
+                                                else
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                                                        Por Código Fornecedor
+                                                    </MudChip>
+                                                }
+                                            </div>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => LimparVinculoItem(context))" Title="Alterar Vínculo" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-flex gap-1 align-center">
+                                            <MudAutocomplete T="Produto" Label="Selecionar Produto Interno *"
+                                                             SearchFunc="BuscarProdutosInternos" ToStringFunc="@(p => p == null ? "" : $"{p.Codigo} - {p.Nome}")"
+                                                             ValueChanged="@(p => AssociarProdutoAoItem(context, p))"
+                                                             Variant="Variant.Outlined" Margin="Margin.Dense" Dense="true" Placeholder="Buscar produto..." />
+                                            <MudIconButton Icon="@Icons.Material.Filled.AddBox" Color="Color.Primary" Size="Size.Medium" Title="Cadastrar Produto no Catálogo" OnClick="@(() => CadastrarProdutoRapido(context))" />
+                                        </div>
+                                    }
+                                </div>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudTabPanel>
+
+                <!-- ABA 3: DUPLICATAS / FINANCEIRO -->
+                <MudTabPanel Text="@($"Duplicatas ({_resultado.Duplicatas.Count})")" Icon="@Icons.Material.Filled.Payments">
+                    @if (_resultado.Duplicatas.Any())
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                            Duplicatas e vencimentos extraídos das tags de cobrança do XML. Serão gerados automaticamente no módulo Contas a Pagar com estas datas e valores exatos.
+                        </MudAlert>
+
+                        <MudTable Items="_resultado.Duplicatas" Dense="true" Hover="true" Elevation="1">
+                            <HeaderContent>
+                                <MudTh>Duplicata / Parcela</MudTh>
+                                <MudTh>Vencimento</MudTh>
+                                <MudTh Style="text-align: right;">Valor</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.NumeroDuplicata</MudTd>
+                                <MudTd>@context.DataVencimento.ToString("dd/MM/yyyy")</MudTd>
+                                <MudTd Style="text-align: right;" Class="font-weight-bold" Color="Color.Primary">
+                                    @context.Valor.ToString("C2")
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined">
+                            Este XML não possui tags de cobrança/duplicatas (&lt;cobr&gt;&lt;dup&gt;). As condições de parcelamento poderão ser definidas livremente na conferência física.
+                        </MudAlert>
+                    }
+                </MudTabPanel>
+
+                <!-- ABA 4: PEDIDOS DE COMPRA SUGERIDOS -->
+                @if (_resultado.PedidosSugeridos.Any())
+                {
+                    <MudTabPanel Text="@($"Pedidos em Aberto ({_resultado.PedidosSugeridos.Count})")" Icon="@Icons.Material.Filled.ShoppingCart">
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                            Foram localizados Pedidos de Compra em aberto para este fornecedor com produtos coincidentes aos da nota fiscal. Se desejar, vincule ao pedido para dar baixa nas quantidades pendentes.
+                        </MudAlert>
+
+                        <MudTable Items="_resultado.PedidosSugeridos" Dense="true" Hover="true" Elevation="1">
+                            <HeaderContent>
+                                <MudTh>Número</MudTh>
+                                <MudTh>Data do Pedido</MudTh>
+                                <MudTh Style="text-align: right;">Valor Total</MudTh>
+                                <MudTh Style="text-align: center;">Itens Coincidentes</MudTh>
+                                <MudTh Style="text-align: center;">Vínculo</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.NumeroPedido</MudTd>
+                                <MudTd>@context.DataPedido.ToString("dd/MM/yyyy")</MudTd>
+                                <MudTd Style="text-align: right;">@context.ValorTotal.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: center;">
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.ItensCoincidentes coincidentes</MudChip>
+                                </MudTd>
+                                <MudTd Style="text-align: center;">
+                                    @if (_pedidoSelecionadoId == context.PedidoId)
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled" Icon="@Icons.Material.Filled.Check">
+                                            Selecionado
+                                        </MudChip>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => _pedidoSelecionadoId = null)" Title="Desvincular" />
+                                    }
+                                    else
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" OnClick="@(() => _pedidoSelecionadoId = context.PedidoId)">
+                                            Vincular Pedido
+                                        </MudButton>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudTabPanel>
+                }
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CheckCircle" OnClick="AvancarParaConferencia" Disabled="@(!PodeAvancar)">
+            Avançar para Conferência Física
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _processandoXml = false;
+    private bool _cadastrandoFornecedor = false;
+    private string? _nomeArquivo;
+    private long _tamanhoArquivoBytes = 0;
+
+    private NfeXmlParseResultDto? _resultado;
+    private int? _pedidoSelecionadoId;
+    private List<Produto> _produtosCatalogo = new();
+
+    private bool PodeAvancar => _resultado != null &&
+                                _resultado.PodeProsseguir &&
+                                _resultado.Itens.All(i => i.ProdutoIdSugerido.HasValue);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _produtosCatalogo = await Context.Produtos
+            .AsNoTracking()
+            .Include(p => p.UnidadeMedida)
+            .Where(p => p.Ativo)
+            .OrderBy(p => p.Nome)
+            .ToListAsync();
+    }
+
+    private async Task OnArquivoXmlSelecionado(IBrowserFile? file)
+    {
+        if (file == null) return;
+
+        try
+        {
+            _processandoXml = true;
+            _nomeArquivo = file.Name;
+            _tamanhoArquivoBytes = file.Size;
+
+            using var reader = new StreamReader(file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024));
+            string xmlContent = await reader.ReadToEndAsync();
+
+            _resultado = await Mediator.Send(new ParseNfeXmlQuery(xmlContent));
+
+            if (_resultado.PedidosSugeridos.Any())
+            {
+                _pedidoSelecionadoId = _resultado.PedidosSugeridos.OrderByDescending(p => p.ItensCoincidentes).First().PedidoId;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao processar arquivo XML: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processandoXml = false;
+        }
+    }
+
+    private async Task CadastrarFornecedorAgora()
+    {
+        if (_resultado == null) return;
+
+        try
+        {
+            _cadastrandoFornecedor = true;
+            var fornId = await Mediator.Send(new CadastrarFornecedorXmlCommand(_resultado.Fornecedor));
+            _resultado.Fornecedor.JaCadastrado = true;
+            _resultado.Fornecedor.FornecedorIdExistente = fornId;
+
+            Snackbar.Add($"Fornecedor '{_resultado.Fornecedor.RazaoSocial}' cadastrado com sucesso!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao cadastrar fornecedor: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _cadastrandoFornecedor = false;
+        }
+    }
+
+    private Task<IEnumerable<Produto>> BuscarProdutosInternos(string valor, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+            return Task.FromResult<IEnumerable<Produto>>(_produtosCatalogo.Take(20));
+
+        var filtrados = _produtosCatalogo.Where(p =>
+            p.Nome.Contains(valor, StringComparison.OrdinalIgnoreCase) ||
+            p.Codigo.Contains(valor, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrEmpty(p.CodigoBarras) && p.CodigoBarras.Contains(valor, StringComparison.OrdinalIgnoreCase))
+        ).Take(20);
+
+        return Task.FromResult(filtrados);
+    }
+
+    private void AssociarProdutoAoItem(NfeXmlItemDto item, Produto? produto)
+    {
+        if (produto == null) return;
+
+        item.ProdutoIdSugerido = produto.Id;
+        item.ProdutoCodigoSugerido = produto.Codigo;
+        item.ProdutoNomeSugerido = produto.Nome;
+        item.UnidadeMedidaInterna = produto.UnidadeMedida?.Sigla ?? "UN";
+        item.ControlaLote = produto.ControlaLote;
+        item.ControlaSerie = produto.ControlaSerie;
+        item.OrigemMapeamento = OrigemMapeamentoProduto.DeParaFornecedor;
+    }
+
+    private void LimparVinculoItem(NfeXmlItemDto item)
+    {
+        item.ProdutoIdSugerido = null;
+        item.ProdutoCodigoSugerido = null;
+        item.ProdutoNomeSugerido = null;
+        item.OrigemMapeamento = OrigemMapeamentoProduto.NaoEncontrado;
+    }
+
+    private async Task CadastrarProdutoRapido(NfeXmlItemDto item)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cadastrar Produto no Catálogo",
+            $"Deseja cadastrar o produto '{item.DescricaoProdutoFornecedor}' no catálogo com o código '{item.CodigoProdutoFornecedor}'?",
+            yesText: "Sim, Cadastrar", cancelText: "Cancelar"
+        );
+
+        if (confirmar == true)
+        {
+            try
+            {
+                var command = new CreateProdutoCommand(
+                    Codigo: item.CodigoProdutoFornecedor,
+                    Nome: item.DescricaoProdutoFornecedor,
+                    Descricao: $"Produto cadastrado via importação de XML da NF-e (Fornecedor: {_resultado?.Fornecedor.RazaoSocial})",
+                    CategoriaId: null,
+                    UnidadeMedidaId: null,
+                    PrecoVenda: item.ValorUnitario * 1.5m, // Margem inicial sugerida de 50%
+                    PrecoCusto: item.ValorUnitario,
+                    EstoqueMinimo: 0,
+                    ControlaLote: !string.IsNullOrEmpty(item.CodigoLote),
+                    ControlaSerie: false,
+                    Ncm: item.Ncm,
+                    Cest: item.Cest,
+                    Cfop: item.Cfop,
+                    CodigoBarras: item.CodigoBarrasEan
+                );
+
+                var result = await Mediator.Send(command);
+                if (result.Sucesso && result.Dados != null)
+                {
+                    var prodNovo = await Context.Produtos.Include(p => p.UnidadeMedida).FirstOrDefaultAsync(p => p.Id == result.Dados.Id);
+                    if (prodNovo != null)
+                    {
+                        _produtosCatalogo.Add(prodNovo);
+                        AssociarProdutoAoItem(item, prodNovo);
+                        Snackbar.Add($"Produto '{prodNovo.Nome}' cadastrado e vinculado com sucesso!", Severity.Success);
+                    }
+                }
+                else
+                {
+                    Snackbar.Add($"Não foi possível cadastrar: {string.Join(", ", result.Erros)}", Severity.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao cadastrar produto: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task AvancarParaConferencia()
+    {
+        if (_resultado == null) return;
+
+        // Se o fornecedor ainda não estiver cadastrado, garante o cadastro antes de avançar
+        if (!_resultado.Fornecedor.JaCadastrado)
+        {
+            await CadastrarFornecedorAgora();
+        }
+
+        // Se houver pedido selecionado, injeta no resultado
+        if (_pedidoSelecionadoId.HasValue)
+        {
+            var pedido = await Context.PedidosCompra.Include(p => p.Itens).FirstOrDefaultAsync(p => p.Id == _pedidoSelecionadoId.Value);
+            if (pedido != null)
+            {
+                foreach (var itemXml in _resultado.Itens)
+                {
+                    if (itemXml.ProdutoIdSugerido.HasValue)
+                    {
+                        var pedidoItem = pedido.Itens.FirstOrDefault(pi => pi.ProdutoId == itemXml.ProdutoIdSugerido.Value);
+                        if (pedidoItem != null)
+                        {
+                            itemXml.PedidoCompraItemId = pedidoItem.Id;
+                            itemXml.QuantidadePedida = pedidoItem.Quantidade;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fecha o modal atual retornando os dados decodificados do XML e abre o diálogo de conferência física
+        MudDialog.Close(DialogResult.Ok((_resultado, _pedidoSelecionadoId)));
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+}

@@ -66,6 +66,7 @@ public interface IApplicationDbContext
     DbSet<ERP.Domain.Core.Entities.Compras.PedidoCompraItem> PedidoCompraItens { get; }
     DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoria> EntradasMercadoria { get; }
     DbSet<ERP.Domain.Core.Entities.Compras.EntradaMercadoriaItem> EntradaMercadoriaItens { get; }
+    DbSet<ERP.Domain.Core.Entities.Compras.ProdutoFornecedor> ProdutosFornecedores { get; }
 
     // Fase 7 - Fiscal
     DbSet<ERP.Domain.Core.Entities.Fiscal.Ncm> Ncms { get; }

@@ -52,5 +52,8 @@ public class EntradaMercadoria : BaseEmpresaEntity, IAggregateRoot
     public DateTime? DataCancelamento { get; set; }
     public string? MotivoCancelamento { get; set; }
 
+    /// <summary>Conteúdo integral do XML da NF-e importada para auditoria fiscal e consulta.</summary>
+    public string? XmlNfeOriginal { get; set; }
+
     public ICollection<EntradaMercadoriaItem> Itens { get; set; } = new List<EntradaMercadoriaItem>();
 }

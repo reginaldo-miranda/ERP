@@ -6,7 +6,9 @@ using ERP.Infrastructure.Data;
 using ERP.Infrastructure.Data.Interceptors;
 using ERP.Infrastructure.Identity;
 using ERP.Infrastructure.Services;
+using ERP.Infrastructure.Services.Compras;
 using ERP.Infrastructure.Services.Fiscal;
+using ERP.Application.Compras.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -79,10 +81,11 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<IOfxParserService, OfxParserService>();
 
-        // Módulo Fiscal
+        // Módulo Fiscal e Compras (XML)
         services.AddScoped<ICalculoTributarioService, CalculoTributarioService>();
         services.AddScoped<ICertificadoDigitalService, CertificadoDigitalService>();
         services.AddScoped<IFiscalService, FiscalService>();
+        services.AddScoped<INfeXmlParserService, NfeXmlParserService>();
 
         // Serviços externos — ViaCEP
         services.AddHttpClient<ICepService, ViaCepService>(client =>

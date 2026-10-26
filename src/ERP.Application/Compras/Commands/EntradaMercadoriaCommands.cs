@@ -68,6 +68,7 @@ public class RegistrarEntradaMercadoriaCommandHandler : IRequestHandler<Registra
             ValorDesconto = dto.ValorDesconto,
             IdParcelamento = idParcelamento,
             Observacoes = dto.Observacoes,
+            XmlNfeOriginal = dto.XmlNfeOriginal,
             CriadoEm = DateTime.UtcNow,
             Ativo = true
         };
@@ -264,6 +265,39 @@ public class RegistrarEntradaMercadoriaCommandHandler : IRequestHandler<Registra
                 CriadoEm = DateTime.UtcNow,
                 Ativo = true
             });
+
+            // 7. Persiste ou atualiza mapeamento De-Para do produto com o fornecedor
+            if (!string.IsNullOrWhiteSpace(itemDto.CodigoProdutoFornecedor))
+            {
+                string codFornLimpo = itemDto.CodigoProdutoFornecedor.Trim();
+                var deParaExistente = await _context.ProdutosFornecedores
+                    .FirstOrDefaultAsync(pf => pf.EmpresaId == empresaId &&
+                                               pf.FornecedorId == dto.FornecedorId &&
+                                               pf.CodigoProdutoFornecedor == codFornLimpo, cancellationToken);
+
+                if (deParaExistente == null)
+                {
+                    _context.ProdutosFornecedores.Add(new ProdutoFornecedor
+                    {
+                        EmpresaId = empresaId,
+                        FornecedorId = dto.FornecedorId,
+                        ProdutoId = itemDto.ProdutoId,
+                        CodigoProdutoFornecedor = codFornLimpo,
+                        DescricaoProdutoFornecedor = itemDto.DescricaoProdutoFornecedor,
+                        UnidadeMedidaFornecedor = itemDto.UnidadeMedidaFornecedor,
+                        FatorConversao = 1.0m,
+                        CriadoEm = DateTime.UtcNow,
+                        Ativo = true
+                    });
+                }
+                else if (deParaExistente.ProdutoId != itemDto.ProdutoId)
+                {
+                    deParaExistente.ProdutoId = itemDto.ProdutoId;
+                    if (!string.IsNullOrEmpty(itemDto.DescricaoProdutoFornecedor))
+                        deParaExistente.DescricaoProdutoFornecedor = itemDto.DescricaoProdutoFornecedor;
+                    deParaExistente.AlteradoEm = DateTime.UtcNow;
+                }
+            }
         }
 
         entrada.ValorProdutos = valorProdutos;
@@ -271,7 +305,7 @@ public class RegistrarEntradaMercadoriaCommandHandler : IRequestHandler<Registra
 
         _context.EntradasMercadoria.Add(entrada);
 
-        // 7. Atualiza Status do Pedido de Compra se vinculado
+        // 8. Atualiza Status do Pedido de Compra se vinculado
         if (dto.PedidoCompraId.HasValue)
         {
             var pedido = await _context.PedidosCompra
@@ -286,49 +320,91 @@ public class RegistrarEntradaMercadoriaCommandHandler : IRequestHandler<Registra
             }
         }
 
-        // 8. Gera Contas a Pagar no Financeiro com rateio exato de centavos
+        // 9. Gera Contas a Pagar no Financeiro
         if (entrada.ValorTotal > 0)
         {
-            int nParcelas = dto.NumeroParcelas > 0 ? dto.NumeroParcelas : 1;
-            int intervalo = dto.IntervaloDias > 0 ? dto.IntervaloDias : 30;
-            int carencia = dto.DiasPrimeiroVencimento;
-
-            decimal valorParcelaBase = Math.Floor((entrada.ValorTotal / nParcelas) * 100) / 100m;
-            decimal somaBase = valorParcelaBase * nParcelas;
-            decimal centavosRestantes = entrada.ValorTotal - somaBase;
-
-            DateTime dataVencimentoBase = dto.DataEmissao.AddDays(carencia);
-            if (carencia == 0) dataVencimentoBase = dto.DataEntrada;
-
-            for (int i = 1; i <= nParcelas; i++)
+            if (dto.ParcelasDiretas != null && dto.ParcelasDiretas.Any())
             {
-                decimal valorEstaParcela = (i == 1) ? valorParcelaBase + centavosRestantes : valorParcelaBase;
-                DateTime vencimentoParcela = (i == 1) ? dataVencimentoBase : dataVencimentoBase.AddDays((i - 1) * intervalo);
-
-                var contaPagar = new ContaPagar
+                // Duplicatas do XML com vencimentos e valores pré-definidos
+                int totalParcs = dto.ParcelasDiretas.Count;
+                int seq = 1;
+                foreach (var pDireta in dto.ParcelasDiretas)
                 {
-                    EmpresaId = empresaId,
-                    FornecedorId = dto.FornecedorId,
-                    PlanoContaId = dto.PlanoContaId,
-                    CentroCustoId = dto.CentroCustoId,
-                    FormaPagamentoId = dto.FormaPagamentoId,
-                    NumeroDocumento = $"{dto.NumeroNotaFiscal}/{i}",
-                    DataEmissao = dto.DataEmissao,
-                    DataVencimento = vencimentoParcela,
-                    DataCompetencia = dto.DataEmissao,
-                    ValorOriginal = valorEstaParcela,
-                    ValorPago = 0,
-                    SaldoRestante = valorEstaParcela,
-                    Status = StatusContaFinanceira.Pendente,
-                    IdParcelamento = idParcelamento,
-                    NumeroParcela = i,
-                    TotalParcelas = nParcelas,
-                    Descricao = $"Compra NF {dto.NumeroNotaFiscal} - Parc {i}/{nParcelas}",
-                    CriadoEm = DateTime.UtcNow,
-                    Ativo = true
-                };
+                    string docNum = !string.IsNullOrWhiteSpace(pDireta.Numero)
+                        ? $"{dto.NumeroNotaFiscal}/{pDireta.Numero}"
+                        : $"{dto.NumeroNotaFiscal}/{seq}";
 
-                _context.ContasPagar.Add(contaPagar);
+                    var contaPagar = new ContaPagar
+                    {
+                        EmpresaId = empresaId,
+                        FornecedorId = dto.FornecedorId,
+                        PlanoContaId = dto.PlanoContaId,
+                        CentroCustoId = dto.CentroCustoId,
+                        FormaPagamentoId = dto.FormaPagamentoId,
+                        NumeroDocumento = docNum,
+                        DataEmissao = dto.DataEmissao,
+                        DataVencimento = pDireta.DataVencimento,
+                        DataCompetencia = dto.DataEmissao,
+                        ValorOriginal = pDireta.Valor,
+                        ValorPago = 0,
+                        SaldoRestante = pDireta.Valor,
+                        Status = StatusContaFinanceira.Pendente,
+                        IdParcelamento = idParcelamento,
+                        NumeroParcela = seq,
+                        TotalParcelas = totalParcs,
+                        Descricao = $"Compra NF {dto.NumeroNotaFiscal} - Duplicata {seq}/{totalParcs}",
+                        CriadoEm = DateTime.UtcNow,
+                        Ativo = true
+                    };
+
+                    _context.ContasPagar.Add(contaPagar);
+                    seq++;
+                }
+            }
+            else
+            {
+                // Cálculo de parcelas com rateio exato de centavos
+                int nParcelas = dto.NumeroParcelas > 0 ? dto.NumeroParcelas : 1;
+                int intervalo = dto.IntervaloDias > 0 ? dto.IntervaloDias : 30;
+                int carencia = dto.DiasPrimeiroVencimento;
+
+                decimal valorParcelaBase = Math.Floor((entrada.ValorTotal / nParcelas) * 100) / 100m;
+                decimal somaBase = valorParcelaBase * nParcelas;
+                decimal centavosRestantes = entrada.ValorTotal - somaBase;
+
+                DateTime dataVencimentoBase = dto.DataEmissao.AddDays(carencia);
+                if (carencia == 0) dataVencimentoBase = dto.DataEntrada;
+
+                for (int i = 1; i <= nParcelas; i++)
+                {
+                    decimal valorEstaParcela = (i == 1) ? valorParcelaBase + centavosRestantes : valorParcelaBase;
+                    DateTime vencimentoParcela = (i == 1) ? dataVencimentoBase : dataVencimentoBase.AddDays((i - 1) * intervalo);
+
+                    var contaPagar = new ContaPagar
+                    {
+                        EmpresaId = empresaId,
+                        FornecedorId = dto.FornecedorId,
+                        PlanoContaId = dto.PlanoContaId,
+                        CentroCustoId = dto.CentroCustoId,
+                        FormaPagamentoId = dto.FormaPagamentoId,
+                        NumeroDocumento = $"{dto.NumeroNotaFiscal}/{i}",
+                        DataEmissao = dto.DataEmissao,
+                        DataVencimento = vencimentoParcela,
+                        DataCompetencia = dto.DataEmissao,
+                        ValorOriginal = valorEstaParcela,
+                        ValorPago = 0,
+                        SaldoRestante = valorEstaParcela,
+                        Status = StatusContaFinanceira.Pendente,
+                        IdParcelamento = idParcelamento,
+                        NumeroParcela = i,
+                        TotalParcelas = nParcelas,
+                        Descricao = $"Compra NF {dto.NumeroNotaFiscal} - Parc {i}/{nParcelas}",
+                        CriadoEm = DateTime.UtcNow,
+                        Ativo = true
+                    };
+
+                    _context.ContasPagar.Add(contaPagar);
+                }
             }
         }
 

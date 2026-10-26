@@ -20,9 +20,14 @@
         <MudText Typo="Typo.h5" Class="font-weight-bold">Recebimento de Mercadorias (Entradas)</MudText>
         <MudText Typo="Typo.body2" Color="Color.Secondary">Conferência física, entrada de estoque com recálculo de custo médio ponderado e geração de Contas a Pagar.</MudText>
     </div>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FactCheck" OnClick="NovaEntrada">
-        Novo Recebimento / NF
-    </MudButton>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.UploadFile" OnClick="ImportarXmlNfe">
+            Importar XML da NF-e
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FactCheck" OnClick="NovaEntrada">
+            Novo Recebimento / NF
+        </MudButton>
+    </div>
 </div>
 
 <!-- CARDS DE INDICADORES -->
@@ -303,6 +308,37 @@
         _depositoFiltroId = null;
         _statusFiltro = null;
         await CarregarEntradas();
+    }
+
+    private async Task ImportarXmlNfe()
+    {
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseButton = true,
+            CloseOnEscapeKey = false
+        };
+
+        var dialogXml = await DialogService.ShowAsync<ImportarXmlNfeDialog>("Importar XML da NF-e", options);
+        var resultXml = await dialogXml.Result;
+
+        if (resultXml != null && !resultXml.Canceled && resultXml.Data is ValueTuple<NfeXmlParseResultDto, int?> dados)
+        {
+            var parameters = new DialogParameters
+            {
+                { nameof(ConferenciaEntradaDialog.DadosXmlInicial), dados.Item1 },
+                { nameof(ConferenciaEntradaDialog.PedidoCompraIdInicial), dados.Item2 }
+            };
+
+            var dialogConf = await DialogService.ShowAsync<ConferenciaEntradaDialog>("Conferência Física & Recebimento", parameters, new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+            var resultConf = await dialogConf.Result;
+
+            if (resultConf != null && !resultConf.Canceled)
+            {
+                await CarregarEntradas();
+            }
+        }
     }
 
     private async Task NovaEntrada()

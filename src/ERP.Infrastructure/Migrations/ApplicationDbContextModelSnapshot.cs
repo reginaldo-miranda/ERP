@@ -691,6 +691,9 @@ namespace ERP.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("XmlNfeOriginal")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DepositoId");
@@ -978,6 +981,69 @@ namespace ERP.Infrastructure.Migrations
                     b.HasIndex("ProdutoId");
 
                     b.ToTable("PedidoCompraItens", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.ProdutoFornecedor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("CodigoProdutoFornecedor")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DescricaoProdutoFornecedor")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("FatorConversao")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasDefaultValue(1.0m);
+
+                    b.Property<int>("FornecedorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UnidadeMedidaFornecedor")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FornecedorId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("EmpresaId", "FornecedorId", "CodigoProdutoFornecedor")
+                        .IsUnique();
+
+                    b.ToTable("ProdutosFornecedores", (string)null);
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.SolicitacaoCompra", b =>
@@ -4681,6 +4747,33 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Empresa");
 
                     b.Navigation("PedidoCompra");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.ProdutoFornecedor", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Fornecedor", "Fornecedor")
+                        .WithMany()
+                        .HasForeignKey("FornecedorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Fornecedor");
 
                     b.Navigation("Produto");
                 });
