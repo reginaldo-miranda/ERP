@@ -19,6 +19,7 @@ public class ProdutoDto
     public string? Cest { get; set; }
     public string? Cfop { get; set; }
     public string? CodigoBarras { get; set; }
+    public string? ImagemUrl { get; set; }
     public bool Ativo { get; set; }
 }
 
@@ -30,5 +31,6 @@ public class ProdutoListItemDto
     public string? CategoriaNome { get; set; }
     public string? UnidadeSigla { get; set; }
     public decimal PrecoVenda { get; set; }
+    public string? ImagemUrl { get; set; }
     public bool Ativo { get; set; }
 }

@@ -22,7 +22,7 @@ public class GetProdutosQueryHandler : IRequestHandler<GetProdutosQuery, Paginat
         if (request.Ativo.HasValue) query = query.Where(p => p.Ativo == request.Ativo.Value);
 
         var projection = query.OrderBy(p => p.Nome).Select(p => new ProdutoListItemDto
-        { Id = p.Id, Codigo = p.Codigo, Nome = p.Nome, CategoriaNome = p.Categoria != null ? p.Categoria.Nome : null, UnidadeSigla = p.UnidadeMedida != null ? p.UnidadeMedida.Sigla : null, PrecoVenda = p.PrecoVenda, Ativo = p.Ativo });
+        { Id = p.Id, Codigo = p.Codigo, Nome = p.Nome, CategoriaNome = p.Categoria != null ? p.Categoria.Nome : null, UnidadeSigla = p.UnidadeMedida != null ? p.UnidadeMedida.Sigla : null, PrecoVenda = p.PrecoVenda, ImagemUrl = p.ImagemUrl, Ativo = p.Ativo });
 
         return await PaginatedList<ProdutoListItemDto>.CreateAsync(projection, request.Pagina, request.TamanhoPagina, cancellationToken);
     }

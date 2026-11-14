@@ -1,0 +1,115 @@
+@using ERP.Application.Contratos.DTOs
+@using ERP.Application.Contratos.Queries
+@using MediatR
+@inject IMediator Mediator
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Contrato @(_detalhes?.Numero)</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_detalhes == null)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+                <MudTabPanel Text="Resumo" Icon="@Icons.Material.Filled.Info">
+                    <MudGrid Class="pt-3">
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">TÍTULO</MudText>
+                            <MudText Typo="Typo.body1"><b>@_detalhes.Titulo</b></MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">CLIENTE</MudText>
+                            <MudText Typo="Typo.body1">@_detalhes.ClienteNome</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">VALOR POR CICLO</MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Primary"><b>@_detalhes.ValorMensal.ToString("C2")</b></MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">PERIODICIDADE</MudText>
+                            <MudText Typo="Typo.body1">@_detalhes.Periodicidade.ToString()</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">PRÓXIMA COBRANÇA</MudText>
+                            <MudText Typo="Typo.body1">@_detalhes.ProximaCobranca.ToLocalTime().ToString("dd/MM/yyyy")</MudText>
+                        </MudItem>
+                        <MudItem xs="6" sm="3">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">VENCIMENTO DIA</MudText>
+                            <MudText Typo="Typo.body1">Dia @_detalhes.DiaVencimento</MudText>
+                        </MudItem>
+                        @if (!string.IsNullOrWhiteSpace(_detalhes.Descricao))
+                        {
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">DESCRIÇÃO</MudText>
+                                <MudText Typo="Typo.body2">@_detalhes.Descricao</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@($"Faturamentos ({_detalhes.Faturamentos.Count})")" Icon="@Icons.Material.Filled.ReceiptLong">
+                    <MudTable Items="_detalhes.Faturamentos" Dense="true" Hover="true" Elevation="0" Class="pt-2">
+                        <HeaderContent>
+                            <MudTh>Competência</MudTh>
+                            <MudTh>Vencimento</MudTh>
+                            <MudTh>Valor</MudTh>
+                            <MudTh>Conta a Receber</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Competência"><b>@context.Competencia</b></MudTd>
+                            <MudTd DataLabel="Vencimento">@context.DataVencimento.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                            <MudTd DataLabel="Valor">@context.ValorFaturado.ToString("C2")</MudTd>
+                            <MudTd DataLabel="Conta a Receber">#@(context.ContaReceberId?.ToString() ?? "-")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudTabPanel>
+
+                <MudTabPanel Text="@($"Reajustes ({_detalhes.Reajustes.Count})")" Icon="@Icons.Material.Filled.TrendingUp">
+                    <MudTable Items="_detalhes.Reajustes" Dense="true" Hover="true" Elevation="0" Class="pt-2">
+                        <HeaderContent>
+                            <MudTh>Data</MudTh>
+                            <MudTh>Anterior</MudTh>
+                            <MudTh>%</MudTh>
+                            <MudTh>Novo Valor</MudTh>
+                            <MudTh>Índice</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Data">@context.DataReajuste.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                            <MudTd DataLabel="Anterior">@context.ValorAnterior.ToString("C2")</MudTd>
+                            <MudTd DataLabel="%">@context.PercentualAplicado.ToString("N2")%</MudTd>
+                            <MudTd DataLabel="Novo"><b>@context.ValorNovo.ToString("C2")</b></MudTd>
+                            <MudTd DataLabel="Índice">@(context.Indice ?? "-")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close())">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int ContratoId { get; set; }
+
+    private ContratoDetalhesDto? _detalhes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _detalhes = await Mediator.Send(new ObterContratoPorIdQuery(ContratoId));
+    }
+}

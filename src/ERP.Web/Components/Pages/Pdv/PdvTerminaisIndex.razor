@@ -1,0 +1,96 @@
+@page "/pdv/terminais"
+@using ERP.Application.Pdv.DTOs
+@using ERP.Application.Pdv.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject NavigationManager Nav
+
+<PageTitle>Terminais PDV - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Computer" Class="mr-2" />
+            Terminais PDV &amp; Caixas
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Configure os caixas e terminais de pré-venda da loja (ex.: Caixa 01, Caixa 02, Balcão).
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.PointOfSale" OnClick="@(() => Nav.NavigateTo("/pdv"))">
+            Abrir Frente de Caixa
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoTerminal">
+            Novo Terminal
+        </MudButton>
+    </div>
+</div>
+
+<MudTable Items="_terminais" Hover="true" Dense="true" Elevation="2">
+    <HeaderContent>
+        <MudTh>Código</MudTh>
+        <MudTh>Nome</MudTh>
+        <MudTh>Perfil</MudTh>
+        <MudTh>Depósito Estoque</MudTh>
+        <MudTh>Conta / Caixa</MudTh>
+        <MudTh>Sessão Atual</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Código"><b>@context.Codigo</b></MudTd>
+        <MudTd DataLabel="Nome">@context.Nome</MudTd>
+        <MudTd DataLabel="Perfil">@context.Tipo.ToString()</MudTd>
+        <MudTd DataLabel="Depósito">@(context.DepositoNome ?? "Padrão")</MudTd>
+        <MudTd DataLabel="Conta">@(context.ContaBancariaNome ?? "-")</MudTd>
+        <MudTd DataLabel="Sessão">
+            @if (context.PossuiSessaoAberta)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success">Aberta (@context.OperadorAtual)</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">Fechada</MudChip>
+            }
+        </MudTd>
+        <MudTd DataLabel="Status">
+            <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Primary : Color.Error)">
+                @(context.Ativo ? "Ativo" : "Inativo")
+            </MudChip>
+        </MudTd>
+        <MudTd DataLabel="Ações">
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditarTerminal(context))" />
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <MudText Class="pa-4">Nenhum terminal cadastrado. Clique em "Novo Terminal" para criar o Caixa 01.</MudText>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private List<TerminalPdvDto> _terminais = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task CarregarAsync()
+    {
+        _terminais = await Mediator.Send(new ListarTerminaisPdvQuery());
+    }
+
+    private async Task NovoTerminal()
+    {
+        var dialog = await DialogService.ShowAsync<TerminalPdvDialog>("Novo Terminal");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task EditarTerminal(TerminalPdvDto terminal)
+    {
+        var parameters = new DialogParameters<TerminalPdvDialog> { { x => x.TerminalExistente, terminal } };
+        var dialog = await DialogService.ShowAsync<TerminalPdvDialog>("Editar Terminal", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+}

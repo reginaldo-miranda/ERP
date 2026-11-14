@@ -1,0 +1,678 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Servicos.Commands
+@using ERP.Application.Servicos.DTOs
+@using ERP.Application.Servicos.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Entities.Financeiro
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IApplicationDbContext Context
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@(OrdemServicoId.HasValue ? Icons.Material.Filled.Edit : Icons.Material.Filled.AddCircle)" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(OrdemServicoId.HasValue ? $"Editar Ordem de Serviço ({_numero})" : "Nova Ordem de Serviço")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+                <!-- ABA 1: CLIENTE E GERAL -->
+                <MudTabPanel Text="1. Cliente &amp; Atendimento" Icon="@Icons.Material.Filled.Person">
+                    <MudGrid Class="pt-4">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int" Label="Cliente *" @bind-Value="_clienteId" Required="true" Dense="true" Variant="Variant.Outlined">
+                                <MudSelectItem Value="0" Disabled="true">Selecione um cliente...</MudSelectItem>
+                                @foreach (var c in _clientes)
+                                {
+                                    <MudSelectItem Value="@c.Id">@c.Nome @(string.IsNullOrWhiteSpace(c.CpfCnpj) ? "" : $"({c.CpfCnpj})")</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="3">
+                            <MudDatePicker Label="Data de Abertura *" @bind-Date="_dataAbertura" Editable="true" DateFormat="dd/MM/yyyy" Dense="true" Variant="Variant.Outlined" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="3">
+                            <MudDatePicker Label="Previsão de Conclusão" @bind-Date="_previsaoConclusao" Editable="true" DateFormat="dd/MM/yyyy" Dense="true" Variant="Variant.Outlined" Clearable="true" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_tecnicoResponsavel" Label="Técnico Responsável" Dense="true" Variant="Variant.Outlined" Placeholder="Nome do técnico da bancada/campo" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="PrioridadeOrdemServico" Label="Prioridade de Atendimento" @bind-Value="_prioridade" Dense="true" Variant="Variant.Outlined">
+                                <MudSelectItem Value="PrioridadeOrdemServico.Baixa">Baixa</MudSelectItem>
+                                <MudSelectItem Value="PrioridadeOrdemServico.Normal">Normal</MudSelectItem>
+                                <MudSelectItem Value="PrioridadeOrdemServico.Alta">Alta</MudSelectItem>
+                                <MudSelectItem Value="PrioridadeOrdemServico.Urgente">Urgente</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- ABA 2: EQUIPAMENTO / OBJETO -->
+                <MudTabPanel Text="2. Equipamento &amp; Defeito" Icon="@Icons.Material.Filled.Devices">
+                    <MudGrid Class="pt-4">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_equipamento" Label="Equipamento / Aparelho *" Required="true" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: Notebook Dell Inspiron, Smartphone Samsung S23..." />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="3">
+                            <MudTextField @bind-Value="_marca" Label="Marca" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: Dell, Apple, HP, Bosch..." />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="3">
+                            <MudTextField @bind-Value="_modelo" Label="Modelo" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: Inspiron 15 3000..." />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_numeroSerie" Label="Número de Série / IMEI / Placa" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: BR123456789..." />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_acessorios" Label="Acessórios Deixados" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: Carregador original, capa de proteção, cabo..." />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_condicoesGerais" Label="Condições Físicas na Entrada (Avarias pré-existentes)" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: Tela com trincado leve no canto superior, marcas de uso na carcaça..." Lines="2" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_defeitoRelatado" Label="Defeito Relatado pelo Cliente *" Required="true" Dense="true" Variant="Variant.Outlined" Placeholder="Descreva detalhadamente o problema relatado..." Lines="3" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- ABA 3: SERVIÇOS (MÃO DE OBRA) -->
+                <MudTabPanel Text="3. Mão de Obra (Serviços)" Icon="@Icons.Material.Filled.Build">
+                    <div class="pa-2">
+                        <!-- Formulário de inclusão rápida de serviço -->
+                        <MudPaper Elevation="1" Class="pa-3 mb-3" Outlined="true">
+                            <MudGrid AlignItems="Center">
+                                <MudItem xs="12" sm="4">
+                                    <MudSelect T="int?" Label="Adicionar Serviço do Catálogo" Value="_novoServicoId" ValueChanged="OnServicoSelecionado" Dense="true" Variant="Variant.Outlined">
+                                        <MudSelectItem T="int?" Value="@((int?)null)">-- Personalizado / Manual --</MudSelectItem>
+                                        @foreach (var s in _servicosCatalogo)
+                                        {
+                                            <MudSelectItem T="int?" Value="@((int?)s.Id)">@s.Nome (@s.PrecoBase.ToString("C2"))</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="3">
+                                    <MudTextField @bind-Value="_novoServicoDescricao" Label="Descrição do Serviço *" Dense="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="6" sm="1">
+                                    <MudNumericField @bind-Value="_novoServicoQtd" Label="Qtd/Horas" Min="0.1m" Dense="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="6" sm="2">
+                                    <MudNumericField @bind-Value="_novoServicoValorUnit" Label="Valor Unit. (R$)" Min="0m" Format="N2" Dense="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="2">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarServico" FullWidth="true">
+                                        Adicionar
+                                    </MudButton>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+
+                        <!-- Tabela de serviços incluídos -->
+                        <MudTable Items="@_servicos" Dense="true" Hover="true" Striped="true" Elevation="1">
+                            <HeaderContent>
+                                <MudTh>Serviço</MudTh>
+                                <MudTh Style="width: 100px;">Qtd/Horas</MudTh>
+                                <MudTh Style="width: 130px; text-align: right;">Unitário</MudTh>
+                                <MudTh Style="width: 130px; text-align: right;">Desconto</MudTh>
+                                <MudTh Style="width: 130px; text-align: right;">Subtotal</MudTh>
+                                <MudTh Style="width: 70px; text-align: center;">Ações</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Descricao</MudTd>
+                                <MudTd>@context.Quantidade.ToString("N1")</MudTd>
+                                <MudTd Style="text-align: right;">@context.ValorUnitario.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: right;">@context.ValorDesconto.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: right;" Class="font-weight-bold">@context.ValorTotal.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: center;">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoverServico(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-2 text-center">Nenhum serviço adicionado ainda.</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                        <div class="d-flex justify-end mt-2">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">
+                                Total de Serviços: @_servicos.Sum(s => s.ValorTotal).ToString("C2")
+                            </MudText>
+                        </div>
+                    </div>
+                </MudTabPanel>
+
+                <!-- ABA 4: PEÇAS E MATERIAIS -->
+                <MudTabPanel Text="4. Peças &amp; Materiais" Icon="@Icons.Material.Filled.Inventory2">
+                    <div class="pa-2">
+                        <!-- Formulário de inclusão rápida de peças -->
+                        <MudPaper Elevation="1" Class="pa-3 mb-3" Outlined="true">
+                            <MudGrid AlignItems="Center">
+                                <MudItem xs="12" sm="3">
+                                    <MudSelect T="int?" Label="Adicionar Produto do Catálogo" Value="_novaPecaProdutoId" ValueChanged="OnProdutoSelecionado" Dense="true" Variant="Variant.Outlined">
+                                        <MudSelectItem T="int?" Value="@((int?)null)">-- Personalizado / Avulso --</MudSelectItem>
+                                        @foreach (var p in _produtosCatalogo)
+                                        {
+                                            <MudSelectItem T="int?" Value="@((int?)p.Id)">@p.Nome (@p.PrecoVenda.ToString("C2"))</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="3">
+                                    <MudTextField @bind-Value="_novaPecaDescricao" Label="Descrição da Peça *" Dense="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="6" sm="1">
+                                    <MudNumericField @bind-Value="_novaPecaQtd" Label="Qtd" Min="1m" Dense="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="6" sm="2">
+                                    <MudNumericField @bind-Value="_novaPecaValorUnit" Label="Valor Unit. (R$)" Min="0m" Format="N2" Dense="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12" sm="2">
+                                    <MudSelect T="int?" Label="Depósito de Saída" @bind-Value="_novaPecaDepositoId" Dense="true" Variant="Variant.Outlined">
+                                        @foreach (var d in _depositos)
+                                        {
+                                            <MudSelectItem T="int?" Value="@((int?)d.Id)">@d.Nome</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudItem>
+                                <MudItem xs="12" sm="1">
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="AdicionarPeca" FullWidth="true">
+                                        Ok
+                                    </MudButton>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+
+                        <!-- Tabela de peças incluídas -->
+                        <MudTable Items="@_pecas" Dense="true" Hover="true" Striped="true" Elevation="1">
+                            <HeaderContent>
+                                <MudTh>Peça / Componente</MudTh>
+                                <MudTh Style="width: 80px;">Qtd</MudTh>
+                                <MudTh Style="width: 120px; text-align: right;">Unitário</MudTh>
+                                <MudTh Style="width: 120px; text-align: right;">Desconto</MudTh>
+                                <MudTh Style="width: 120px; text-align: right;">Subtotal</MudTh>
+                                <MudTh Style="width: 60px; text-align: center;">Ações</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.Descricao</MudTd>
+                                <MudTd>@context.Quantidade.ToString("N1")</MudTd>
+                                <MudTd Style="text-align: right;">@context.ValorUnitario.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: right;">@context.ValorDesconto.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: right;" Class="font-weight-bold">@context.ValorTotal.ToString("C2")</MudTd>
+                                <MudTd Style="text-align: center;">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoverPeca(context))" />
+                                </MudTd>
+                            </RowTemplate>
+                            <NoRecordsContent>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-2 text-center">Nenhuma peça adicionada ainda.</MudText>
+                            </NoRecordsContent>
+                        </MudTable>
+                        <div class="d-flex justify-end mt-2">
+                            <MudText Typo="Typo.subtitle2" Class="font-weight-bold">
+                                Total de Peças: @_pecas.Sum(p => p.ValorTotal).ToString("C2")
+                            </MudText>
+                        </div>
+                    </div>
+                </MudTabPanel>
+
+                <!-- ABA 5: LAUDO & GARANTIA -->
+                <MudTabPanel Text="5. Laudo &amp; Garantia" Icon="@Icons.Material.Filled.Description">
+                    <MudGrid Class="pt-4">
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_laudoTecnico" Label="Laudo Técnico / Diagnóstico de Bancada" Dense="true" Variant="Variant.Outlined" Placeholder="Parecer técnico constatado após desmontagem ou testes..." Lines="3" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_solucaoTecnica" Label="Solução Técnica Executada" Dense="true" Variant="Variant.Outlined" Placeholder="Procedimentos executados para solucionar o problema..." Lines="3" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_termoGarantia" Label="Termo de Garantia da OS" Dense="true" Variant="Variant.Outlined" Placeholder="Ex: Garantia de 90 dias sobre as peças substituídas e serviços executados." Lines="2" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_observacoes" Label="Observações Gerais / Internas" Dense="true" Variant="Variant.Outlined" Placeholder="Anotações para a equipe interna..." Lines="2" />
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+
+                <!-- ABA 6: FECHAMENTO & FINANCEIRO -->
+                <MudTabPanel Text="6. Fechamento &amp; Totais" Icon="@Icons.Material.Filled.Calculate">
+                    <MudGrid Class="pt-4">
+                        <MudItem xs="12" sm="6">
+                            <MudCard Outlined="true" Class="pa-3">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-2">Condições de Pagamento</MudText>
+                                <MudSelect T="int?" Label="Forma de Pagamento Pretendida" @bind-Value="_formaPagamentoId" Dense="true" Variant="Variant.Outlined" Class="mb-3">
+                                    <MudSelectItem T="int?" Value="@((int?)null)">A Combinar</MudSelectItem>
+                                    @foreach (var fp in _formasPagamento)
+                                    {
+                                        <MudSelectItem T="int?" Value="@((int?)fp.Id)">@fp.Nome</MudSelectItem>
+                                    }
+                                </MudSelect>
+
+                                <MudNumericField @bind-Value="_numeroParcelas" Label="Número de Parcelas" Min="1" Max="24" Dense="true" Variant="Variant.Outlined" />
+                            </MudCard>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudCard Outlined="true" Class="pa-3">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold mb-2">Resumo Financeiro da OS</MudText>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Subtotal Peças:</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@TotalPecas.ToString("C2")</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2">Subtotal Mão de Obra:</MudText>
+                                    <MudText Typo="Typo.body2" Class="font-weight-bold">@TotalServicos.ToString("C2")</MudText>
+                                </div>
+                                <div class="d-flex justify-space-between align-center mb-1">
+                                    <MudText Typo="Typo.body2">Desconto Geral (R$):</MudText>
+                                    <MudNumericField @bind-Value="_valorDesconto" Min="0m" Format="N2" Dense="true" Variant="Variant.Outlined" Style="max-width: 140px;" />
+                                </div>
+                                <MudDivider Class="my-2" />
+                                <div class="d-flex justify-space-between align-center">
+                                    <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">VALOR TOTAL:</MudText>
+                                    <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Primary">@ValorTotalOS.ToString("C2")</MudText>
+                                </div>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@_salvando">
+            @if (_salvando)
+            {
+                <MudProgressCircular Class="mr-1" Size="Size.Small" Indeterminate="true" />
+                <span>Salvando...</span>
+            }
+            else
+            {
+                <span>Salvar Ordem de Serviço</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? OrdemServicoId { get; set; }
+
+    private bool _carregando = true;
+    private bool _salvando = false;
+    private string _numero = string.Empty;
+
+    // Dados gerais
+    private int _clienteId = 0;
+    private DateTime? _dataAbertura = DateTime.UtcNow.Date;
+    private DateTime? _previsaoConclusao;
+    private string? _tecnicoResponsavel;
+    private PrioridadeOrdemServico _prioridade = PrioridadeOrdemServico.Normal;
+
+    // Equipamento
+    private string _equipamento = string.Empty;
+    private string? _marca;
+    private string? _modelo;
+    private string? _numeroSerie;
+    private string? _acessorios;
+    private string? _condicoesGerais;
+    private string _defeitoRelatado = string.Empty;
+
+    // Laudo & Termos
+    private string? _laudoTecnico;
+    private string? _solucaoTecnica;
+    private string? _termoGarantia = "Garantia de 90 dias sobre as peças substituídas e serviços executados.";
+    private string? _observacoes;
+
+    // Financeiro
+    private decimal _valorDesconto = 0m;
+    private int? _formaPagamentoId;
+    private int _numeroParcelas = 1;
+
+    // Inclusão rápida de Serviços
+    private int? _novoServicoId;
+    private string _novoServicoDescricao = string.Empty;
+    private decimal _novoServicoQtd = 1;
+    private decimal _novoServicoValorUnit = 0;
+
+    // Inclusão rápida de Peças
+    private int? _novaPecaProdutoId;
+    private string _novaPecaDescricao = string.Empty;
+    private decimal _novaPecaQtd = 1;
+    private decimal _novaPecaValorUnit = 0;
+    private int? _novaPecaDepositoId;
+
+    // Listas locais de itens
+    private List<ItemServicoLocal> _servicos = new();
+    private List<ItemPecaLocal> _pecas = new();
+
+    // Catálogos do sistema
+    private List<Cliente> _clientes = new();
+    private List<Servico> _servicosCatalogo = new();
+    private List<Produto> _produtosCatalogo = new();
+    private List<Deposito> _depositos = new();
+    private List<FormaPagamento> _formasPagamento = new();
+
+    private decimal TotalServicos => _servicos.Sum(s => s.ValorTotal);
+    private decimal TotalPecas => _pecas.Sum(p => p.ValorTotal);
+    private decimal ValorTotalOS => Math.Max(0, (TotalServicos + TotalPecas) - _valorDesconto);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _clientes = await Context.Clientes.AsNoTracking().Where(c => c.Ativo).OrderBy(c => c.Nome).ToListAsync();
+            _servicosCatalogo = await Context.Servicos.AsNoTracking().Where(s => s.Ativo).OrderBy(s => s.Nome).ToListAsync();
+            _produtosCatalogo = await Context.Produtos.AsNoTracking().Where(p => p.Ativo).OrderBy(p => p.Nome).ToListAsync();
+            _depositos = await Context.Depositos.AsNoTracking().Where(d => d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+            _formasPagamento = await Context.FormasPagamento.AsNoTracking().Where(f => f.Ativa).OrderBy(f => f.Nome).ToListAsync();
+
+            var depPadrao = _depositos.FirstOrDefault(d => d.Padrao) ?? _depositos.FirstOrDefault();
+            _novaPecaDepositoId = depPadrao?.Id;
+
+            if (OrdemServicoId.HasValue)
+            {
+                var os = await Mediator.Send(new GetOrdemServicoByIdQuery(OrdemServicoId.Value));
+                if (os != null)
+                {
+                    _numero = os.Numero;
+                    _clienteId = os.ClienteId;
+                    _dataAbertura = os.DataAbertura;
+                    _previsaoConclusao = os.PrevisaoConclusao;
+                    _tecnicoResponsavel = os.TecnicoResponsavel;
+                    _prioridade = os.Prioridade;
+
+                    _equipamento = os.Equipamento;
+                    _marca = os.Marca;
+                    _modelo = os.Modelo;
+                    _numeroSerie = os.NumeroSerie;
+                    _acessorios = os.Acessorios;
+                    _condicoesGerais = os.CondicoesGerais;
+                    _defeitoRelatado = os.DefeitoRelatado;
+
+                    _laudoTecnico = os.LaudoTecnico;
+                    _solucaoTecnica = os.SolucaoTecnica;
+                    _termoGarantia = os.TermoGarantia;
+                    _observacoes = os.Observacoes;
+
+                    _valorDesconto = os.ValorDesconto;
+                    _formaPagamentoId = os.FormaPagamentoId;
+                    _numeroParcelas = os.NumeroParcelas;
+
+                    _servicos = os.Servicos.Select(s => new ItemServicoLocal
+                    {
+                        ServicoId = s.ServicoId,
+                        Descricao = s.Descricao,
+                        Quantidade = s.Quantidade,
+                        ValorUnitario = s.ValorUnitario,
+                        ValorDesconto = s.ValorDesconto,
+                        Tecnico = s.Tecnico
+                    }).ToList();
+
+                    _pecas = os.Pecas.Select(p => new ItemPecaLocal
+                    {
+                        ProdutoId = p.ProdutoId,
+                        Descricao = p.Descricao,
+                        Quantidade = p.Quantidade,
+                        ValorUnitario = p.ValorUnitario,
+                        ValorDesconto = p.ValorDesconto,
+                        DepositoId = p.DepositoId
+                    }).ToList();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados da OS: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private void OnServicoSelecionado(int? id)
+    {
+        _novoServicoId = id;
+        if (id.HasValue)
+        {
+            var s = _servicosCatalogo.FirstOrDefault(x => x.Id == id.Value);
+            if (s != null)
+            {
+                _novoServicoDescricao = s.Nome;
+                _novoServicoValorUnit = s.PrecoBase;
+            }
+        }
+    }
+
+    private void OnProdutoSelecionado(int? id)
+    {
+        _novaPecaProdutoId = id;
+        if (id.HasValue)
+        {
+            var p = _produtosCatalogo.FirstOrDefault(x => x.Id == id.Value);
+            if (p != null)
+            {
+                _novaPecaDescricao = p.Nome;
+                _novaPecaValorUnit = p.PrecoVenda;
+            }
+        }
+    }
+
+    private void AdicionarServico()
+    {
+        if (string.IsNullOrWhiteSpace(_novoServicoDescricao))
+        {
+            Snackbar.Add("Informe a descrição do serviço.", Severity.Warning);
+            return;
+        }
+
+        _servicos.Add(new ItemServicoLocal
+        {
+            ServicoId = _novoServicoId,
+            Descricao = _novoServicoDescricao.Trim(),
+            Quantidade = _novoServicoQtd,
+            ValorUnitario = _novoServicoValorUnit,
+            Tecnico = _tecnicoResponsavel
+        });
+
+        _novoServicoId = null;
+        _novoServicoDescricao = string.Empty;
+        _novoServicoQtd = 1;
+        _novoServicoValorUnit = 0;
+    }
+
+    private void RemoverServico(ItemServicoLocal item)
+    {
+        _servicos.Remove(item);
+    }
+
+    private void AdicionarPeca()
+    {
+        if (string.IsNullOrWhiteSpace(_novaPecaDescricao))
+        {
+            Snackbar.Add("Informe a descrição da peça.", Severity.Warning);
+            return;
+        }
+
+        _pecas.Add(new ItemPecaLocal
+        {
+            ProdutoId = _novaPecaProdutoId,
+            Descricao = _novaPecaDescricao.Trim(),
+            Quantidade = _novaPecaQtd,
+            ValorUnitario = _novaPecaValorUnit,
+            DepositoId = _novaPecaDepositoId
+        });
+
+        _novaPecaProdutoId = null;
+        _novaPecaDescricao = string.Empty;
+        _novaPecaQtd = 1;
+        _novaPecaValorUnit = 0;
+    }
+
+    private void RemoverPeca(ItemPecaLocal item)
+    {
+        _pecas.Remove(item);
+    }
+
+    private async Task Salvar()
+    {
+        if (_clienteId <= 0)
+        {
+            Snackbar.Add("Selecione um cliente para a Ordem de Serviço.", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_equipamento))
+        {
+            Snackbar.Add("Informe o equipamento/objeto do atendimento.", Severity.Warning);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_defeitoRelatado))
+        {
+            Snackbar.Add("Informe o defeito relatado pelo cliente.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            var pecasInput = _pecas.Select(p => new OrdemServicoPecaInputDto(
+                p.ProdutoId,
+                p.Descricao,
+                p.Quantidade,
+                p.ValorUnitario,
+                p.ValorDesconto,
+                p.DepositoId
+            )).ToList();
+
+            var servicosInput = _servicos.Select(s => new OrdemServicoServicoInputDto(
+                s.ServicoId,
+                s.Descricao,
+                s.Quantidade,
+                s.ValorUnitario,
+                s.ValorDesconto,
+                s.Tecnico
+            )).ToList();
+
+            if (OrdemServicoId.HasValue)
+            {
+                var updateDto = new AtualizarOrdemServicoDto(
+                    _clienteId,
+                    _prioridade,
+                    _dataAbertura ?? DateTime.UtcNow,
+                    _previsaoConclusao,
+                    _tecnicoResponsavel,
+                    _equipamento,
+                    _marca,
+                    _modelo,
+                    _numeroSerie,
+                    _acessorios,
+                    _condicoesGerais,
+                    _defeitoRelatado,
+                    _laudoTecnico,
+                    _solucaoTecnica,
+                    _valorDesconto,
+                    _formaPagamentoId,
+                    _numeroParcelas,
+                    _observacoes,
+                    _termoGarantia,
+                    pecasInput,
+                    servicosInput
+                );
+
+                await Mediator.Send(new AtualizarOrdemServicoCommand(OrdemServicoId.Value, updateDto));
+                Snackbar.Add("Ordem de Serviço atualizada com sucesso!", Severity.Success);
+            }
+            else
+            {
+                var createDto = new CriarOrdemServicoDto(
+                    _clienteId,
+                    _prioridade,
+                    _dataAbertura ?? DateTime.UtcNow,
+                    _previsaoConclusao,
+                    _tecnicoResponsavel,
+                    _equipamento,
+                    _marca,
+                    _modelo,
+                    _numeroSerie,
+                    _acessorios,
+                    _condicoesGerais,
+                    _defeitoRelatado,
+                    _laudoTecnico,
+                    _solucaoTecnica,
+                    _valorDesconto,
+                    _formaPagamentoId,
+                    _numeroParcelas,
+                    _observacoes,
+                    _termoGarantia,
+                    pecasInput,
+                    servicosInput
+                );
+
+                var novoId = await Mediator.Send(new CriarOrdemServicoCommand(createDto));
+                Snackbar.Add("Ordem de Serviço criada com sucesso!", Severity.Success);
+            }
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar OS: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private class ItemServicoLocal
+    {
+        public int? ServicoId { get; set; }
+        public string Descricao { get; set; } = string.Empty;
+        public decimal Quantidade { get; set; } = 1;
+        public decimal ValorUnitario { get; set; }
+        public decimal ValorDesconto { get; set; }
+        public decimal ValorTotal => Math.Max(0, (Quantidade * ValorUnitario) - ValorDesconto);
+        public string? Tecnico { get; set; }
+    }
+
+    private class ItemPecaLocal
+    {
+        public int? ProdutoId { get; set; }
+        public string Descricao { get; set; } = string.Empty;
+        public decimal Quantidade { get; set; } = 1;
+        public decimal ValorUnitario { get; set; }
+        public decimal ValorDesconto { get; set; }
+        public decimal ValorTotal => Math.Max(0, (Quantidade * ValorUnitario) - ValorDesconto);
+        public int? DepositoId { get; set; }
+    }
+}

@@ -1,0 +1,123 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Pdv.Commands
+@using ERP.Application.Pdv.DTOs
+@using ERP.Domain.Core.Entities.Estoque
+@using ERP.Domain.Core.Entities.Financeiro
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IApplicationDbContext Context
+@inject ICurrentEmpresaService CurrentEmpresaService
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Computer" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(TerminalExistente != null ? "Editar Terminal PDV" : "Novo Terminal PDV")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudTextField @bind-Value="_dto.Codigo" Label="Código *" Required="true" Variant="Variant.Outlined" Dense="true" Placeholder="PDV-01" />
+            </MudItem>
+            <MudItem xs="12" sm="8">
+                <MudTextField @bind-Value="_dto.Nome" Label="Nome do Terminal *" Required="true" Variant="Variant.Outlined" Dense="true" Placeholder="Caixa 01 / Balcão" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="TipoTerminalPdv" @bind-Value="_dto.Tipo" Label="Perfil do Terminal" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="TipoTerminalPdv.Hibrido">Híbrido (Caixa + Pré-Venda)</MudSelectItem>
+                    <MudSelectItem Value="TipoTerminalPdv.Caixa">Somente Caixa</MudSelectItem>
+                    <MudSelectItem Value="TipoTerminalPdv.PreVenda">Somente Pré-Venda (Vendedor)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.ImpressoraCupom" Label="Impressora (opcional)" Variant="Variant.Outlined" Dense="true" Placeholder="Térmica 80mm" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" @bind-Value="_dto.DepositoId" Label="Depósito Padrão (Estoque)" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                    @foreach (var d in _depositos)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)d.Id)">@d.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="int?" @bind-Value="_dto.ContaBancariaId" Label="Conta/Caixa Financeiro" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                    @foreach (var c in _contas)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Descricao</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Value="_dto.Ativo" Label="Terminal Ativo" Color="Color.Primary" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@_salvando">Salvar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public TerminalPdvDto? TerminalExistente { get; set; }
+
+    private SalvarTerminalPdvDto _dto = new();
+    private List<Deposito> _depositos = new();
+    private List<ContaBancaria> _contas = new();
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        int empresaId = CurrentEmpresaService.EmpresaId ?? 1;
+        _depositos = await Context.Depositos.AsNoTracking().Where(d => d.EmpresaId == empresaId && d.Ativo).OrderBy(d => d.Nome).ToListAsync();
+        _contas = await Context.ContasBancarias.AsNoTracking().Where(c => c.EmpresaId == empresaId && c.Ativo).OrderBy(c => c.Descricao).ToListAsync();
+
+        if (TerminalExistente != null)
+        {
+            _dto = new SalvarTerminalPdvDto
+            {
+                Codigo = TerminalExistente.Codigo,
+                Nome = TerminalExistente.Nome,
+                Tipo = TerminalExistente.Tipo,
+                DepositoId = TerminalExistente.DepositoId,
+                ContaBancariaId = TerminalExistente.ContaBancariaId,
+                ImpressoraCupom = TerminalExistente.ImpressoraCupom,
+                Ativo = TerminalExistente.Ativo
+            };
+        }
+    }
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_dto.Codigo) || string.IsNullOrWhiteSpace(_dto.Nome))
+        {
+            Snackbar.Add("Informe o código e o nome do terminal.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            await Mediator.Send(new SalvarTerminalPdvCommand(TerminalExistente?.Id, _dto));
+            Snackbar.Add("Terminal PDV salvo.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar terminal: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

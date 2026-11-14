@@ -52,6 +52,22 @@ public static class DatabaseSeeder
             ("Compras.Relatorios.Visualizar", "Compras", "Relatorios", "Visualizar", "Visualizar histórico e comparativo de preços"),
 
             ("Estoque.Posicao.Visualizar", "Estoque", "Posicao", "Visualizar", "Visualizar posição de estoque"),
+
+            ("Servicos.OrdensServico.Visualizar", "Servicos", "OrdensServico", "Visualizar", "Visualizar ordens de serviço"),
+            ("Servicos.OrdensServico.Gerenciar", "Servicos", "OrdensServico", "Gerenciar", "Criar, editar, aprovar, faturar e cancelar ordens de serviço"),
+
+            ("Crm.Visualizar", "Crm", "Crm", "Visualizar", "Visualizar leads, oportunidades e atividades do CRM"),
+            ("Crm.Gerenciar", "Crm", "Crm", "Gerenciar", "Criar, editar, converter leads e gerenciar funil de vendas"),
+
+            ("Vendas.Comissoes.Visualizar", "Vendas", "Comissoes", "Visualizar", "Visualizar vendedores, regras e comissões"),
+            ("Vendas.Comissoes.Gerenciar", "Vendas", "Comissoes", "Gerenciar", "Gerenciar vendedores, regras, aprovar e pagar comissões"),
+
+            ("Contratos.Visualizar", "Contratos", "Contratos", "Visualizar", "Visualizar contratos recorrentes, faturamentos e reajustes"),
+            ("Contratos.Gerenciar", "Contratos", "Contratos", "Gerenciar", "Criar, editar, faturar, reajustar e renovar contratos recorrentes"),
+
+            ("Pdv.Operar", "Pdv", "Pdv", "Operar", "Operar PDV, pré-vendas, abertura e fechamento de caixa"),
+            ("Pdv.Gerenciar", "Pdv", "Pdv", "Gerenciar", "Gerenciar terminais PDV e cancelar vendas"),
+
             ("Fiscal.NFe.Visualizar", "Fiscal", "NFe", "Visualizar", "Visualizar notas fiscais"),
             ("Fiscal.NFe.Gerenciar", "Fiscal", "NFe", "Gerenciar", "Criar, emitir, cancelar e gerenciar notas fiscais"),
             ("Fiscal.Regras.Gerenciar", "Fiscal", "Regras", "Gerenciar", "Gerenciar regras tributárias e regimes fiscais"),

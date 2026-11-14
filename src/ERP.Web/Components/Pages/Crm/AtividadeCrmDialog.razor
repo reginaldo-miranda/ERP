@@ -1,0 +1,121 @@
+@using ERP.Application.Crm.Commands
+@using ERP.Application.Crm.DTOs
+@using ERP.Domain.Core.Enums
+@using ERP.Infrastructure.Identity
+@using MediatR
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject UserManager<ApplicationUser> UserManager
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Registrar Atividade / Follow-up</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="TipoAtividadeCrm" @bind-Value="_dto.Tipo" Label="Tipo" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="TipoAtividadeCrm.Ligacao">Ligação</MudSelectItem>
+                    <MudSelectItem Value="TipoAtividadeCrm.WhatsApp">WhatsApp</MudSelectItem>
+                    <MudSelectItem Value="TipoAtividadeCrm.Email">E-mail</MudSelectItem>
+                    <MudSelectItem Value="TipoAtividadeCrm.Reuniao">Reunião</MudSelectItem>
+                    <MudSelectItem Value="TipoAtividadeCrm.Tarefa">Tarefa / Retorno</MudSelectItem>
+                    <MudSelectItem Value="TipoAtividadeCrm.Anotacao">Anotação (já concluída)</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudDatePicker Label="Data Prevista" @bind-Date="_dataPrevista" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_dto.Assunto" Label="Assunto *" Required="true" Variant="Variant.Outlined" Dense="true" Placeholder="Ex: Retornar proposta comercial" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudSelect T="string" Value="_dto.ResponsavelId" ValueChanged="OnResponsavelChanged" Label="Responsável" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                    @foreach (var u in _usuarios)
+                    {
+                        <MudSelectItem Value="@u.Id">@u.NomeCompleto</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_dto.Descricao" Label="Detalhes / Observações" Lines="3" Variant="Variant.Outlined" Dense="true" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@_salvando">
+            @(_salvando ? "Salvando..." : "Salvar Atividade")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? LeadId { get; set; }
+
+    [Parameter]
+    public int? OportunidadeId { get; set; }
+
+    [Parameter]
+    public string? ResponsavelId { get; set; }
+
+    [Parameter]
+    public string? ResponsavelNome { get; set; }
+
+    private CriarAtividadeCrmDto _dto = new();
+    private DateTime? _dataPrevista = DateTime.Today;
+    private List<ApplicationUser> _usuarios = new();
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarios = await UserManager.Users.AsNoTracking().Where(u => u.Ativo).OrderBy(u => u.NomeCompleto).ToListAsync();
+        _dto.LeadId = LeadId;
+        _dto.OportunidadeId = OportunidadeId;
+        _dto.ResponsavelId = ResponsavelId;
+        _dto.ResponsavelNome = ResponsavelNome;
+    }
+
+    private void OnResponsavelChanged(string? userId)
+    {
+        _dto.ResponsavelId = userId;
+        _dto.ResponsavelNome = _usuarios.FirstOrDefault(u => u.Id == userId)?.NomeCompleto;
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_dto.Assunto))
+        {
+            Snackbar.Add("Informe o assunto da atividade.", Severity.Warning);
+            return;
+        }
+
+        _dto.DataPrevista = _dataPrevista ?? DateTime.Today;
+        _salvando = true;
+        try
+        {
+            await Mediator.Send(new CriarAtividadeCrmCommand(_dto));
+            Snackbar.Add("Atividade registrada com sucesso.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao registrar atividade: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

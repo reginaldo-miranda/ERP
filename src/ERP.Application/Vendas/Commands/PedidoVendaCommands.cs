@@ -473,6 +473,13 @@ public class PedidoVendaCommandsHandler :
         pedido.Status = StatusPedidoVenda.Faturado;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // 6. Calcula e gera comissão automática do vendedor (Fase 13), se aplicável
+        var comissaoGerada = await ERP.Application.Comissoes.Commands.ComissaoCommandsHandler
+            .CalcularEGerarComissaoAsync(_context, empresaId, pedido, faturamento.Id, cancellationToken);
+        if (comissaoGerada != null)
+            await _context.SaveChangesAsync(cancellationToken);
+
         return faturamento.Id;
     }
 

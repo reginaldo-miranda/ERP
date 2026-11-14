@@ -1,0 +1,164 @@
+@using ERP.Application.Pdv.Commands
+@using ERP.Application.Pdv.DTOs
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(SessaoAtual == null ? $"Abrir Caixa — {Terminal.Nome}" : $"Controle de Caixa — {Terminal.Nome}")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (SessaoAtual == null)
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_operadorNome" Label="Nome do Operador" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudNumericField T="decimal" @bind-Value="_valorAbertura" Label="Fundo de Troco Inicial (R$)" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+                <MudTabPanel Text="Resumo / Fechamento" Icon="@Icons.Material.Filled.Lock">
+                    <MudPaper Outlined="true" Class="pa-3 mt-3 mb-3">
+                        <div class="d-flex justify-space-between"><MudText>Abertura (Troco):</MudText><b>@SessaoAtual.ValorAbertura.ToString("C2")</b></div>
+                        <div class="d-flex justify-space-between"><MudText>Vendas (@SessaoAtual.QuantidadeVendas):</MudText><b style="color:green;">+ @SessaoAtual.TotalVendas.ToString("C2")</b></div>
+                        <div class="d-flex justify-space-between"><MudText>Suprimentos:</MudText><b style="color:blue;">+ @SessaoAtual.TotalSuprimentos.ToString("C2")</b></div>
+                        <div class="d-flex justify-space-between"><MudText>Sangrias:</MudText><b style="color:red;">- @SessaoAtual.TotalSangrias.ToString("C2")</b></div>
+                        <MudDivider Class="my-2" />
+                        <div class="d-flex justify-space-between"><MudText Typo="Typo.subtitle1"><b>Saldo Esperado:</b></MudText><MudText Typo="Typo.subtitle1" Color="Color.Primary"><b>@SessaoAtual.SaldoEsperado.ToString("C2")</b></MudText></div>
+                    </MudPaper>
+
+                    <MudNumericField T="decimal" @bind-Value="_valorFechamento" Label="Valor Conferido no Caixa (R$)" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="_observacaoFechamento" Label="Observações do Fechamento" Lines="2" Variant="Variant.Outlined" Dense="true" Class="mb-3" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" FullWidth="true" StartIcon="@Icons.Material.Filled.Lock" OnClick="FecharCaixa" Disabled="@_processando">
+                        Encerrar Turno e Fechar Caixa
+                    </MudButton>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Sangria / Suprimento" Icon="@Icons.Material.Filled.SwapVert">
+                    <MudGrid Class="pt-3">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="TipoMovimentoCaixa" @bind-Value="_tipoMovimento" Label="Operação" Variant="Variant.Outlined" Dense="true">
+                                <MudSelectItem Value="TipoMovimentoCaixa.Sangria">Sangria (Retirada)</MudSelectItem>
+                                <MudSelectItem Value="TipoMovimentoCaixa.Suprimento">Suprimento (Entrada)</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudNumericField T="decimal" @bind-Value="_valorMovimento" Label="Valor (R$)" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_motivoMovimento" Label="Motivo *" Variant="Variant.Outlined" Dense="true" Placeholder="Ex: Troco ou depósito cofre" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="RegistrarMovimento" Disabled="@_processando">
+                                Registrar Movimentação
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Fechar</MudButton>
+        @if (SessaoAtual == null)
+        {
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="AbrirCaixa" Disabled="@_processando">Abrir Caixa</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public TerminalPdvDto Terminal { get; set; } = null!;
+
+    [Parameter]
+    public SessaoCaixaPdvDto? SessaoAtual { get; set; }
+
+    [Parameter]
+    public string OperadorPadrao { get; set; } = "Operador";
+
+    private string _operadorNome = "Operador";
+    private decimal _valorAbertura;
+    private decimal _valorFechamento;
+    private string? _observacaoFechamento;
+
+    private TipoMovimentoCaixa _tipoMovimento = TipoMovimentoCaixa.Sangria;
+    private decimal _valorMovimento;
+    private string _motivoMovimento = string.Empty;
+    private bool _processando;
+
+    protected override void OnInitialized()
+    {
+        _operadorNome = OperadorPadrao;
+        if (SessaoAtual != null)
+            _valorFechamento = SessaoAtual.SaldoEsperado;
+    }
+
+    private async Task AbrirCaixa()
+    {
+        _processando = true;
+        try
+        {
+            await Mediator.Send(new AbrirSessaoCaixaCommand(Terminal.Id, _valorAbertura, null, _operadorNome));
+            Snackbar.Add("Caixa aberto com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+
+    private async Task RegistrarMovimento()
+    {
+        if (_valorMovimento <= 0 || string.IsNullOrWhiteSpace(_motivoMovimento))
+        {
+            Snackbar.Add("Informe valor e motivo.", Severity.Warning);
+            return;
+        }
+
+        _processando = true;
+        try
+        {
+            await Mediator.Send(new RegistrarMovimentoCaixaCommand(SessaoAtual!.Id, _tipoMovimento, _valorMovimento, _motivoMovimento, OperadorPadrao));
+            Snackbar.Add("Movimentação registrada!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+
+    private async Task FecharCaixa()
+    {
+        _processando = true;
+        try
+        {
+            await Mediator.Send(new FecharSessaoCaixaCommand(SessaoAtual!.Id, _valorFechamento, _observacaoFechamento));
+            Snackbar.Add("Caixa fechado com sucesso!", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+}

@@ -1,0 +1,191 @@
+@using ERP.Application.Crm.Commands
+@using ERP.Application.Crm.DTOs
+@using ERP.Application.Crm.Queries
+@using ERP.Domain.Core.Enums
+@using ERP.Infrastructure.Identity
+@using MediatR
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject UserManager<ApplicationUser> UserManager
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@(LeadId.HasValue ? Icons.Material.Filled.Edit : Icons.Material.Filled.PersonAdd)" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(LeadId.HasValue ? "Editar Lead" : "Novo Lead")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_dto.Nome" Label="Nome do Contato *" Required="true" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_dto.EmpresaContato" Label="Empresa / Organização" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="TipoPessoa" @bind-Value="_dto.TipoPessoa" Label="Tipo Pessoa" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="TipoPessoa.Fisica">Pessoa Física</MudSelectItem>
+                        <MudSelectItem Value="TipoPessoa.Juridica">Pessoa Jurídica</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_dto.CpfCnpj" Label="CPF / CNPJ" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_dto.Cargo" Label="Cargo" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_dto.Email" Label="E-mail" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_dto.Telefone" Label="Telefone" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_dto.Celular" Label="Celular / WhatsApp" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="OrigemLead" @bind-Value="_dto.Origem" Label="Origem" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="OrigemLead.Indicacao">Indicação</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.Site">Site</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.RedesSociais">Redes Sociais</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.Telefone">Telefone</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.Email">E-mail</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.Evento">Evento</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.ProspeccaoAtiva">Prospecção Ativa</MudSelectItem>
+                        <MudSelectItem Value="OrigemLead.Outro">Outro</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="StatusLead" @bind-Value="_dto.Status" Label="Status" Variant="Variant.Outlined" Dense="true"
+                               Disabled="@(_dto.Status == StatusLead.Convertido)">
+                        <MudSelectItem Value="StatusLead.Novo">Novo</MudSelectItem>
+                        <MudSelectItem Value="StatusLead.EmContato">Em Contato</MudSelectItem>
+                        <MudSelectItem Value="StatusLead.Qualificado">Qualificado</MudSelectItem>
+                        @if (_dto.Status == StatusLead.Convertido)
+                        {
+                            <MudSelectItem Value="StatusLead.Convertido">Convertido</MudSelectItem>
+                        }
+                        <MudSelectItem Value="StatusLead.Descartado">Descartado</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="string" Value="_dto.ResponsavelId" ValueChanged="OnResponsavelChanged" Label="Responsável (Vendedor)" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                        @foreach (var u in _usuarios)
+                        {
+                            <MudSelectItem Value="@u.Id">@u.NomeCompleto</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_dto.Observacoes" Label="Observações" Lines="3" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(_salvando || _carregando)">
+            @(_salvando ? "Salvando..." : "Salvar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? LeadId { get; set; }
+
+    private AtualizarLeadDto _dto = new();
+    private List<ApplicationUser> _usuarios = new();
+    private bool _carregando = true;
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarios = await UserManager.Users.AsNoTracking().Where(u => u.Ativo).OrderBy(u => u.NomeCompleto).ToListAsync();
+
+        if (LeadId.HasValue)
+        {
+            var lead = await Mediator.Send(new ObterLeadPorIdQuery(LeadId.Value));
+            if (lead != null)
+            {
+                _dto = new AtualizarLeadDto
+                {
+                    Nome = lead.Nome,
+                    EmpresaContato = lead.EmpresaContato,
+                    TipoPessoa = lead.TipoPessoa,
+                    CpfCnpj = lead.CpfCnpj,
+                    Email = lead.Email,
+                    Telefone = lead.Telefone,
+                    Celular = lead.Celular,
+                    Cargo = lead.Cargo,
+                    Origem = lead.Origem,
+                    Status = lead.Status,
+                    Observacoes = lead.Observacoes,
+                    ResponsavelId = lead.ResponsavelId,
+                    ResponsavelNome = lead.ResponsavelNome
+                };
+            }
+        }
+
+        _carregando = false;
+    }
+
+    private void OnResponsavelChanged(string? userId)
+    {
+        _dto.ResponsavelId = userId;
+        _dto.ResponsavelNome = _usuarios.FirstOrDefault(u => u.Id == userId)?.NomeCompleto;
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_dto.Nome))
+        {
+            Snackbar.Add("Informe o nome do Lead.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            if (LeadId.HasValue)
+            {
+                await Mediator.Send(new AtualizarLeadCommand(LeadId.Value, _dto));
+                Snackbar.Add("Lead atualizado com sucesso.", Severity.Success);
+            }
+            else
+            {
+                await Mediator.Send(new CriarLeadCommand(_dto));
+                Snackbar.Add("Lead criado com sucesso.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar Lead: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

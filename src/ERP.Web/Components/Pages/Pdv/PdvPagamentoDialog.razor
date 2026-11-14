@@ -1,0 +1,134 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Pdv.DTOs
+@using ERP.Domain.Core.Entities.Financeiro
+@using Microsoft.EntityFrameworkCore
+@inject IApplicationDbContext Context
+@inject ICurrentEmpresaService CurrentEmpresaService
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Color="Color.Success" Class="mr-2" />
+            <MudText Typo="Typo.h6">Receber Pagamento — Total @TotalVenda.ToString("C2")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudPaper Outlined="true" Class="pa-3 mb-3 d-flex justify-space-between">
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL DA VENDA</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">@TotalVenda.ToString("C2")</MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL PAGO</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="font-weight-bold">@TotalPago.ToString("C2")</MudText>
+            </div>
+            <div>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@(Restante > 0 ? "RESTANTE" : "TROCO")</MudText>
+                <MudText Typo="Typo.h6" Color="@(Restante > 0 ? Color.Error : Color.Success)" Class="font-weight-bold">
+                    @(Restante > 0 ? Restante.ToString("C2") : Troco.ToString("C2"))
+                </MudText>
+            </div>
+        </MudPaper>
+
+        <MudGrid Class="mb-3">
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_formaSelecionada" Label="Forma de Pagamento" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="@("Dinheiro")">Dinheiro</MudSelectItem>
+                    <MudSelectItem Value="@("PIX")">PIX</MudSelectItem>
+                    <MudSelectItem Value="@("Cartão de Débito")">Cartão de Débito</MudSelectItem>
+                    <MudSelectItem Value="@("Cartão de Crédito")">Cartão de Crédito</MudSelectItem>
+                    @foreach (var f in _formasCadastradas)
+                    {
+                        <MudSelectItem Value="@f.Nome">@f.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="8" sm="4">
+                <MudNumericField T="decimal" @bind-Value="_valorParcela" Label="Valor (R$)" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            </MudItem>
+            <MudItem xs="4" sm="2" Class="d-flex align-center">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AdicionarPagamento" FullWidth="true">+</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_pagamentos.Count > 0)
+        {
+            <MudList T="VendaPdvPagamentoInputDto" Dense="true">
+                @foreach (var p in _pagamentos)
+                {
+                    <MudListItem>
+                        <div class="d-flex justify-space-between align-center w-100">
+                            <MudText Typo="Typo.body2"><b>@p.DescricaoForma</b></MudText>
+                            <div class="d-flex align-center gap-2">
+                                <MudText Typo="Typo.body2">@p.Valor.ToString("C2")</MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoverPagamento(p))" />
+                            </div>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Cancelar</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Check" OnClick="Confirmar" Disabled="@(TotalPago < TotalVenda)">
+            Finalizar Venda (Enter)
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public decimal TotalVenda { get; set; }
+
+    private string _formaSelecionada = "Dinheiro";
+    private decimal _valorParcela;
+    private List<FormaPagamento> _formasCadastradas = new();
+    private List<VendaPdvPagamentoInputDto> _pagamentos = new();
+
+    private decimal TotalPago => _pagamentos.Sum(p => p.Valor);
+    private decimal Restante => Math.Max(0, TotalVenda - TotalPago);
+    private decimal Troco => Math.Max(0, TotalPago - TotalVenda);
+
+    protected override async Task OnInitializedAsync()
+    {
+        int empresaId = CurrentEmpresaService.EmpresaId ?? 1;
+        _formasCadastradas = await Context.FormasPagamento.AsNoTracking().Where(f => f.EmpresaId == empresaId && f.Ativo).ToListAsync();
+        _valorParcela = TotalVenda;
+    }
+
+    private void AdicionarPagamento()
+    {
+        if (_valorParcela <= 0) return;
+
+        var forma = _formasCadastradas.FirstOrDefault(f => f.Nome == _formaSelecionada);
+        _pagamentos.Add(new VendaPdvPagamentoInputDto
+        {
+            FormaPagamentoId = forma?.Id,
+            DescricaoForma = _formaSelecionada,
+            Valor = _valorParcela
+        });
+
+        _valorParcela = Restante;
+    }
+
+    private void RemoverPagamento(VendaPdvPagamentoInputDto p)
+    {
+        _pagamentos.Remove(p);
+        _valorParcela = Restante;
+    }
+
+    private void Confirmar()
+    {
+        if (TotalPago < TotalVenda)
+        {
+            Snackbar.Add("O valor pago ainda é menor que o total da venda.", Severity.Warning);
+            return;
+        }
+        MudDialog.Close(DialogResult.Ok(_pagamentos));
+    }
+}

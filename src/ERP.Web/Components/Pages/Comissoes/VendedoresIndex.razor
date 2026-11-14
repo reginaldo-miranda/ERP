@@ -1,0 +1,148 @@
+@page "/vendas/vendedores"
+@using ERP.Application.Comissoes.Commands
+@using ERP.Application.Comissoes.DTOs
+@using ERP.Application.Comissoes.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Vendedores &amp; Regras de Comissão - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Badge" Class="mr-2" />
+            Vendedores &amp; Regras de Comissão
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Cadastre vendedores, vincule usuários do sistema e defina percentuais ou metas de comissão.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Rule" OnClick="NovaRegra">
+            Nova Regra
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="NovoVendedor">
+            Novo Vendedor
+        </MudButton>
+    </div>
+</div>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+    <MudTabPanel Text="@($"Vendedores ({_vendedores.Count})")" Icon="@Icons.Material.Filled.People">
+        <MudTable Items="_vendedores" Hover="true" Dense="true" Elevation="0" Class="pa-2">
+            <HeaderContent>
+                <MudTh>Nome</MudTh>
+                <MudTh>Contato</MudTh>
+                <MudTh>Comissão Padrão</MudTh>
+                <MudTh>Regras Específicas</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Nome"><b>@context.Nome</b></MudTd>
+                <MudTd DataLabel="Contato">@(context.Email ?? context.Telefone ?? "-")</MudTd>
+                <MudTd DataLabel="Comissão Padrão">
+                    @(context.TipoComissaoPadrao == TipoRegraComissao.PercentualSobreVenda
+                        ? $"{context.PercentualPadrao:N2}% sobre venda"
+                        : $"{context.ValorFixoPadrao:C2} fixo")
+                </MudTd>
+                <MudTd DataLabel="Regras">@context.TotalRegras</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)">
+                        @(context.Ativo ? "Ativo" : "Inativo")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditarVendedor(context))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="@($"Regras de Comissão ({_regras.Count})")" Icon="@Icons.Material.Filled.Rule">
+        <MudTable Items="_regras" Hover="true" Dense="true" Elevation="0" Class="pa-2">
+            <HeaderContent>
+                <MudTh>Regra</MudTh>
+                <MudTh>Vendedor</MudTh>
+                <MudTh>Valor / %</MudTh>
+                <MudTh>Venda Mínima</MudTh>
+                <MudTh>Prioridade</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Regra"><b>@context.Nome</b></MudTd>
+                <MudTd DataLabel="Vendedor">@context.VendedorNome</MudTd>
+                <MudTd DataLabel="Valor / %">
+                    @(context.Tipo == TipoRegraComissao.PercentualSobreVenda
+                        ? $"{context.Percentual:N2}%"
+                        : $"{context.ValorFixo:C2}")
+                </MudTd>
+                <MudTd DataLabel="Venda Mínima">@(context.ValorMinimoVenda.HasValue ? context.ValorMinimoVenda.Value.ToString("C2") : "Sem mínimo")</MudTd>
+                <MudTd DataLabel="Prioridade">@context.Prioridade</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Ativo ? Color.Success : Color.Default)">
+                        @(context.Ativo ? "Ativa" : "Inativa")
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditarRegra(context))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => ExcluirRegra(context.Id))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private List<VendedorDto> _vendedores = new();
+    private List<RegraComissaoDto> _regras = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task CarregarAsync()
+    {
+        _vendedores = await Mediator.Send(new ListarVendedoresQuery());
+        _regras = await Mediator.Send(new ListarRegrasComissaoQuery());
+    }
+
+    private async Task NovoVendedor()
+    {
+        var dialog = await DialogService.ShowAsync<VendedorDialog>("Novo Vendedor");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task EditarVendedor(VendedorDto vendedor)
+    {
+        var parameters = new DialogParameters<VendedorDialog> { { x => x.VendedorExistente, vendedor } };
+        var dialog = await DialogService.ShowAsync<VendedorDialog>("Editar Vendedor", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task NovaRegra()
+    {
+        var dialog = await DialogService.ShowAsync<RegraComissaoDialog>("Nova Regra de Comissão");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task EditarRegra(RegraComissaoDto regra)
+    {
+        var parameters = new DialogParameters<RegraComissaoDialog> { { x => x.RegraExistente, regra } };
+        var dialog = await DialogService.ShowAsync<RegraComissaoDialog>("Editar Regra", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task ExcluirRegra(int id)
+    {
+        await Mediator.Send(new ExcluirRegraComissaoCommand(id));
+        Snackbar.Add("Regra removida.", Severity.Info);
+        await CarregarAsync();
+    }
+}

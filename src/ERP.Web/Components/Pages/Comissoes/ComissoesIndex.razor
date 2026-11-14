@@ -1,0 +1,255 @@
+@page "/vendas/comissoes"
+@using ERP.Application.Comissoes.Commands
+@using ERP.Application.Comissoes.DTOs
+@using ERP.Application.Comissoes.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject ISnackbar Snackbar
+
+<PageTitle>Comissões de Vendedores - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Paid" Class="mr-2" />
+            Comissões de Vendedores
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Cálculo automático sobre vendas faturadas, aprovação, pagamento e relatório por período.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" StartIcon="@Icons.Material.Filled.Sync" OnClick="ProcessarPendentes">
+            Processar Vendas Faturadas
+        </MudButton>
+        @if (_selecionadas.Count > 0)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ThumbUp" OnClick="AprovarLote">
+                Aprovar (@_selecionadas.Count)
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Payments" OnClick="PagarLote">
+                Pagar (@_selecionadas.Count)
+            </MudButton>
+        }
+    </div>
+</div>
+
+<!-- KPIs -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">BASE DE VENDAS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">@_resumo.TotalVendasBase.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">@_resumo.QuantidadeComissoes venda(s) comissionada(s)</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">PENDENTES</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Warning">@_resumo.TotalPendente.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">Aguardando aprovação</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">APROVADAS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Info">@_resumo.TotalAprovada.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">Prontas para pagamento</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">PAGAS NO PERÍODO</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_resumo.TotalPaga.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">Liquidadas</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros -->
+<MudPaper Elevation="1" Class="pa-3 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="3">
+            <MudDatePicker Label="Data Inicial" @bind-Date="_dataInicio" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudDatePicker Label="Data Final" @bind-Date="_dataFim" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="int?" @bind-Value="_vendedorIdFiltro" Label="Vendedor" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                @foreach (var v in _vendedores)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)v.Id)">@v.Nome</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudSelect T="StatusComissao?" @bind-Value="_statusFiltro" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="StatusComissao?" Value="StatusComissao.Pendente">Pendente</MudSelectItem>
+                <MudSelectItem T="StatusComissao?" Value="StatusComissao.Aprovada">Aprovada</MudSelectItem>
+                <MudSelectItem T="StatusComissao?" Value="StatusComissao.Paga">Paga</MudSelectItem>
+                <MudSelectItem T="StatusComissao?" Value="StatusComissao.Cancelada">Cancelada</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="1" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CarregarAsync" FullWidth="true">Filtrar</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary">
+    <MudTabPanel Text="Lançamentos Detalhados" Icon="@Icons.Material.Filled.ListAlt">
+        <MudTable Items="_comissoes" MultiSelection="true" @bind-SelectedItems="_selecionadas" Hover="true" Dense="true" Elevation="0" Class="pa-2">
+            <HeaderContent>
+                <MudTh>Data</MudTh>
+                <MudTh>Pedido</MudTh>
+                <MudTh>Cliente</MudTh>
+                <MudTh>Vendedor</MudTh>
+                <MudTh>Base Venda</MudTh>
+                <MudTh>%</MudTh>
+                <MudTh>Comissão</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Ações</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Data">@context.DataVenda.ToLocalTime().ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Pedido"><b>@context.PedidoNumero</b></MudTd>
+                <MudTd DataLabel="Cliente">@context.ClienteNome</MudTd>
+                <MudTd DataLabel="Vendedor">@context.VendedorNome</MudTd>
+                <MudTd DataLabel="Base">@context.ValorBaseVenda.ToString("C2")</MudTd>
+                <MudTd DataLabel="%">@(context.PercentualAplicado > 0 ? $"{context.PercentualAplicado:N2}%" : "Fixo")</MudTd>
+                <MudTd DataLabel="Comissão"><b>@context.ValorComissao.ToString("C2")</b></MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@CorStatus(context.Status)">@context.Status.ToString()</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Ações">
+                    @if (context.Status == StatusComissao.Pendente)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.ThumbUp" Size="Size.Small" Color="Color.Primary" Title="Aprovar" OnClick="@(() => Aprovar(context.Id))" />
+                    }
+                    @if (context.Status == StatusComissao.Pendente || context.Status == StatusComissao.Aprovada)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Color="Color.Success" Title="Marcar como Paga" OnClick="@(() => Pagar(context.Id))" />
+                    }
+                    @if (context.Status != StatusComissao.Paga && context.Status != StatusComissao.Cancelada)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error" Title="Cancelar" OnClick="@(() => Cancelar(context.Id))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4">Nenhuma comissão encontrada no período selecionado.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Relatório Consolidado por Vendedor" Icon="@Icons.Material.Filled.Assessment">
+        <MudTable Items="_resumo.PorVendedor" Hover="true" Dense="true" Elevation="0" Class="pa-2">
+            <HeaderContent>
+                <MudTh>Vendedor</MudTh>
+                <MudTh>Qtd. Vendas</MudTh>
+                <MudTh>Total Vendido</MudTh>
+                <MudTh>Total Comissão</MudTh>
+                <MudTh>Pendente</MudTh>
+                <MudTh>Aprovada</MudTh>
+                <MudTh>Paga</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Vendedor"><b>@context.VendedorNome</b></MudTd>
+                <MudTd DataLabel="Qtd. Vendas">@context.QuantidadeVendas</MudTd>
+                <MudTd DataLabel="Total Vendido">@context.TotalVendido.ToString("C2")</MudTd>
+                <MudTd DataLabel="Total Comissão"><b>@context.TotalComissao.ToString("C2")</b></MudTd>
+                <MudTd DataLabel="Pendente">@context.Pendente.ToString("C2")</MudTd>
+                <MudTd DataLabel="Aprovada">@context.Aprovada.ToString("C2")</MudTd>
+                <MudTd DataLabel="Paga">@context.Paga.ToString("C2")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    private DateTime? _dataInicio = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime? _dataFim = DateTime.Today;
+    private int? _vendedorIdFiltro;
+    private StatusComissao? _statusFiltro;
+
+    private List<VendedorDto> _vendedores = new();
+    private List<ComissaoVendaDto> _comissoes = new();
+    private ComissaoResumoPeriodoDto _resumo = new();
+    private HashSet<ComissaoVendaDto> _selecionadas = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _vendedores = await Mediator.Send(new ListarVendedoresQuery());
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _selecionadas.Clear();
+        _resumo = await Mediator.Send(new ObterResumoComissoesQuery(_dataInicio, _dataFim, _vendedorIdFiltro));
+        _comissoes = await Mediator.Send(new ListarComissoesVendaQuery(_dataInicio, _dataFim, _vendedorIdFiltro, _statusFiltro));
+    }
+
+    private async Task ProcessarPendentes()
+    {
+        int qtd = await Mediator.Send(new ProcessarComissoesPendentesCommand());
+        Snackbar.Add(qtd > 0 ? $"{qtd} comissão(ões) gerada(s)!" : "Nenhuma venda faturada pendente de comissão.", qtd > 0 ? Severity.Success : Severity.Info);
+        await CarregarAsync();
+    }
+
+    private async Task Aprovar(int id)
+    {
+        await Mediator.Send(new AprovarComissaoCommand(id));
+        Snackbar.Add("Comissão aprovada.", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private async Task Pagar(int id)
+    {
+        await Mediator.Send(new PagarComissaoCommand(id));
+        Snackbar.Add("Comissão marcada como paga.", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private async Task Cancelar(int id)
+    {
+        await Mediator.Send(new CancelarComissaoCommand(id));
+        Snackbar.Add("Comissão cancelada.", Severity.Info);
+        await CarregarAsync();
+    }
+
+    private async Task AprovarLote()
+    {
+        var ids = _selecionadas.Select(x => x.Id).ToList();
+        int qtd = await Mediator.Send(new AprovarComissoesLoteCommand(ids));
+        Snackbar.Add($"{qtd} comissão(ões) aprovada(s).", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private async Task PagarLote()
+    {
+        var ids = _selecionadas.Select(x => x.Id).ToList();
+        int qtd = await Mediator.Send(new PagarComissoesLoteCommand(ids));
+        Snackbar.Add($"{qtd} comissão(ões) paga(s).", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private static Color CorStatus(StatusComissao status) => status switch
+    {
+        StatusComissao.Pendente => Color.Warning,
+        StatusComissao.Aprovada => Color.Info,
+        StatusComissao.Paga => Color.Success,
+        StatusComissao.Cancelada => Color.Error,
+        _ => Color.Default
+    };
+}

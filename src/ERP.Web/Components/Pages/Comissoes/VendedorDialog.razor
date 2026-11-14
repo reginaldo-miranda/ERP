@@ -1,0 +1,158 @@
+@using ERP.Application.Comissoes.Commands
+@using ERP.Application.Comissoes.DTOs
+@using ERP.Domain.Core.Enums
+@using ERP.Infrastructure.Identity
+@using MediatR
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject UserManager<ApplicationUser> UserManager
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@(VendedorExistente != null ? Icons.Material.Filled.Edit : Icons.Material.Filled.PersonAdd)" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(VendedorExistente != null ? "Editar Vendedor" : "Novo Vendedor")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudSelect T="string" Value="_dto.UsuarioId" ValueChanged="OnUsuarioChanged" Label="Vincular Usuário do Sistema (opcional)" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                    @foreach (var u in _usuarios)
+                    {
+                        <MudSelectItem Value="@u.Id">@u.NomeCompleto (@u.Email)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_dto.Nome" Label="Nome do Vendedor *" Required="true" Variant="Variant.Outlined" Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Email" Label="E-mail" Variant="Variant.Outlined" Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Telefone" Label="Telefone" Variant="Variant.Outlined" Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_dto.Cpf" Label="CPF" Variant="Variant.Outlined" Dense="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6" Class="d-flex align-center">
+                <MudSwitch T="bool" @bind-Value="_dto.Ativo" Label="Vendedor Ativo" Color="Color.Primary" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudDivider Class="my-1" />
+                <MudText Typo="Typo.subtitle2" Color="Color.Primary">Comissão Padrão</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="TipoRegraComissao" @bind-Value="_dto.TipoComissaoPadrao" Label="Tipo" Variant="Variant.Outlined" Dense="true">
+                    <MudSelectItem Value="TipoRegraComissao.PercentualSobreVenda">% sobre a Venda</MudSelectItem>
+                    <MudSelectItem Value="TipoRegraComissao.ValorFixoPorVenda">Valor Fixo por Venda</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                @if (_dto.TipoComissaoPadrao == TipoRegraComissao.PercentualSobreVenda)
+                {
+                    <MudNumericField T="decimal" @bind-Value="_dto.PercentualPadrao" Label="Percentual (%)" Format="N2" Min="0" Max="100" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+                else
+                {
+                    <MudNumericField T="decimal" @bind-Value="_dto.ValorFixoPadrao" Label="Valor Fixo (R$)" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                }
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_dto.Observacoes" Label="Observações" Lines="2" Variant="Variant.Outlined" Dense="true" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@_salvando">
+            @(_salvando ? "Salvando..." : "Salvar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public VendedorDto? VendedorExistente { get; set; }
+
+    private SalvarVendedorDto _dto = new();
+    private List<ApplicationUser> _usuarios = new();
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarios = await UserManager.Users.AsNoTracking().Where(u => u.Ativo).OrderBy(u => u.NomeCompleto).ToListAsync();
+
+        if (VendedorExistente != null)
+        {
+            _dto = new SalvarVendedorDto
+            {
+                UsuarioId = VendedorExistente.UsuarioId,
+                Nome = VendedorExistente.Nome,
+                Email = VendedorExistente.Email,
+                Telefone = VendedorExistente.Telefone,
+                Cpf = VendedorExistente.Cpf,
+                TipoComissaoPadrao = VendedorExistente.TipoComissaoPadrao,
+                PercentualPadrao = VendedorExistente.PercentualPadrao,
+                ValorFixoPadrao = VendedorExistente.ValorFixoPadrao,
+                Observacoes = VendedorExistente.Observacoes,
+                Ativo = VendedorExistente.Ativo
+            };
+        }
+    }
+
+    private void OnUsuarioChanged(string? userId)
+    {
+        _dto.UsuarioId = userId;
+        var user = _usuarios.FirstOrDefault(u => u.Id == userId);
+        if (user != null)
+        {
+            if (string.IsNullOrWhiteSpace(_dto.Nome))
+                _dto.Nome = user.NomeCompleto;
+            if (string.IsNullOrWhiteSpace(_dto.Email))
+                _dto.Email = user.Email;
+        }
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_dto.Nome))
+        {
+            Snackbar.Add("Informe o nome do vendedor.", Severity.Warning);
+            return;
+        }
+
+        _salvando = true;
+        try
+        {
+            if (VendedorExistente != null)
+            {
+                await Mediator.Send(new AtualizarVendedorCommand(VendedorExistente.Id, _dto));
+                Snackbar.Add("Vendedor atualizado.", Severity.Success);
+            }
+            else
+            {
+                await Mediator.Send(new CriarVendedorCommand(_dto));
+                Snackbar.Add("Vendedor cadastrado.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar vendedor: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

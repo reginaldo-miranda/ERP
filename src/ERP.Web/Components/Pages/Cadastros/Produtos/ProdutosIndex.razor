@@ -31,6 +31,22 @@
     <MudDataGrid T="ProdutoListItemDto" Items="@_resultado?.Itens" Loading="@_carregando" Dense="true" Hover="true"
                  RowClick="@(args => Nav.NavigateTo($"/cadastros/produtos/{args.Item.Id}"))">
         <Columns>
+            <TemplateColumn Title="Foto" Sortable="false">
+                <CellTemplate>
+                    @if (!string.IsNullOrWhiteSpace(context.Item.ImagemUrl))
+                    {
+                        <MudAvatar Size="Size.Medium" Rounded="true">
+                            <MudImage Src="@context.Item.ImagemUrl" Alt="@context.Item.Nome" ObjectFit="ObjectFit.Cover" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Size="Size.Medium" Rounded="true" Color="Color.Default" Variant="Variant.Outlined">
+                            <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Small" />
+                        </MudAvatar>
+                    }
+                </CellTemplate>
+            </TemplateColumn>
             <PropertyColumn Property="x => x.Codigo" Title="Código" />
             <PropertyColumn Property="x => x.Nome" Title="Nome" />
             <PropertyColumn Property="x => x.CategoriaNome" Title="Categoria" />

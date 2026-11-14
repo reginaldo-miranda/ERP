@@ -39,4 +39,5 @@ public class Produto : BaseEmpresaEntity, IAggregateRoot
     // Código de barras / referência
     public string? CodigoBarras { get; set; }
     public string? CodigoFornecedor { get; set; }
+    public string? ImagemUrl { get; set; }
 }

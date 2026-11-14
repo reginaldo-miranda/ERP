@@ -5,7 +5,7 @@ using MediatR;
 
 namespace ERP.Application.Cadastros.Produtos.Commands;
 
-public record UpdateProdutoCommand(int Id, string Codigo, string Nome, string? Descricao, int? CategoriaId, int? UnidadeMedidaId, decimal PrecoVenda, decimal PrecoCusto, decimal EstoqueMinimo, bool ControlaLote, bool ControlaSerie, string? Ncm, string? Cest, string? Cfop, string? CodigoBarras, bool Ativo) : IRequest<Result>;
+public record UpdateProdutoCommand(int Id, string Codigo, string Nome, string? Descricao, int? CategoriaId, int? UnidadeMedidaId, decimal PrecoVenda, decimal PrecoCusto, decimal EstoqueMinimo, bool ControlaLote, bool ControlaSerie, string? Ncm, string? Cest, string? Cfop, string? CodigoBarras, bool Ativo, string? ImagemUrl = null) : IRequest<Result>;
 
 public class UpdateProdutoCommandValidator : AbstractValidator<UpdateProdutoCommand>
 {
@@ -30,6 +30,7 @@ public class UpdateProdutoCommandHandler : IRequestHandler<UpdateProdutoCommand,
         p.PrecoVenda = request.PrecoVenda; p.PrecoCusto = request.PrecoCusto; p.EstoqueMinimo = request.EstoqueMinimo;
         p.ControlaLote = request.ControlaLote; p.ControlaSerie = request.ControlaSerie;
         p.Ncm = request.Ncm; p.Cest = request.Cest; p.Cfop = request.Cfop; p.CodigoBarras = request.CodigoBarras;
+        p.ImagemUrl = request.ImagemUrl;
         p.Ativo = request.Ativo;
         await _context.SaveChangesAsync(cancellationToken);
         return Result.Ok();

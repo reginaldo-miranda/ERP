@@ -1,0 +1,318 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Servicos.DTOs
+@using ERP.Application.Servicos.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" Class="mr-2" />
+                <MudText Typo="Typo.h6">Ordem de Serviço @_os?.Numero</MudText>
+            </div>
+            @if (_os != null)
+            {
+                <div>
+                    @switch (_os.Status)
+                    {
+                        case StatusOrdemServico.Aberta:
+                            <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">Aberta</MudChip>
+                            break;
+                        case StatusOrdemServico.AguardandoAprovacao:
+                            <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined">Aguardando Aprovação</MudChip>
+                            break;
+                        case StatusOrdemServico.Aprovada:
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">Em Execução</MudChip>
+                            break;
+                        case StatusOrdemServico.AguardandoPecas:
+                            <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled">Aguardando Peças</MudChip>
+                            break;
+                        case StatusOrdemServico.Concluida:
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">Concluída / Pronta</MudChip>
+                            break;
+                        case StatusOrdemServico.Faturada:
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled">Faturada &amp; Entregue</MudChip>
+                            break;
+                        case StatusOrdemServico.Cancelada:
+                            <MudChip T="string" Color="Color.Error" Variant="Variant.Outlined">Cancelada</MudChip>
+                            break;
+                    }
+                </div>
+            }
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_os != null)
+        {
+            <MudGrid>
+                <!-- DADOS DO CLIENTE & ATENDIMENTO -->
+                <MudItem xs="12" md="6">
+                    <MudCard Outlined="true" Class="pa-3 h-100">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="font-weight-bold mb-2">DADOS DO CLIENTE &amp; ATENDIMENTO</MudText>
+                        <MudText Typo="Typo.body2"><b>Cliente:</b> @_os.ClienteNome</MudText>
+                        @if (!string.IsNullOrEmpty(_os.ClienteCpfCnpj))
+                        {
+                            <MudText Typo="Typo.body2"><b>CPF/CNPJ:</b> @_os.ClienteCpfCnpj</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(_os.ClienteTelefone))
+                        {
+                            <MudText Typo="Typo.body2"><b>Telefone:</b> @_os.ClienteTelefone</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(_os.ClienteEmail))
+                        {
+                            <MudText Typo="Typo.body2"><b>Email:</b> @_os.ClienteEmail</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(_os.ClienteEndereco))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary"><b>Endereço:</b> @_os.ClienteEndereco</MudText>
+                        }
+                        <MudDivider Class="my-2" />
+                        <MudText Typo="Typo.body2"><b>Técnico Responsável:</b> @(string.IsNullOrEmpty(_os.TecnicoResponsavel) ? "Não definido" : _os.TecnicoResponsavel)</MudText>
+                        <MudText Typo="Typo.body2"><b>Data de Abertura:</b> @_os.DataAbertura.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        @if (_os.PrevisaoConclusao.HasValue)
+                        {
+                            <MudText Typo="Typo.body2"><b>Previsão de Conclusão:</b> @_os.PrevisaoConclusao.Value.ToString("dd/MM/yyyy")</MudText>
+                        }
+                        @if (_os.DataConclusao.HasValue)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Success"><b>Concluída em:</b> @_os.DataConclusao.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        }
+                        @if (_os.DataEntrega.HasValue)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Primary"><b>Entregue/Faturada em:</b> @_os.DataEntrega.Value.ToString("dd/MM/yyyy HH:mm")</MudText>
+                        }
+                    </MudCard>
+                </MudItem>
+
+                <!-- DADOS DO EQUIPAMENTO / OBJETO -->
+                <MudItem xs="12" md="6">
+                    <MudCard Outlined="true" Class="pa-3 h-100">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="font-weight-bold mb-2">IDENTIFICAÇÃO DO EQUIPAMENTO</MudText>
+                        <MudText Typo="Typo.body1" Class="font-weight-bold">@_os.Equipamento</MudText>
+                        <div class="d-flex flex-wrap gap-2 mt-1">
+                            @if (!string.IsNullOrEmpty(_os.Marca))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Marca: @_os.Marca</MudChip>
+                            }
+                            @if (!string.IsNullOrEmpty(_os.Modelo))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Modelo: @_os.Modelo</MudChip>
+                            }
+                            @if (!string.IsNullOrEmpty(_os.NumeroSerie))
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">S/N: @_os.NumeroSerie</MudChip>
+                            }
+                        </div>
+                        <MudDivider Class="my-2" />
+                        @if (!string.IsNullOrEmpty(_os.Acessorios))
+                        {
+                            <MudText Typo="Typo.body2"><b>Acessórios Deixados:</b> @_os.Acessorios</MudText>
+                        }
+                        @if (!string.IsNullOrEmpty(_os.CondicoesGerais))
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary"><b>Condições Físicas/Avarias:</b> @_os.CondicoesGerais</MudText>
+                        }
+                        <div class="mt-2 pa-2 rounded" style="background-color: var(--mud-palette-background-grey);">
+                            <MudText Typo="Typo.caption" Class="font-weight-bold">DEFEITO RELATADO:</MudText>
+                            <MudText Typo="Typo.body2">@_os.DefeitoRelatado</MudText>
+                        </div>
+                    </MudCard>
+                </MudItem>
+
+                <!-- PARECER TÉCNICO & LAUDO -->
+                @if (!string.IsNullOrEmpty(_os.LaudoTecnico) || !string.IsNullOrEmpty(_os.SolucaoTecnica))
+                {
+                    <MudItem xs="12">
+                        <MudCard Outlined="true" Class="pa-3">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Primary" Class="font-weight-bold mb-2">DIAGNÓSTICO E SOLUÇÃO TÉCNICA</MudText>
+                            @if (!string.IsNullOrEmpty(_os.LaudoTecnico))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-1"><b>Laudo Técnico / Diagnóstico:</b> @_os.LaudoTecnico</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(_os.SolucaoTecnica))
+                            {
+                                <MudText Typo="Typo.body2"><b>Solução Técnica Executada:</b> @_os.SolucaoTecnica</MudText>
+                            }
+                        </MudCard>
+                    </MudItem>
+                }
+
+                <!-- TABELA DE SERVIÇOS -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">SERVIÇOS EXECUTADOS (MÃO DE OBRA)</MudText>
+                    <MudTable Items="@_os.Servicos" Dense="true" Hover="true" Elevation="1" Outlined="true">
+                        <HeaderContent>
+                            <MudTh>Descrição</MudTh>
+                            <MudTh Style="width: 100px;">Qtd/Horas</MudTh>
+                            <MudTh Style="width: 120px; text-align: right;">Unitário</MudTh>
+                            <MudTh Style="width: 120px; text-align: right;">Desconto</MudTh>
+                            <MudTh Style="width: 120px; text-align: right;">Total</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Descricao</MudTd>
+                            <MudTd>@context.Quantidade.ToString("N1")</MudTd>
+                            <MudTd Style="text-align: right;">@context.ValorUnitario.ToString("C2")</MudTd>
+                            <MudTd Style="text-align: right;">@context.ValorDesconto.ToString("C2")</MudTd>
+                            <MudTd Style="text-align: right;" Class="font-weight-bold">@context.ValorTotal.ToString("C2")</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.caption" Class="pa-2 text-center" Color="Color.Secondary">Nenhum serviço registrado.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudItem>
+
+                <!-- TABELA DE PEÇAS -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-1">PEÇAS &amp; MATERIAIS UTILIZADOS</MudText>
+                    <MudTable Items="@_os.Pecas" Dense="true" Hover="true" Elevation="1" Outlined="true">
+                        <HeaderContent>
+                            <MudTh>Descrição</MudTh>
+                            <MudTh Style="width: 80px;">Qtd</MudTh>
+                            <MudTh Style="width: 120px; text-align: right;">Unitário</MudTh>
+                            <MudTh Style="width: 120px; text-align: right;">Desconto</MudTh>
+                            <MudTh Style="width: 120px; text-align: right;">Total</MudTh>
+                            <MudTh Style="width: 140px; text-align: center;">Baixa Estoque</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Descricao</MudTd>
+                            <MudTd>@context.Quantidade.ToString("N1")</MudTd>
+                            <MudTd Style="text-align: right;">@context.ValorUnitario.ToString("C2")</MudTd>
+                            <MudTd Style="text-align: right;">@context.ValorDesconto.ToString("C2")</MudTd>
+                            <MudTd Style="text-align: right;" Class="font-weight-bold">@context.ValorTotal.ToString("C2")</MudTd>
+                            <MudTd Style="text-align: center;">
+                                @if (context.BaixadoEstoque)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Baixado</MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Pendente</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.caption" Class="pa-2 text-center" Color="Color.Secondary">Nenhuma peça registrada.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudItem>
+
+                <!-- RESUMO FINANCEIRO -->
+                <MudItem xs="12">
+                    <div class="d-flex justify-end">
+                        <MudCard Outlined="true" Class="pa-3" Style="min-width: 300px;">
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">Total Serviços:</MudText>
+                                <MudText Typo="Typo.body2">@_os.ValorServicos.ToString("C2")</MudText>
+                            </div>
+                            <div class="d-flex justify-space-between mb-1">
+                                <MudText Typo="Typo.body2">Total Peças:</MudText>
+                                <MudText Typo="Typo.body2">@_os.ValorPecas.ToString("C2")</MudText>
+                            </div>
+                            @if (_os.ValorDesconto > 0)
+                            {
+                                <div class="d-flex justify-space-between mb-1">
+                                    <MudText Typo="Typo.body2" Color="Color.Error">Desconto:</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Error">-@_os.ValorDesconto.ToString("C2")</MudText>
+                                </div>
+                            }
+                            <MudDivider Class="my-2" />
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.subtitle1" Class="font-weight-bold" Color="Color.Primary">VALOR TOTAL:</MudText>
+                                <MudText Typo="Typo.h5" Class="font-weight-bold" Color="Color.Primary">@_os.ValorTotal.ToString("C2")</MudText>
+                            </div>
+                        </MudCard>
+                    </div>
+                </MudItem>
+
+                <!-- HISTÓRICO DE STATUS (TIMELINE) -->
+                @if (_os.HistoricoStatus.Any())
+                {
+                    <MudItem xs="12">
+                        <MudExpansionPanels Elevation="0" Outlined="true">
+                            <MudExpansionPanel Text="Histórico de Evolução da OS (Timeline)" Icon="@Icons.Material.Filled.History">
+                                <MudTimeline TimelinePosition="TimelinePosition.Left">
+                                    @foreach (var h in _os.HistoricoStatus)
+                                    {
+                                        <MudTimelineItem Color="Color.Primary" Size="Size.Small">
+                                            <ItemContent>
+                                                <MudText Typo="Typo.body2" Class="font-weight-bold">
+                                                    @h.StatusNovo
+                                                    @if (h.StatusAnterior.HasValue)
+                                                    {
+                                                        <span style="font-weight: normal; color: var(--mud-palette-text-secondary);"> (de @h.StatusAnterior.Value)</span>
+                                                    }
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @h.Data.ToString("dd/MM/yyyy HH:mm") • Por @(h.UsuarioNome ?? "Sistema")
+                                                </MudText>
+                                                @if (!string.IsNullOrEmpty(h.Observacao))
+                                                {
+                                                    <MudText Typo="Typo.body2" Class="mt-1">@h.Observacao</MudText>
+                                                }
+                                            </ItemContent>
+                                        </MudTimelineItem>
+                                    }
+                                </MudTimeline>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_os != null)
+        {
+            <MudButton StartIcon="@Icons.Material.Filled.Print" Variant="Variant.Outlined" Color="Color.Primary" OnClick="AbrirImpressao">
+                Imprimir Comprovante / Termo
+            </MudButton>
+        }
+        <MudButton OnClick="Fechar" Color="Color.Default">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int OrdemServicoId { get; set; }
+
+    private bool _carregando = true;
+    private OrdemServicoDetalhesDto? _os;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _os = await Mediator.Send(new GetOrdemServicoByIdQuery(OrdemServicoId));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar detalhes da OS: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task AbrirImpressao()
+    {
+        var parameters = new DialogParameters { { nameof(OrdemServicoImprimirDialog.OrdemServicoId), OrdemServicoId } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        await DialogService.ShowAsync<OrdemServicoImprimirDialog>("Comprovante / Termo da OS", parameters, options);
+    }
+
+    private void Fechar() => MudDialog.Close();
+}

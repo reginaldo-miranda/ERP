@@ -1,0 +1,151 @@
+@page "/crm/atividades"
+@using ERP.Application.Crm.Commands
+@using ERP.Application.Crm.DTOs
+@using ERP.Application.Crm.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Atividades &amp; Follow-ups (CRM) - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.EventNote" Class="mr-2" />
+            Atividades &amp; Follow-ups
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Agenda comercial de ligações, reuniões, e-mails e retornos pendentes ou atrasados.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaAtividade">
+        Nova Atividade
+    </MudButton>
+</div>
+
+<MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" Color="Color.Primary" ActivePanelIndexChanged="OnTabChanged" Class="mb-4">
+    <MudTabPanel Text="Pendentes" Icon="@Icons.Material.Filled.PendingActions" />
+    <MudTabPanel Text="Atrasadas" Icon="@Icons.Material.Filled.Warning" />
+    <MudTabPanel Text="Todas (Histórico)" Icon="@Icons.Material.Filled.History" />
+</MudTabs>
+
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (_atividades.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">Nenhuma atividade encontrada para este filtro.</MudAlert>
+}
+else
+{
+    <MudTable Items="_atividades" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>Tipo</MudTh>
+            <MudTh>Assunto</MudTh>
+            <MudTh>Vínculo (Lead / Oportunidade)</MudTh>
+            <MudTh>Data Prevista</MudTh>
+            <MudTh>Responsável</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Tipo">
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">@context.Tipo.ToString()</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Assunto">
+                <b>@context.Assunto</b>
+                @if (!string.IsNullOrWhiteSpace(context.Descricao))
+                {
+                    <div class="mud-text-secondary" style="font-size: 0.78rem;">@context.Descricao</div>
+                }
+            </MudTd>
+            <MudTd DataLabel="Vínculo">
+                @if (!string.IsNullOrWhiteSpace(context.OportunidadeTitulo))
+                {
+                    <div>Op: <b>@context.OportunidadeTitulo</b></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(context.LeadNome))
+                {
+                    <div class="mud-text-secondary" style="font-size: 0.78rem;">Lead: @context.LeadNome</div>
+                }
+            </MudTd>
+            <MudTd DataLabel="Data Prevista">
+                <MudText Typo="Typo.body2" Color="@(context.EstaAtrasada ? Color.Error : Color.Default)" Class="@(context.EstaAtrasada ? "font-weight-bold" : "")">
+                    @context.DataPrevista.ToLocalTime().ToString("dd/MM/yyyy")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Responsável">@(context.ResponsavelNome ?? "-")</MudTd>
+            <MudTd DataLabel="Status">
+                @if (context.Concluida)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Concluída</MudChip>
+                }
+                else if (context.EstaAtrasada)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error">Atrasada</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning">Pendente</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                @if (!context.Concluida)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" Title="Marcar como concluída"
+                                   OnClick="@(() => Concluir(context.Id))" />
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small" Title="Excluir"
+                               OnClick="@(() => Excluir(context.Id))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private bool _carregando = true;
+    private int _tabIndex;
+    private List<AtividadeCrmDto> _atividades = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task OnTabChanged(int index)
+    {
+        _tabIndex = index;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        bool? apenasPendentes = _tabIndex == 0 ? true : null;
+        bool? apenasAtrasadas = _tabIndex == 1 ? true : null;
+        _atividades = await Mediator.Send(new ListarAtividadesCrmQuery(null, null, apenasPendentes, apenasAtrasadas));
+        _carregando = false;
+    }
+
+    private async Task NovaAtividade()
+    {
+        var dialog = await DialogService.ShowAsync<AtividadeCrmDialog>("Nova Atividade");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task Concluir(int id)
+    {
+        await Mediator.Send(new ConcluirAtividadeCrmCommand(id));
+        Snackbar.Add("Atividade concluída.", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private async Task Excluir(int id)
+    {
+        await Mediator.Send(new ExcluirAtividadeCrmCommand(id));
+        Snackbar.Add("Atividade excluída.", Severity.Info);
+        await CarregarAsync();
+    }
+}

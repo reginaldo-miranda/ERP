@@ -95,6 +95,35 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<ERP.Domain.Core.Entities.Fiscal.XmlNotaFiscal> XmlNotasFiscais => Set<ERP.Domain.Core.Entities.Fiscal.XmlNotaFiscal>();
     public DbSet<ERP.Domain.Core.Entities.Fiscal.CartaCorrecao> CartasCorrecao => Set<ERP.Domain.Core.Entities.Fiscal.CartaCorrecao>();
 
+    // Fase 12 - Ordens de Serviço
+    public DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServico> OrdensServico => Set<ERP.Domain.Core.Entities.Servicos.OrdemServico>();
+    public DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServicoPeca> OrdemServicoPecas => Set<ERP.Domain.Core.Entities.Servicos.OrdemServicoPeca>();
+    public DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServicoServico> OrdemServicoServicos => Set<ERP.Domain.Core.Entities.Servicos.OrdemServicoServico>();
+    public DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServicoHistorico> OrdemServicoHistoricos => Set<ERP.Domain.Core.Entities.Servicos.OrdemServicoHistorico>();
+
+    // Fase 11 - CRM Básico
+    public DbSet<ERP.Domain.Core.Entities.Crm.Lead> Leads => Set<ERP.Domain.Core.Entities.Crm.Lead>();
+    public DbSet<ERP.Domain.Core.Entities.Crm.Oportunidade> Oportunidades => Set<ERP.Domain.Core.Entities.Crm.Oportunidade>();
+    public DbSet<ERP.Domain.Core.Entities.Crm.AtividadeCrm> AtividadesCrm => Set<ERP.Domain.Core.Entities.Crm.AtividadeCrm>();
+
+    // Fase 13 - Comissões de Vendedores
+    public DbSet<ERP.Domain.Core.Entities.Comissoes.Vendedor> Vendedores => Set<ERP.Domain.Core.Entities.Comissoes.Vendedor>();
+    public DbSet<ERP.Domain.Core.Entities.Comissoes.RegraComissao> RegrasComissao => Set<ERP.Domain.Core.Entities.Comissoes.RegraComissao>();
+    public DbSet<ERP.Domain.Core.Entities.Comissoes.ComissaoVenda> ComissoesVenda => Set<ERP.Domain.Core.Entities.Comissoes.ComissaoVenda>();
+
+    // Fase 14 - Contratos Recorrentes
+    public DbSet<ERP.Domain.Core.Entities.Contratos.ContratoRecorrente> ContratosRecorrentes => Set<ERP.Domain.Core.Entities.Contratos.ContratoRecorrente>();
+    public DbSet<ERP.Domain.Core.Entities.Contratos.ContratoFaturamento> ContratoFaturamentos => Set<ERP.Domain.Core.Entities.Contratos.ContratoFaturamento>();
+    public DbSet<ERP.Domain.Core.Entities.Contratos.ContratoReajuste> ContratoReajustes => Set<ERP.Domain.Core.Entities.Contratos.ContratoReajuste>();
+
+    // Fase 10 - PDV (Multi-Terminal + Pré-Venda)
+    public DbSet<ERP.Domain.Core.Entities.Pdv.TerminalPdv> TerminaisPdv => Set<ERP.Domain.Core.Entities.Pdv.TerminalPdv>();
+    public DbSet<ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv> SessoesCaixaPdv => Set<ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv>();
+    public DbSet<ERP.Domain.Core.Entities.Pdv.MovimentoCaixaPdv> MovimentosCaixaPdv => Set<ERP.Domain.Core.Entities.Pdv.MovimentoCaixaPdv>();
+    public DbSet<ERP.Domain.Core.Entities.Pdv.VendaPdv> VendasPdv => Set<ERP.Domain.Core.Entities.Pdv.VendaPdv>();
+    public DbSet<ERP.Domain.Core.Entities.Pdv.VendaPdvItem> VendaPdvItens => Set<ERP.Domain.Core.Entities.Pdv.VendaPdvItem>();
+    public DbSet<ERP.Domain.Core.Entities.Pdv.VendaPdvPagamento> VendaPdvPagamentos => Set<ERP.Domain.Core.Entities.Pdv.VendaPdvPagamento>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

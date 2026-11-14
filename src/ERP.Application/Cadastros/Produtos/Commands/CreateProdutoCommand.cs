@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ERP.Application.Cadastros.Produtos.Commands;
 
-public record CreateProdutoCommand(string Codigo, string Nome, string? Descricao, int? CategoriaId, int? UnidadeMedidaId, decimal PrecoVenda, decimal PrecoCusto, decimal EstoqueMinimo, bool ControlaLote, bool ControlaSerie, string? Ncm, string? Cest, string? Cfop, string? CodigoBarras) : IRequest<Result<ProdutoDto>>;
+public record CreateProdutoCommand(string Codigo, string Nome, string? Descricao, int? CategoriaId, int? UnidadeMedidaId, decimal PrecoVenda, decimal PrecoCusto, decimal EstoqueMinimo, bool ControlaLote, bool ControlaSerie, string? Ncm, string? Cest, string? Cfop, string? CodigoBarras, string? ImagemUrl = null) : IRequest<Result<ProdutoDto>>;
 
 public class CreateProdutoCommandValidator : AbstractValidator<CreateProdutoCommand>
 {
@@ -40,10 +40,11 @@ public class CreateProdutoCommandHandler : IRequestHandler<CreateProdutoCommand,
             PrecoVenda = request.PrecoVenda, PrecoCusto = request.PrecoCusto, EstoqueMinimo = request.EstoqueMinimo,
             ControlaLote = request.ControlaLote, ControlaSerie = request.ControlaSerie,
             Ncm = request.Ncm, Cest = request.Cest, Cfop = request.Cfop, CodigoBarras = request.CodigoBarras,
+            ImagemUrl = request.ImagemUrl,
             EmpresaId = _empresaService.EmpresaId!.Value
         };
         _context.Produtos.Add(produto);
         await _context.SaveChangesAsync(cancellationToken);
-        return Result<ProdutoDto>.Ok(new ProdutoDto { Id = produto.Id, Codigo = produto.Codigo, Nome = produto.Nome, PrecoVenda = produto.PrecoVenda, Ativo = produto.Ativo });
+        return Result<ProdutoDto>.Ok(new ProdutoDto { Id = produto.Id, Codigo = produto.Codigo, Nome = produto.Nome, PrecoVenda = produto.PrecoVenda, ImagemUrl = produto.ImagemUrl, Ativo = produto.Ativo });
     }
 }

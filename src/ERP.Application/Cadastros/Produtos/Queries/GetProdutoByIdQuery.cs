@@ -46,6 +46,7 @@ public class GetProdutoByIdQueryHandler : IRequestHandler<GetProdutoByIdQuery, R
             Cest = p.Cest,
             Cfop = p.Cfop,
             CodigoBarras = p.CodigoBarras,
+            ImagemUrl = p.ImagemUrl,
             Ativo = p.Ativo
         });
     }

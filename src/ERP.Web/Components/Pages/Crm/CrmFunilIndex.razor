@@ -1,0 +1,372 @@
+@page "/crm/funil"
+@using ERP.Application.Crm.Commands
+@using ERP.Application.Crm.DTOs
+@using ERP.Application.Crm.Queries
+@using ERP.Domain.Core.Enums
+@using ERP.Infrastructure.Identity
+@using MediatR
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject UserManager<ApplicationUser> UserManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Funil de Vendas (CRM) - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.ViewKanban" Class="mr-2" />
+            Funil de Vendas (CRM)
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Acompanhe oportunidades, movimente etapas e gere orçamentos ou pedidos com 1 clique.
+        </MudText>
+    </div>
+    <div class="d-flex align-center gap-2">
+        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary">
+            <MudButton Variant="@(_modoKanban ? Variant.Filled : Variant.Outlined)" StartIcon="@Icons.Material.Filled.ViewKanban" OnClick="@(() => _modoKanban = true)">Kanban</MudButton>
+            <MudButton Variant="@(!_modoKanban ? Variant.Filled : Variant.Outlined)" StartIcon="@Icons.Material.Filled.List" OnClick="@(() => _modoKanban = false)">Lista</MudButton>
+        </MudButtonGroup>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaOportunidade">
+            Nova Oportunidade
+        </MudButton>
+    </div>
+</div>
+
+<!-- KPIs do CRM -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">PIPELINE ABERTO</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">@_kpis.ValorPipeline.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">@_kpis.OportunidadesAbertas oportunidade(s)</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">GANHO NO MÊS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_kpis.ValorGanhoMes.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">Fechamentos do mês</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">LEADS ATIVOS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold">@_kpis.LeadsNovosOuEmContato</MudText>
+                <MudText Typo="Typo.caption">de @_kpis.TotalLeads total</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">TAXA CONVERSÃO</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Info">@_kpis.TaxaConversaoPercent.ToString("N1")%</MudText>
+                <MudText Typo="Typo.caption">Leads → Clientes</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">ATIVIDADES HOJE</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Warning">@_kpis.AtividadesHoje</MudText>
+                <MudText Typo="Typo.caption">Pendentes para hoje</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">ATRASADAS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="@(_kpis.AtividadesAtrasadas > 0 ? Color.Error : Color.Default)">@_kpis.AtividadesAtrasadas</MudText>
+                <MudText Typo="Typo.caption">Follow-ups vencidos</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros -->
+<MudPaper Elevation="1" Class="pa-3 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="5">
+            <MudTextField @bind-Value="_busca" Label="Buscar por código, título, lead ou cliente" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" OnDebounceIntervalElapsed="CarregarAsync" DebounceInterval="350" />
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="string" Value="_responsavelFiltro" ValueChanged="OnResponsavelFiltroChanged" Label="Responsável" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                @foreach (var u in _usuarios)
+                {
+                    <MudSelectItem Value="@u.Id">@u.NomeCompleto</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3" Class="d-flex align-center">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarAsync" FullWidth="true">Atualizar</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else if (_modoKanban)
+{
+    <!-- VISÃO KANBAN -->
+    <div style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px;">
+        @foreach (var etapa in _etapas)
+        {
+            var itensEtapa = _oportunidades.Where(o => o.Etapa == etapa).ToList();
+            var totalEtapa = itensEtapa.Sum(o => o.ValorEstimado);
+
+            <MudPaper Elevation="2" Class="pa-3" Style="min-width: 285px; max-width: 285px; background-color: var(--mud-palette-background-grey);">
+                <div class="d-flex justify-space-between align-center mb-1">
+                    <MudChip T="string" Size="Size.Small" Color="@CorEtapa(etapa)">@NomeEtapa(etapa)</MudChip>
+                    <MudText Typo="Typo.caption" Class="font-weight-bold">@itensEtapa.Count</MudText>
+                </div>
+                <MudText Typo="Typo.subtitle2" Class="font-weight-bold mb-3">@totalEtapa.ToString("C2")</MudText>
+
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var op in itensEtapa)
+                    {
+                        <MudCard Elevation="1" Class="pa-2">
+                            <div class="d-flex justify-space-between align-center">
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@op.Codigo</MudText>
+                                @if (op.TemAtividadeAtrasada)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Text">Atrasada</MudChip>
+                                }
+                            </div>
+                            <MudText Typo="Typo.body2" Class="font-weight-bold mt-1" Style="cursor:pointer;" @onclick="@(() => EditarOportunidade(op.Id))">
+                                @op.Titulo
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @(op.ClienteNome ?? op.LeadNome ?? "Sem vínculo")
+                            </MudText>
+                            <div class="d-flex justify-space-between align-center mt-2">
+                                <MudText Typo="Typo.body2" Color="Color.Primary" Class="font-weight-bold">@op.ValorEstimado.ToString("C2")</MudText>
+                                <MudText Typo="Typo.caption">@op.Probabilidade%</MudText>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(op.ResponsavelNome))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-1">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" /> @op.ResponsavelNome
+                                </MudText>
+                            }
+
+                            <MudDivider Class="my-2" />
+
+                            <div class="d-flex justify-space-between align-center">
+                                <div class="d-flex">
+                                    @if (etapa != EtapaFunil.Prospeccao && etapa != EtapaFunil.Ganha && etapa != EtapaFunil.Perdida)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" Title="Voltar etapa"
+                                                       OnClick="@(() => MoverEtapa(op, (EtapaFunil)((int)etapa - 1)))" />
+                                    }
+                                    @if ((int)etapa < (int)EtapaFunil.Ganha)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small" Color="Color.Primary" Title="Avançar etapa"
+                                                       OnClick="@(() => MoverEtapa(op, (EtapaFunil)((int)etapa + 1)))" />
+                                    }
+                                </div>
+                                <div class="d-flex">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Title="Detalhes / Editar" OnClick="@(() => EditarOportunidade(op.Id))" />
+                                    @if (!op.OrcamentoId.HasValue && etapa != EtapaFunil.Perdida)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.RequestQuote" Size="Size.Small" Color="Color.Info" Title="Gerar Orçamento"
+                                                       OnClick="@(() => GerarOrcamento(op.Id))" />
+                                    }
+                                    @if (!op.PedidoVendaId.HasValue && etapa != EtapaFunil.Perdida)
+                                    {
+                                        <MudIconButton Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Small" Color="Color.Success" Title="Gerar Pedido de Venda"
+                                                       OnClick="@(() => GerarPedido(op.Id))" />
+                                    }
+                                </div>
+                            </div>
+                        </MudCard>
+                    }
+                </div>
+            </MudPaper>
+        }
+    </div>
+}
+else
+{
+    <!-- VISÃO LISTA -->
+    <MudTable Items="_oportunidades" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>Código</MudTh>
+            <MudTh>Título</MudTh>
+            <MudTh>Lead / Cliente</MudTh>
+            <MudTh>Etapa</MudTh>
+            <MudTh>Valor Estimado</MudTh>
+            <MudTh>Prob.</MudTh>
+            <MudTh>Responsável</MudTh>
+            <MudTh>Comercial</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Código">@context.Codigo</MudTd>
+            <MudTd DataLabel="Título">
+                <b>@context.Titulo</b>
+                @if (context.TemAtividadeAtrasada)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Class="ml-1">Atrasada</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Lead / Cliente">@(context.ClienteNome ?? context.LeadNome ?? "-")</MudTd>
+            <MudTd DataLabel="Etapa">
+                <MudChip T="string" Size="Size.Small" Color="@CorEtapa(context.Etapa)">@NomeEtapa(context.Etapa)</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Valor">@context.ValorEstimado.ToString("C2")</MudTd>
+            <MudTd DataLabel="Prob.">@context.Probabilidade%</MudTd>
+            <MudTd DataLabel="Responsável">@(context.ResponsavelNome ?? "-")</MudTd>
+            <MudTd DataLabel="Comercial">
+                @if (!string.IsNullOrWhiteSpace(context.OrcamentoNumero))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.OrcamentoNumero</MudChip>
+                }
+                @if (!string.IsNullOrWhiteSpace(context.PedidoVendaNumero))
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@context.PedidoVendaNumero</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => EditarOportunidade(context.Id))" />
+                @if (!context.OrcamentoId.HasValue && context.Etapa != EtapaFunil.Perdida)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.RequestQuote" Size="Size.Small" Color="Color.Info" Title="Gerar Orçamento" OnClick="@(() => GerarOrcamento(context.Id))" />
+                }
+                @if (!context.PedidoVendaId.HasValue && context.Etapa != EtapaFunil.Perdida)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.ShoppingBag" Size="Size.Small" Color="Color.Success" Title="Gerar Pedido" OnClick="@(() => GerarPedido(context.Id))" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private bool _carregando = true;
+    private bool _modoKanban = true;
+    private string? _busca;
+    private string? _responsavelFiltro;
+
+    private CrmResumoKpiDto _kpis = new();
+    private List<OportunidadeDto> _oportunidades = new();
+    private List<ApplicationUser> _usuarios = new();
+
+    private readonly EtapaFunil[] _etapas =
+    {
+        EtapaFunil.Prospeccao,
+        EtapaFunil.Qualificacao,
+        EtapaFunil.Proposta,
+        EtapaFunil.Negociacao,
+        EtapaFunil.Ganha,
+        EtapaFunil.Perdida
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarios = await UserManager.Users.AsNoTracking().Where(u => u.Ativo).OrderBy(u => u.NomeCompleto).ToListAsync();
+        await CarregarAsync();
+    }
+
+    private async Task OnResponsavelFiltroChanged(string? userId)
+    {
+        _responsavelFiltro = userId;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        _kpis = await Mediator.Send(new ObterResumoKpiCrmQuery());
+        _oportunidades = await Mediator.Send(new ListarOportunidadesQuery(_busca, null, _responsavelFiltro));
+        _carregando = false;
+    }
+
+    private async Task NovaOportunidade()
+    {
+        var dialog = await DialogService.ShowAsync<OportunidadeDialog>("Nova Oportunidade");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+            await CarregarAsync();
+    }
+
+    private async Task EditarOportunidade(int id)
+    {
+        var parameters = new DialogParameters<OportunidadeDialog> { { x => x.OportunidadeId, id } };
+        var dialog = await DialogService.ShowAsync<OportunidadeDialog>("Oportunidade", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled)
+            await CarregarAsync();
+    }
+
+    private async Task MoverEtapa(OportunidadeDto op, EtapaFunil novaEtapa)
+    {
+        await Mediator.Send(new MoverEtapaOportunidadeCommand(op.Id, novaEtapa));
+        Snackbar.Add($"Oportunidade movida para {NomeEtapa(novaEtapa)}.", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private async Task GerarOrcamento(int id)
+    {
+        try
+        {
+            await Mediator.Send(new GerarOrcamentoDeOportunidadeCommand(id));
+            Snackbar.Add("Orçamento gerado com sucesso em Vendas > Orçamentos!", Severity.Success);
+            await CarregarAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private async Task GerarPedido(int id)
+    {
+        try
+        {
+            await Mediator.Send(new GerarPedidoDeOportunidadeCommand(id));
+            Snackbar.Add("Pedido de Venda gerado com sucesso em Vendas > Pedidos!", Severity.Success);
+            await CarregarAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private static string NomeEtapa(EtapaFunil etapa) => etapa switch
+    {
+        EtapaFunil.Prospeccao => "Prospecção",
+        EtapaFunil.Qualificacao => "Qualificação",
+        EtapaFunil.Proposta => "Proposta",
+        EtapaFunil.Negociacao => "Negociação",
+        EtapaFunil.Ganha => "Ganha",
+        EtapaFunil.Perdida => "Perdida",
+        _ => etapa.ToString()
+    };
+
+    private static Color CorEtapa(EtapaFunil etapa) => etapa switch
+    {
+        EtapaFunil.Prospeccao => Color.Default,
+        EtapaFunil.Qualificacao => Color.Info,
+        EtapaFunil.Proposta => Color.Primary,
+        EtapaFunil.Negociacao => Color.Warning,
+        EtapaFunil.Ganha => Color.Success,
+        EtapaFunil.Perdida => Color.Error,
+        _ => Color.Default
+    };
+}

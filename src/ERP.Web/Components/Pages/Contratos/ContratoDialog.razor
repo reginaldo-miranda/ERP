@@ -1,0 +1,226 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Contratos.Commands
+@using ERP.Application.Contratos.DTOs
+@using ERP.Application.Contratos.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Entities.Financeiro
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IApplicationDbContext Context
+@inject ICurrentEmpresaService CurrentEmpresaService
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@(ContratoId.HasValue ? Icons.Material.Filled.Edit : Icons.Material.Filled.NoteAdd)" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">@(ContratoId.HasValue ? $"Editar Contrato ({_numero})" : "Novo Contrato Recorrente")</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" sm="8">
+                    <MudTextField @bind-Value="_dto.Titulo" Label="Título do Contrato *" Required="true" Variant="Variant.Outlined" Dense="true" Placeholder="Ex: Mensalidade Suporte TI" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="StatusContrato" @bind-Value="_dto.Status" Label="Status" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="StatusContrato.Rascunho">Rascunho</MudSelectItem>
+                        <MudSelectItem Value="StatusContrato.Ativo">Ativo</MudSelectItem>
+                        <MudSelectItem Value="StatusContrato.Suspenso">Suspenso</MudSelectItem>
+                        <MudSelectItem Value="StatusContrato.Encerrado">Encerrado</MudSelectItem>
+                        <MudSelectItem Value="StatusContrato.Cancelado">Cancelado</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int" @bind-Value="_dto.ClienteId" Label="Cliente *" Required="true" Variant="Variant.Outlined" Dense="true">
+                        @foreach (var c in _clientes)
+                        {
+                            <MudSelectItem Value="@c.Id">@c.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="_dto.ServicoId" Label="Serviço Vinculado (opcional)" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                        @foreach (var s in _servicos)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)s.Id)">@s.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="PeriodicidadeContrato" @bind-Value="_dto.Periodicidade" Label="Periodicidade" Variant="Variant.Outlined" Dense="true">
+                        <MudSelectItem Value="PeriodicidadeContrato.Mensal">Mensal</MudSelectItem>
+                        <MudSelectItem Value="PeriodicidadeContrato.Bimestral">Bimestral</MudSelectItem>
+                        <MudSelectItem Value="PeriodicidadeContrato.Trimestral">Trimestral</MudSelectItem>
+                        <MudSelectItem Value="PeriodicidadeContrato.Semestral">Semestral</MudSelectItem>
+                        <MudSelectItem Value="PeriodicidadeContrato.Anual">Anual</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal" @bind-Value="_dto.ValorMensal" Label="Valor por Ciclo (R$) *" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="int" @bind-Value="_dto.DiaVencimento" Label="Dia Vencimento (1-28)" Min="1" Max="28" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Início Vigência" @bind-Date="_dataInicio" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Fim Vigência (opcional)" @bind-Date="_dataFim" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" Clearable="true" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudDatePicker Label="Próxima Cobrança" @bind-Date="_proximaCobranca" Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy" />
+                </MudItem>
+
+                <MudItem xs="12" sm="4">
+                    <MudSelect T="int?" @bind-Value="_dto.FormaPagamentoId" Label="Forma de Pagamento" Variant="Variant.Outlined" Dense="true" Clearable="true">
+                        @foreach (var fp in _formasPagamento)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)fp.Id)">@fp.Nome</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudTextField @bind-Value="_dto.IndiceReajuste" Label="Índice de Reajuste" Variant="Variant.Outlined" Dense="true" Placeholder="IPCA / IGP-M / Fixo" />
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudNumericField T="decimal" @bind-Value="_dto.PercentualReajustePadrao" Label="% Reajuste Padrão" Format="N2" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudSwitch T="bool" @bind-Value="_dto.RenovacaoAutomatica" Label="Renovação automática ao vencer vigência (+12 meses)" Color="Color.Primary" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_dto.Descricao" Label="Descrição / Escopo" Lines="2" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_dto.Observacoes" Label="Observações Internas" Lines="2" Variant="Variant.Outlined" Dense="true" />
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancelar">Cancelar</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Salvar" Disabled="@(_salvando || _carregando)">
+            @(_salvando ? "Salvando..." : "Salvar")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int? ContratoId { get; set; }
+
+    private SalvarContratoDto _dto = new();
+    private string _numero = string.Empty;
+    private DateTime? _dataInicio = DateTime.Today;
+    private DateTime? _dataFim;
+    private DateTime? _proximaCobranca = DateTime.Today;
+
+    private List<Cliente> _clientes = new();
+    private List<Servico> _servicos = new();
+    private List<FormaPagamento> _formasPagamento = new();
+    private bool _carregando = true;
+    private bool _salvando;
+
+    protected override async Task OnInitializedAsync()
+    {
+        int empresaId = CurrentEmpresaService.EmpresaId ?? 1;
+        _clientes = await Context.Clientes.AsNoTracking().Where(c => c.EmpresaId == empresaId).OrderBy(c => c.Nome).ToListAsync();
+        _servicos = await Context.Servicos.AsNoTracking().Where(s => s.EmpresaId == empresaId && s.Ativo).OrderBy(s => s.Nome).ToListAsync();
+        _formasPagamento = await Context.FormasPagamento.AsNoTracking().Where(f => f.EmpresaId == empresaId && f.Ativo).OrderBy(f => f.Nome).ToListAsync();
+
+        if (ContratoId.HasValue)
+        {
+            var c = await Mediator.Send(new ObterContratoPorIdQuery(ContratoId.Value));
+            if (c != null)
+            {
+                _numero = c.Numero;
+                _dataInicio = c.DataInicio.ToLocalTime();
+                _dataFim = c.DataFim?.ToLocalTime();
+                _proximaCobranca = c.ProximaCobranca.ToLocalTime();
+                _dto = new SalvarContratoDto
+                {
+                    Titulo = c.Titulo,
+                    Descricao = c.Descricao,
+                    ClienteId = c.ClienteId,
+                    ServicoId = c.ServicoId,
+                    FormaPagamentoId = c.FormaPagamentoId,
+                    Periodicidade = c.Periodicidade,
+                    Status = c.Status,
+                    DataInicio = c.DataInicio,
+                    DataFim = c.DataFim,
+                    DiaVencimento = c.DiaVencimento,
+                    ValorMensal = c.ValorMensal,
+                    PercentualReajustePadrao = c.PercentualReajustePadrao,
+                    IndiceReajuste = c.IndiceReajuste,
+                    RenovacaoAutomatica = c.RenovacaoAutomatica,
+                    ProximaCobranca = c.ProximaCobranca,
+                    Observacoes = c.Observacoes
+                };
+            }
+        }
+        else if (_clientes.Count > 0)
+        {
+            _dto.ClienteId = _clientes[0].Id;
+        }
+
+        _carregando = false;
+    }
+
+    private void Cancelar() => MudDialog.Cancel();
+
+    private async Task Salvar()
+    {
+        if (string.IsNullOrWhiteSpace(_dto.Titulo) || _dto.ClienteId <= 0)
+        {
+            Snackbar.Add("Informe o título e o cliente do contrato.", Severity.Warning);
+            return;
+        }
+
+        _dto.DataInicio = _dataInicio ?? DateTime.Today;
+        _dto.DataFim = _dataFim;
+        _dto.ProximaCobranca = _proximaCobranca ?? DateTime.Today;
+
+        _salvando = true;
+        try
+        {
+            if (ContratoId.HasValue)
+            {
+                await Mediator.Send(new AtualizarContratoCommand(ContratoId.Value, _dto));
+                Snackbar.Add("Contrato atualizado.", Severity.Success);
+            }
+            else
+            {
+                await Mediator.Send(new CriarContratoCommand(_dto));
+                Snackbar.Add("Contrato criado com sucesso.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar contrato: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _salvando = false;
+        }
+    }
+}

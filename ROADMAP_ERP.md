@@ -745,40 +745,46 @@ decisão baseada em dados.
 
 ## FASES FUTURAS
 
-### FASE 10 — PDV (Ponto de Venda)
+### FASE 10 — PDV (Ponto de Venda) (Implementado — Web Fullscreen Multi-Terminal)
 
-- Aplicação Blazor WASM separada
-- Interface otimizada para operação rápida de caixa
-- Suporte offline com IndexedDB + Service Worker
-- Sincronização automática quando voltar online
-- Emissão de NFC-e integrada
-- Impressão de cupom fiscal
+- [x] Interface Web fullscreen otimizada para operação rápida de caixa (`/pdv`)
+- [x] Multi-terminal independente (`/pdv/terminais`: Caixa, Pré-Venda, Híbrido)
+- [x] Sessões de caixa independentes por terminal (Abertura, Sangria, Suprimento, Fechamento)
+- [x] Fluxo de Pré-Venda em balcão e recebimento em qualquer caixa aberto
+- [x] Pagamento múltiplo com cálculo automático de troco, baixa de estoque, lançamento financeiro e comissão
+- [x] Impressão de cupom não-fiscal (80mm / A4)
+- [ ] Suporte offline com IndexedDB + Service Worker / Aplicação WASM separada (futuro)
+- [ ] Emissão de NFC-e integrada (futuro)
 
 ### FASE 11 — CRM Básico
 
-- Cadastro de Leads e Oportunidades
-- Funil de vendas
-- Atividades e follow-ups
-- Conversão de lead em cliente
+- [x] Cadastro de Leads e Oportunidades (vinculados a Usuário Responsável / Vendedor)
+- [x] Funil de vendas (visão Kanban + Lista com etapas padrão e probabilidade)
+- [x] Atividades e follow-ups (timeline, agenda de retornos e destaque para atrasadas)
+- [x] Conversão de lead em cliente + geração de Orçamento e Pedido de Venda com 1 clique
 
 ### FASE 12 — Ordens de Serviço
 
-- CRUD de Ordens de Serviço
-- Apontamento de horas e materiais
-- Status do serviço (workflow)
-- Faturamento de OS
+- [x] CRUD completo de Ordens de Serviço (Assistência Técnica & Serviços)
+- [x] Identificação de equipamento, marca, modelo, número de série, avarias e defeito relatado
+- [x] Apontamento de serviços/mão de obra e peças/materiais utilizados
+- [x] Laudo técnico, diagnóstico e parecer de bancada
+- [x] Workflow completo de status (Aberta, Orçamento, Em Execução, Aguardando Peças, Concluída, Faturada, Cancelada)
+- [x] Faturamento de OS integrado: baixa automática no estoque + geração de parcelas no Contas a Receber
+- [x] Histórico de status (timeline de auditoria da OS)
+- [x] Emissão e impressão em PDF/A4 do termo de entrada e comprovante com termo de garantia
 
 ### FASE 13 — Comissões de Vendedores
 
-- Cadastro de vendedores e regras de comissão
-- Cálculo automático por venda
-- Relatório de comissões por período
+- [x] Cadastro de vendedores e regras de comissão
+- [x] Cálculo automático por venda (ao faturar Pedido de Venda + processamento retroativo)
+- [x] Relatório de comissões por período (com aprovação e pagamento individual ou em lote)
 
 ### FASE 14 — Contratos Recorrentes
 
-- Gestão de contratos com faturamento mensal/periódico
-- Geração automática de contas a receber
-- Renovação e reajuste automático
+- [x] Gestão de contratos com faturamento mensal/periódico (Mensal, Bimestral, Trimestral, Semestral, Anual)
+- [x] Geração automática de contas a receber (individual ou em lote para vencidos)
+- [x] Renovação e reajuste automático (com histórico de reajustes e faturamentos)
 
 ### FASE 15 — API Pública
 

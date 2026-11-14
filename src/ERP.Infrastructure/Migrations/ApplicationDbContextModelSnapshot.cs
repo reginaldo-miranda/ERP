@@ -432,6 +432,9 @@ namespace ERP.Infrastructure.Migrations
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)");
 
+                    b.Property<string>("ImagemUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("Ncm")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -585,6 +588,224 @@ namespace ERP.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("UnidadesMedida", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.ComissaoVenda", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DataAprovacao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataPagamento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DataVenda")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FaturamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("PedidoVendaId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PercentualAplicado")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<int?>("RegraComissaoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ValorBaseVenda")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorComissao")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("VendedorId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataVenda");
+
+                    b.HasIndex("FaturamentoId");
+
+                    b.HasIndex("PedidoVendaId");
+
+                    b.HasIndex("RegraComissaoId");
+
+                    b.HasIndex("VendedorId");
+
+                    b.HasIndex("EmpresaId", "PedidoVendaId")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "VendedorId", "Status");
+
+                    b.ToTable("ComissoesVenda", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.RegraComissao", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("Percentual")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<int>("Prioridade")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ValorFixo")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("ValorMinimoVenda")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("VendedorId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VendedorId");
+
+                    b.HasIndex("EmpresaId", "VendedorId");
+
+                    b.ToTable("RegrasComissao", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.Vendedor", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Cpf")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("PercentualPadrao")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("Telefone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("TipoComissaoPadrao")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsuarioId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal>("ValorFixoPadrao")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId", "Nome");
+
+                    b.HasIndex("EmpresaId", "UsuarioId");
+
+                    b.ToTable("Vendedores", (string)null);
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.EntradaMercadoria", b =>
@@ -1185,6 +1406,500 @@ namespace ERP.Infrastructure.Migrations
                     b.HasIndex("SolicitacaoCompraId");
 
                     b.ToTable("SolicitacaoCompraItens", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoFaturamento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Competencia")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("ContaReceberId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ContratoRecorrenteId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataReferencia")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DataVencimento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ValorFaturado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContaReceberId");
+
+                    b.HasIndex("ContratoRecorrenteId");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.ToTable("ContratoFaturamentos", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoReajuste", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ContratoRecorrenteId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataReajuste")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Indice")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("PercentualAplicado")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<decimal>("ValorAnterior")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorNovo")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContratoRecorrenteId");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.ToTable("ContratoReajustes", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoRecorrente", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ClienteId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DataFim")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DataInicio")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataUltimoFaturamento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataUltimoReajuste")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("DiaVencimento")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FormaPagamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IndiceReajuste")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("PercentualReajustePadrao")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<int>("Periodicidade")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ProximaCobranca")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("RenovacaoAutomatica")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("ServicoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("ValorMensal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("FormaPagamentoId");
+
+                    b.HasIndex("ServicoId");
+
+                    b.HasIndex("EmpresaId", "Numero")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "Status", "ProximaCobranca");
+
+                    b.ToTable("ContratosRecorrentes", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.AtividadeCrm", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Assunto")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Concluida")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DataConclusao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DataPrevista")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OportunidadeId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResponsavelId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResponsavelNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LeadId");
+
+                    b.HasIndex("OportunidadeId");
+
+                    b.HasIndex("EmpresaId", "Concluida", "DataPrevista");
+
+                    b.ToTable("CrmAtividades", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.Lead", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Cargo")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Celular")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("ClienteConvertidoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CpfCnpj")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DataConversao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("EmpresaContato")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Origem")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResponsavelId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResponsavelNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Telefone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("TipoPessoa")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteConvertidoId");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("ResponsavelId");
+
+                    b.HasIndex("EmpresaId", "Status");
+
+                    b.ToTable("CrmLeads", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.Oportunidade", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("ClienteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DataFechamentoPrevista")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataFechamentoReal")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descricao")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Etapa")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MotivoPerda")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("OrcamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PedidoVendaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Probabilidade")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResponsavelId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResponsavelNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Titulo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("ValorEstimado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("LeadId");
+
+                    b.HasIndex("OrcamentoId");
+
+                    b.HasIndex("PedidoVendaId");
+
+                    b.HasIndex("ResponsavelId");
+
+                    b.HasIndex("EmpresaId", "Codigo")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "Etapa");
+
+                    b.ToTable("CrmOportunidades", (string)null);
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Empresa", b =>
@@ -3772,6 +4487,420 @@ namespace ERP.Infrastructure.Migrations
                     b.ToTable("PapelPermissoes", (string)null);
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.MovimentoCaixaPdv", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataMovimento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("OperadorNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("SessaoCaixaPdvId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("SessaoCaixaPdvId");
+
+                    b.ToTable("MovimentosCaixaPdv", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataAbertura")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataFechamento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DiferencaQuebra")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ObservacoesFechamento")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("OperadorId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("OperadorNome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TerminalPdvId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ValorAbertura")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("ValorFechamentoCalculado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal?>("ValorFechamentoInformado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TerminalPdvId");
+
+                    b.HasIndex("EmpresaId", "TerminalPdvId", "Status");
+
+                    b.ToTable("SessoesCaixaPdv", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.TerminalPdv", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("ContaBancariaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("DepositoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ImpressoraCupom")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int>("Tipo")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContaBancariaId");
+
+                    b.HasIndex("DepositoId");
+
+                    b.HasIndex("EmpresaId", "Codigo")
+                        .IsUnique();
+
+                    b.ToTable("TerminaisPdv", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdv", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("ClienteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConsumidorCpf")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ConsumidorNome")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataVenda")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("SessaoCaixaPdvId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TerminalPdvId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Troco")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorBruto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorDesconto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int?>("VendedorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("VendedorNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("SessaoCaixaPdvId");
+
+                    b.HasIndex("TerminalPdvId");
+
+                    b.HasIndex("VendedorId");
+
+                    b.HasIndex("EmpresaId", "Numero")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "Status");
+
+                    b.ToTable("VendasPdv", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdvItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("CodigoProduto")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NomeProduto")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantidade")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("ValorDesconto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorUnitario")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("VendaPdvId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("VendaPdvId");
+
+                    b.ToTable("VendaPdvItens", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdvPagamento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("DescricaoForma")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FormaPagamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("VendaPdvId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("FormaPagamentoId");
+
+                    b.HasIndex("VendaPdvId");
+
+                    b.ToTable("VendaPdvPagamentos", (string)null);
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.Permissao", b =>
                 {
                     b.Property<int>("Id")
@@ -3809,6 +4938,359 @@ namespace ERP.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Permissoes", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServico", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Acessorios")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ClienteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CondicoesGerais")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DataAbertura")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataCancelamento")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataConclusao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DataEntrega")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DefeitoRelatado")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Equipamento")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int?>("FormaPagamentoId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("IdParcelamento")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LaudoTecnico")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Marca")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Modelo")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("MotivoCancelamento")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Numero")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("NumeroParcelas")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NumeroSerie")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Observacoes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("PrevisaoConclusao")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Prioridade")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SolucaoTecnica")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TecnicoResponsavel")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("TermoGarantia")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("ValorDesconto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorPecas")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorServicos")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClienteId");
+
+                    b.HasIndex("Equipamento");
+
+                    b.HasIndex("FormaPagamentoId");
+
+                    b.HasIndex("NumeroSerie");
+
+                    b.HasIndex("EmpresaId", "Numero")
+                        .IsUnique();
+
+                    b.HasIndex("EmpresaId", "Status");
+
+                    b.ToTable("OrdensServico", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServicoHistorico", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Data")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("OrdemServicoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("StatusAnterior")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StatusNovo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UsuarioNome")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Data");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("OrdemServicoId");
+
+                    b.ToTable("OrdemServicoHistoricos", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServicoPeca", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("BaixadoEstoque")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("CustoUnitario")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int?>("DepositoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OrdemServicoId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ProdutoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantidade")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("ValorDesconto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorUnitario")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepositoId");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("OrdemServicoId");
+
+                    b.HasIndex("ProdutoId");
+
+                    b.ToTable("OrdemServicoPecas", (string)null);
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServicoServico", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("AlteradoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AlteradoPor")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CriadoPor")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Descricao")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<int>("EmpresaId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OrdemServicoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Quantidade")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<int?>("ServicoId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tecnico")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal>("ValorDesconto")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("ValorUnitario")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpresaId");
+
+                    b.HasIndex("OrdemServicoId");
+
+                    b.HasIndex("ServicoId");
+
+                    b.ToTable("OrdemServicoServicos", (string)null);
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.UsuarioEmpresa", b =>
@@ -4608,6 +6090,76 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Empresa");
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.ComissaoVenda", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Vendas.Faturamento", "Faturamento")
+                        .WithMany()
+                        .HasForeignKey("FaturamentoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Vendas.PedidoVenda", "PedidoVenda")
+                        .WithMany()
+                        .HasForeignKey("PedidoVendaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Comissoes.RegraComissao", "RegraComissao")
+                        .WithMany()
+                        .HasForeignKey("RegraComissaoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Comissoes.Vendedor", "Vendedor")
+                        .WithMany("Comissoes")
+                        .HasForeignKey("VendedorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Faturamento");
+
+                    b.Navigation("PedidoVenda");
+
+                    b.Navigation("RegraComissao");
+
+                    b.Navigation("Vendedor");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.RegraComissao", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Comissoes.Vendedor", "Vendedor")
+                        .WithMany("Regras")
+                        .HasForeignKey("VendedorId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Vendedor");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.Vendedor", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.EntradaMercadoria", b =>
                 {
                     b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "Deposito")
@@ -4814,6 +6366,166 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Produto");
 
                     b.Navigation("SolicitacaoCompra");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoFaturamento", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Financeiro.ContaReceber", "ContaReceber")
+                        .WithMany()
+                        .HasForeignKey("ContaReceberId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Contratos.ContratoRecorrente", "ContratoRecorrente")
+                        .WithMany("Faturamentos")
+                        .HasForeignKey("ContratoRecorrenteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ContaReceber");
+
+                    b.Navigation("ContratoRecorrente");
+
+                    b.Navigation("Empresa");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoReajuste", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Contratos.ContratoRecorrente", "ContratoRecorrente")
+                        .WithMany("Reajustes")
+                        .HasForeignKey("ContratoRecorrenteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ContratoRecorrente");
+
+                    b.Navigation("Empresa");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoRecorrente", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Financeiro.FormaPagamento", "FormaPagamento")
+                        .WithMany()
+                        .HasForeignKey("FormaPagamentoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Servico", "Servico")
+                        .WithMany()
+                        .HasForeignKey("ServicoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("FormaPagamento");
+
+                    b.Navigation("Servico");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.AtividadeCrm", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Crm.Lead", "Lead")
+                        .WithMany("Atividades")
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Crm.Oportunidade", "Oportunidade")
+                        .WithMany("Atividades")
+                        .HasForeignKey("OportunidadeId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("Oportunidade");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.Lead", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Cliente", "ClienteConvertido")
+                        .WithMany()
+                        .HasForeignKey("ClienteConvertidoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClienteConvertido");
+
+                    b.Navigation("Empresa");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.Oportunidade", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Crm.Lead", "Lead")
+                        .WithMany("Oportunidades")
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Vendas.Orcamento", "Orcamento")
+                        .WithMany()
+                        .HasForeignKey("OrcamentoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Vendas.PedidoVenda", "PedidoVenda")
+                        .WithMany()
+                        .HasForeignKey("PedidoVendaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Lead");
+
+                    b.Navigation("Orcamento");
+
+                    b.Navigation("PedidoVenda");
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Estoque.Deposito", b =>
@@ -5502,6 +7214,266 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Permissao");
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.MovimentoCaixaPdv", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv", "SessaoCaixaPdv")
+                        .WithMany("Movimentos")
+                        .HasForeignKey("SessaoCaixaPdvId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("SessaoCaixaPdv");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Pdv.TerminalPdv", "TerminalPdv")
+                        .WithMany("Sessoes")
+                        .HasForeignKey("TerminalPdvId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("TerminalPdv");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.TerminalPdv", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Financeiro.ContaBancaria", "ContaBancaria")
+                        .WithMany()
+                        .HasForeignKey("ContaBancariaId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "Deposito")
+                        .WithMany()
+                        .HasForeignKey("DepositoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ContaBancaria");
+
+                    b.Navigation("Deposito");
+
+                    b.Navigation("Empresa");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdv", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv", "SessaoCaixaPdv")
+                        .WithMany("Vendas")
+                        .HasForeignKey("SessaoCaixaPdvId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Pdv.TerminalPdv", "TerminalPdv")
+                        .WithMany()
+                        .HasForeignKey("TerminalPdvId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Comissoes.Vendedor", "Vendedor")
+                        .WithMany()
+                        .HasForeignKey("VendedorId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("SessaoCaixaPdv");
+
+                    b.Navigation("TerminalPdv");
+
+                    b.Navigation("Vendedor");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdvItem", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Pdv.VendaPdv", "VendaPdv")
+                        .WithMany("Itens")
+                        .HasForeignKey("VendaPdvId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("Produto");
+
+                    b.Navigation("VendaPdv");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdvPagamento", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Financeiro.FormaPagamento", "FormaPagamento")
+                        .WithMany()
+                        .HasForeignKey("FormaPagamentoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Pdv.VendaPdv", "VendaPdv")
+                        .WithMany("Pagamentos")
+                        .HasForeignKey("VendaPdvId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("FormaPagamento");
+
+                    b.Navigation("VendaPdv");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServico", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Cliente", "Cliente")
+                        .WithMany()
+                        .HasForeignKey("ClienteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Financeiro.FormaPagamento", "FormaPagamento")
+                        .WithMany()
+                        .HasForeignKey("FormaPagamentoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Cliente");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("FormaPagamento");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServicoHistorico", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Servicos.OrdemServico", "OrdemServico")
+                        .WithMany("HistoricoStatus")
+                        .HasForeignKey("OrdemServicoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("OrdemServico");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServicoPeca", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Estoque.Deposito", "Deposito")
+                        .WithMany()
+                        .HasForeignKey("DepositoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Servicos.OrdemServico", "OrdemServico")
+                        .WithMany("ItensPecas")
+                        .HasForeignKey("OrdemServicoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Produto", "Produto")
+                        .WithMany()
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Deposito");
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("OrdemServico");
+
+                    b.Navigation("Produto");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServicoServico", b =>
+                {
+                    b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
+                        .WithMany()
+                        .HasForeignKey("EmpresaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Servicos.OrdemServico", "OrdemServico")
+                        .WithMany("ItensServicos")
+                        .HasForeignKey("OrdemServicoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ERP.Domain.Core.Entities.Cadastros.Servico", "Servico")
+                        .WithMany()
+                        .HasForeignKey("ServicoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Empresa");
+
+                    b.Navigation("OrdemServico");
+
+                    b.Navigation("Servico");
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.UsuarioEmpresa", b =>
                 {
                     b.HasOne("ERP.Domain.Core.Entities.Empresa", "Empresa")
@@ -5739,6 +7711,13 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Produtos");
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Comissoes.Vendedor", b =>
+                {
+                    b.Navigation("Comissoes");
+
+                    b.Navigation("Regras");
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.EntradaMercadoria", b =>
                 {
                     b.Navigation("Itens");
@@ -5754,6 +7733,25 @@ namespace ERP.Infrastructure.Migrations
             modelBuilder.Entity("ERP.Domain.Core.Entities.Compras.SolicitacaoCompra", b =>
                 {
                     b.Navigation("Itens");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Contratos.ContratoRecorrente", b =>
+                {
+                    b.Navigation("Faturamentos");
+
+                    b.Navigation("Reajustes");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.Lead", b =>
+                {
+                    b.Navigation("Atividades");
+
+                    b.Navigation("Oportunidades");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Crm.Oportunidade", b =>
+                {
+                    b.Navigation("Atividades");
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Empresa", b =>
@@ -5810,9 +7808,37 @@ namespace ERP.Infrastructure.Migrations
                     b.Navigation("Xmls");
                 });
 
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv", b =>
+                {
+                    b.Navigation("Movimentos");
+
+                    b.Navigation("Vendas");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.TerminalPdv", b =>
+                {
+                    b.Navigation("Sessoes");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Pdv.VendaPdv", b =>
+                {
+                    b.Navigation("Itens");
+
+                    b.Navigation("Pagamentos");
+                });
+
             modelBuilder.Entity("ERP.Domain.Core.Entities.Permissao", b =>
                 {
                     b.Navigation("PapelPermissoes");
+                });
+
+            modelBuilder.Entity("ERP.Domain.Core.Entities.Servicos.OrdemServico", b =>
+                {
+                    b.Navigation("HistoricoStatus");
+
+                    b.Navigation("ItensPecas");
+
+                    b.Navigation("ItensServicos");
                 });
 
             modelBuilder.Entity("ERP.Domain.Core.Entities.Vendas.Orcamento", b =>

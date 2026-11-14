@@ -1,0 +1,590 @@
+@page "/pdv"
+@using ERP.Web.Components.Layout
+@layout PdvLayout
+
+@using ERP.Application.Comissoes.DTOs
+@using ERP.Application.Comissoes.Queries
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Pdv.Commands
+@using ERP.Application.Pdv.DTOs
+@using ERP.Application.Pdv.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IApplicationDbContext DbContext
+@inject ICurrentEmpresaService CurrentEmpresaService
+
+<PageTitle>PDV — Frente de Caixa</PageTitle>
+
+<div class="d-flex flex-column" style="height: 100vh; overflow: hidden;">
+    <!-- Top Bar -->
+    <MudPaper Elevation="2" Class="px-4 py-2 d-flex align-center justify-space-between flex-wrap gap-2" Style="border-radius: 0; z-index: 10;">
+        <div class="d-flex align-center gap-3">
+            <MudIcon Icon="@Icons.Material.Filled.PointOfSale" Color="Color.Primary" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h6" Class="fw-bold" Style="line-height: 1.1;">PDV Frente de Caixa</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Multi-terminal &amp; Pré-Venda</MudText>
+            </div>
+
+            <MudSelect T="int?" Value="_terminalSelecionadoId" ValueChanged="OnTerminalChanged"
+                       Label="Terminal" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Style="min-width: 240px;" Class="ml-4">
+                @foreach (var t in _terminais)
+                {
+                    <MudSelectItem T="int?" Value="@t.Id">@t.Codigo - @t.Nome (@t.Tipo)</MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (_terminalAtual is not null)
+            {
+                @if (_terminalAtual.Tipo == TipoTerminalPdv.PreVenda)
+                {
+                    <MudChip T="string" Color="Color.Info" Icon="@Icons.Material.Filled.ReceiptLong" Size="Size.Small">
+                        Terminal Pré-Venda
+                    </MudChip>
+                }
+                else if (_sessaoAtual is not null)
+                {
+                    <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.LockOpen" Size="Size.Small"
+                             OnClick="AbrirCaixaDialog">
+                        Caixa Aberto (@_sessaoAtual.OperadorNome) — Esperado: @_sessaoAtual.SaldoEsperado.ToString("C2")
+                    </MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Icon="@Icons.Material.Filled.Lock" Size="Size.Small"
+                             OnClick="AbrirCaixaDialog">
+                        Caixa Fechado (Clique para abrir)
+                    </MudChip>
+                }
+            }
+        </div>
+
+        <div class="d-flex align-center gap-2">
+            @if (_terminalAtual is not null && _terminalAtual.Tipo != TipoTerminalPdv.PreVenda)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.AccountBalanceWallet"
+                           OnClick="AbrirCaixaDialog">
+                    Caixa
+                </MudButton>
+            }
+
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       OnClick="PuxarPreVenda">
+                Puxar Pré-Venda
+            </MudButton>
+
+            <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Settings"
+                       OnClick="@(() => Navigation.NavigateTo("/pdv/terminais"))">
+                Terminais
+            </MudButton>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Dark" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.ExitToApp"
+                       OnClick="@(() => Navigation.NavigateTo("/"))">
+                Voltar ao ERP
+            </MudButton>
+        </div>
+    </MudPaper>
+
+    @if (_terminais.Count == 0 && !_carregando)
+    {
+        <div class="d-flex flex-column align-center justify-center flex-grow-1 pa-6">
+            <MudAlert Severity="Severity.Warning" Class="mb-4">
+                Nenhum terminal PDV ativo encontrado. Cadastre um terminal (ex: Caixa 01) para iniciar as operações.
+            </MudAlert>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="@(() => Navigation.NavigateTo("/pdv/terminais"))">
+                Cadastrar Terminal PDV
+            </MudButton>
+        </div>
+    }
+    else
+    {
+        <!-- Main Split View -->
+        <MudGrid Class="flex-grow-1 ma-0 pa-3" Style="overflow: hidden; height: calc(100vh - 68px);" Spacing="3">
+            <!-- Left: Search + Product Catalog -->
+            <MudItem xs="12" md="7" lg="8" Class="d-flex flex-column" Style="height: 100%; overflow: hidden;">
+                <MudPaper Elevation="1" Class="pa-3 mb-3 d-flex align-center gap-2">
+                    <MudTextField @bind-Value="_buscaProduto"
+                                  Placeholder="Buscar produto por nome, código ou bipar código de barras (Enter para adicionar)..."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.QrCodeScanner"
+                                  Immediate="true"
+                                  DebounceInterval="250"
+                                  OnDebounceIntervalElapsed="BuscarProdutos"
+                                  OnKeyDown="OnBuscaKeyDown"
+                                  FullWidth="true" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" OnClick="@(() => BuscarProdutos(_buscaProduto))" />
+                </MudPaper>
+
+                <div class="flex-grow-1" style="overflow-y: auto; padding-right: 4px;">
+                    @if (_produtos.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info">Nenhum produto encontrado para a busca informada.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudGrid Spacing="2">
+                            @foreach (var p in _produtos)
+                            {
+                                <MudItem xs="6" sm="4" md="4" lg="3">
+                                    <MudCard Elevation="2" Class="cursor-pointer h-100 d-flex flex-column justify-space-between"
+                                             Style="transition: transform 0.1s ease;"
+                                             @onclick="@(() => AdicionarProdutoAoCarrinho(p))">
+                                        @if (!string.IsNullOrWhiteSpace(p.ImagemUrl))
+                                        {
+                                            <MudCardMedia Image="@p.ImagemUrl" Height="110" />
+                                        }
+                                        else
+                                        {
+                                            <div class="d-flex align-center justify-center" style="height: 110px; background-color: var(--mud-palette-background-grey);">
+                                                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Large" Color="Color.Secondary" />
+                                            </div>
+                                        }
+                                        <MudCardContent Class="pa-2">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@p.Codigo @(string.IsNullOrWhiteSpace(p.UnidadeSigla) ? "" : $"• {p.UnidadeSigla}")</MudText>
+                                            <MudText Typo="Typo.body2" Class="fw-bold" Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5em;">
+                                                @p.Nome
+                                            </MudText>
+                                            <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="fw-bold mt-1">
+                                                @p.PrecoVenda.ToString("C2")
+                                            </MudText>
+                                        </MudCardContent>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    }
+                </div>
+            </MudItem>
+
+            <!-- Right: Cart & Checkout -->
+            <MudItem xs="12" md="5" lg="4" Class="d-flex flex-column" Style="height: 100%; overflow: hidden;">
+                <MudPaper Elevation="3" Class="d-flex flex-column pa-3" Style="height: 100%; overflow: hidden;">
+                    <div class="d-flex align-center justify-space-between mb-2">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Class="fw-bold">Cupom Atual</MudText>
+                            @if (_preVendaId.HasValue)
+                            {
+                                <MudChip T="string" Color="Color.Secondary" Size="Size.Small">Pré-Venda #@_preVendaNumero</MudChip>
+                            }
+                        </div>
+                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                                   Disabled="@(_itens.Count == 0)" OnClick="LimparCarrinho">
+                            Limpar
+                        </MudButton>
+                    </div>
+
+                    <!-- Cliente & Vendedor -->
+                    <MudGrid Spacing="1" Class="mb-2">
+                        <MudItem xs="6">
+                            <MudSelect T="int?" @bind-Value="_clienteId" Label="Cliente (Opcional)"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                @foreach (var c in _clientes)
+                                {
+                                    <MudSelectItem T="int?" Value="@c.Id">@c.Nome</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudSelect T="int?" @bind-Value="_vendedorId" Label="Vendedor (Comissão)"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                                @foreach (var v in _vendedores)
+                                {
+                                    <MudSelectItem T="int?" Value="@v.Id">@v.Nome</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="mb-2" />
+
+                    <!-- Cart Items -->
+                    <div class="flex-grow-1" style="overflow-y: auto;">
+                        @if (_itens.Count == 0)
+                        {
+                            <div class="d-flex flex-column align-center justify-center h-100 text-muted pa-4">
+                                <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Size="Size.Large" Color="Color.Secondary" Class="mb-2" />
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                                    Clique nos produtos à esquerda ou bipe o código de barras para iniciar a venda.
+                                </MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var item in _itens)
+                            {
+                                <MudPaper Elevation="0" Outlined="true" Class="pa-2 mb-2 d-flex align-center justify-space-between gap-2">
+                                    <div style="min-width: 0; flex: 1;">
+                                        <MudText Typo="Typo.body2" Class="fw-bold text-truncate">@item.NomeProduto</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @item.Quantidade.ToString("N2") x @item.ValorUnitario.ToString("C2")
+                                        </MudText>
+                                    </div>
+
+                                    <div class="d-flex align-center gap-1">
+                                        <MudIconButton Icon="@Icons.Material.Filled.RemoveCircleOutline" Size="Size.Small"
+                                                       OnClick="@(() => AlterarQuantidade(item, -1))" />
+                                        <MudText Typo="Typo.body2" Class="fw-bold" Style="min-width: 24px; text-align: center;">
+                                            @item.Quantidade.ToString("0.##")
+                                        </MudText>
+                                        <MudIconButton Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small"
+                                                       OnClick="@(() => AlterarQuantidade(item, 1))" />
+                                    </div>
+
+                                    <div class="text-right" style="min-width: 75px;">
+                                        <MudText Typo="Typo.body2" Class="fw-bold">
+                                            @((item.Quantidade * item.ValorUnitario - item.ValorDesconto).ToString("C2"))
+                                        </MudText>
+                                    </div>
+
+                                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => RemoverItem(item))" />
+                                </MudPaper>
+                            }
+                        }
+                    </div>
+
+                    <MudDivider Class="my-2" />
+
+                    <!-- Totals -->
+                    <div class="d-flex flex-column gap-1 mb-3">
+                        <div class="d-flex justify-space-between">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Subtotal (@_itens.Sum(i => i.Quantidade).ToString("0.##") itens):</MudText>
+                            <MudText Typo="Typo.body2">@ValorBruto.ToString("C2")</MudText>
+                        </div>
+                        <div class="d-flex align-center justify-space-between">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Desconto (R$):</MudText>
+                            <MudNumericField T="decimal" @bind-Value="_valorDesconto" Min="0" Max="@ValorBruto"
+                                             Format="N2" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                             Style="max-width: 120px;" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mt-1">
+                            <MudText Typo="Typo.h6" Class="fw-bold">TOTAL:</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Primary" Class="fw-bold">@ValorTotal.ToString("C2")</MudText>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex gap-2">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   Disabled="@(_itens.Count == 0 || _terminalAtual is null || _processando)"
+                                   OnClick="SalvarPreVenda">
+                            Pré-Venda
+                        </MudButton>
+
+                        @if (_terminalAtual is not null && _terminalAtual.Tipo != TipoTerminalPdv.PreVenda)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Size="Size.Large"
+                                       StartIcon="@Icons.Material.Filled.Payments"
+                                       Disabled="@(_itens.Count == 0 || _sessaoAtual is null || _processando)"
+                                       OnClick="FinalizarVenda">
+                                Receber
+                            </MudButton>
+                        }
+                    </div>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code {
+    private bool _carregando = true;
+    private bool _processando = false;
+
+    private List<TerminalPdvDto> _terminais = new();
+    private int? _terminalSelecionadoId;
+    private TerminalPdvDto? _terminalAtual => _terminais.FirstOrDefault(t => t.Id == _terminalSelecionadoId);
+    private SessaoCaixaPdvDto? _sessaoAtual;
+
+    private string? _buscaProduto;
+    private List<ProdutoPdvDto> _produtos = new();
+    private List<ClienteLookup> _clientes = new();
+    private List<VendedorDto> _vendedores = new();
+
+    private int? _preVendaId;
+    private string? _preVendaNumero;
+    private int? _clienteId;
+    private int? _vendedorId;
+    private decimal _valorDesconto;
+    private string? _observacoes;
+    private string _operadorAtual = "Operador";
+
+    private List<VendaPdvItemInputDto> _itens = new();
+
+    private decimal ValorBruto => _itens.Sum(i => Math.Round(i.Quantidade * i.ValorUnitario, 2) - i.ValorDesconto);
+    private decimal ValorTotal => Math.Max(0, ValorBruto - _valorDesconto);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _operadorAtual = authState.User.Identity?.Name ?? "Operador";
+
+        await CarregarDadosIniciais();
+    }
+
+    private async Task CarregarDadosIniciais()
+    {
+        _carregando = true;
+        try
+        {
+            _terminais = await Mediator.Send(new ListarTerminaisPdvQuery(ApenasAtivos: true));
+            _vendedores = await Mediator.Send(new ListarVendedoresQuery(ApenasAtivos: true));
+
+            int empresaId = CurrentEmpresaService.EmpresaId ?? 1;
+            _clientes = await DbContext.Clientes
+                .AsNoTracking()
+                .Where(c => c.EmpresaId == empresaId)
+                .OrderBy(c => c.Nome)
+                .Select(c => new ClienteLookup { Id = c.Id, Nome = c.Nome })
+                .Take(200)
+                .ToListAsync();
+
+            _produtos = await Mediator.Send(new BuscarProdutosPdvQuery(null));
+
+            if (_terminais.Count > 0)
+            {
+                var caixaPadrao = _terminais.FirstOrDefault(t => t.PossuiSessaoAberta) ?? _terminais.First();
+                await OnTerminalChanged(caixaPadrao.Id);
+            }
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task OnTerminalChanged(int? terminalId)
+    {
+        _terminalSelecionadoId = terminalId;
+        _sessaoAtual = null;
+
+        if (terminalId.HasValue)
+        {
+            _sessaoAtual = await Mediator.Send(new ObterSessaoAbertaTerminalQuery(terminalId.Value));
+        }
+    }
+
+    private async Task BuscarProdutos(string? termo)
+    {
+        _buscaProduto = termo;
+        _produtos = await Mediator.Send(new BuscarProdutosPdvQuery(termo));
+    }
+
+    private async Task OnBuscaKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_buscaProduto))
+        {
+            var termo = _buscaProduto.Trim();
+            var exato = _produtos.FirstOrDefault(p =>
+                string.Equals(p.CodigoBarras, termo, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(p.Codigo, termo, StringComparison.OrdinalIgnoreCase));
+
+            if (exato is not null)
+            {
+                AdicionarProdutoAoCarrinho(exato);
+                _buscaProduto = string.Empty;
+                await BuscarProdutos(null);
+            }
+        }
+    }
+
+    private void AdicionarProdutoAoCarrinho(ProdutoPdvDto produto)
+    {
+        var existente = _itens.FirstOrDefault(i => i.ProdutoId == produto.Id);
+        if (existente is not null)
+        {
+            existente.Quantidade += 1;
+        }
+        else
+        {
+            _itens.Add(new VendaPdvItemInputDto
+            {
+                ProdutoId = produto.Id,
+                CodigoProduto = produto.Codigo,
+                NomeProduto = produto.Nome,
+                Quantidade = 1,
+                ValorUnitario = produto.PrecoVenda,
+                ValorDesconto = 0,
+                ImagemUrl = produto.ImagemUrl
+            });
+        }
+    }
+
+    private void AlterarQuantidade(VendaPdvItemInputDto item, decimal delta)
+    {
+        var novaQtd = item.Quantidade + delta;
+        if (novaQtd <= 0)
+        {
+            _itens.Remove(item);
+        }
+        else
+        {
+            item.Quantidade = novaQtd;
+        }
+    }
+
+    private void RemoverItem(VendaPdvItemInputDto item) => _itens.Remove(item);
+
+    private void LimparCarrinho()
+    {
+        _preVendaId = null;
+        _preVendaNumero = null;
+        _clienteId = null;
+        _vendedorId = null;
+        _valorDesconto = 0;
+        _observacoes = null;
+        _itens.Clear();
+    }
+
+    private async Task AbrirCaixaDialog()
+    {
+        if (_terminalAtual is null) return;
+
+        var parameters = new DialogParameters<PdvCaixaDialog>
+        {
+            { x => x.Terminal, _terminalAtual },
+            { x => x.SessaoAtual, _sessaoAtual },
+            { x => x.OperadorPadrao, _operadorAtual }
+        };
+
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PdvCaixaDialog>($"Caixa — {_terminalAtual.Nome}", parameters, options);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await OnTerminalChanged(_terminalAtual.Id);
+        }
+    }
+
+    private async Task PuxarPreVenda()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<PdvPreVendasDialog>("Pré-Vendas em Aberto", options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is VendaPdvDto preVenda)
+        {
+            _preVendaId = preVenda.Id;
+            _preVendaNumero = preVenda.Numero;
+            _clienteId = preVenda.ClienteId;
+            _vendedorId = preVenda.VendedorId;
+            _valorDesconto = preVenda.ValorDesconto;
+            _observacoes = preVenda.Observacoes;
+            _itens = preVenda.Itens.Select(i => new VendaPdvItemInputDto
+            {
+                ProdutoId = i.ProdutoId,
+                CodigoProduto = i.CodigoProduto,
+                NomeProduto = i.NomeProduto,
+                Quantidade = i.Quantidade,
+                ValorUnitario = i.ValorUnitario,
+                ValorDesconto = i.ValorDesconto,
+                ImagemUrl = i.ImagemUrl
+            }).ToList();
+
+            Snackbar.Add($"Pré-venda {preVenda.Numero} carregada no carrinho.", Severity.Info);
+        }
+    }
+
+    private SalvarVendaPdvDto MontarVendaDto(List<VendaPdvPagamentoInputDto>? pagamentos = null)
+    {
+        var vendedorSelecionado = _vendedores.FirstOrDefault(v => v.Id == _vendedorId);
+        return new SalvarVendaPdvDto
+        {
+            PreVendaId = _preVendaId,
+            TerminalPdvId = _terminalSelecionadoId!.Value,
+            SessaoCaixaPdvId = _sessaoAtual?.Id,
+            ClienteId = _clienteId,
+            VendedorId = _vendedorId,
+            VendedorNome = vendedorSelecionado?.Nome,
+            ValorDesconto = _valorDesconto,
+            Observacoes = _observacoes,
+            Itens = _itens,
+            Pagamentos = pagamentos ?? new List<VendaPdvPagamentoInputDto>()
+        };
+    }
+
+    private async Task SalvarPreVenda()
+    {
+        if (_terminalSelecionadoId is null || _itens.Count == 0) return;
+
+        _processando = true;
+        try
+        {
+            var id = await Mediator.Send(new CriarPreVendaPdvCommand(MontarVendaDto()));
+            Snackbar.Add($"Pré-venda #{id} salva com sucesso! Pode ser finalizada em qualquer caixa.", Severity.Success);
+            LimparCarrinho();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao salvar pré-venda: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+
+    private async Task FinalizarVenda()
+    {
+        if (_terminalSelecionadoId is null || _sessaoAtual is null || _itens.Count == 0) return;
+
+        var pagParams = new DialogParameters<PdvPagamentoDialog>
+        {
+            { x => x.TotalVenda, ValorTotal }
+        };
+        var pagOptions = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var pagDialog = await DialogService.ShowAsync<PdvPagamentoDialog>("Recebimento PDV", pagParams, pagOptions);
+        var pagResult = await pagDialog.Result;
+
+        if (pagResult is null || pagResult.Canceled || pagResult.Data is not List<VendaPdvPagamentoInputDto> pagamentos)
+            return;
+
+        _processando = true;
+        try
+        {
+            var vendaId = await Mediator.Send(new FinalizarVendaPdvCommand(MontarVendaDto(pagamentos)));
+            Snackbar.Add("Venda PDV finalizada com sucesso!", Severity.Success);
+            LimparCarrinho();
+            await OnTerminalChanged(_terminalSelecionadoId);
+
+            var cupomParams = new DialogParameters<PdvCupomDialog>
+            {
+                { x => x.VendaId, vendaId }
+            };
+            await DialogService.ShowAsync<PdvCupomDialog>("Cupom PDV", cupomParams, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao finalizar venda: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _processando = false;
+        }
+    }
+
+    private class ClienteLookup
+    {
+        public int Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,227 @@
+@page "/contratos"
+@using ERP.Application.Contratos.Commands
+@using ERP.Application.Contratos.DTOs
+@using ERP.Application.Contratos.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Contratos Recorrentes - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.Autorenew" Class="mr-2" />
+            Contratos Recorrentes
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gestão de mensalidades, faturamento automático no Contas a Receber, renovação e reajustes.
+        </MudText>
+    </div>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.PlaylistAddCheck" OnClick="FaturarVencidos">
+            Faturar Vencidos (@_kpis.PendentesFaturamento)
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovoContrato">
+            Novo Contrato
+        </MudButton>
+    </div>
+</div>
+
+<!-- KPIs -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">MRR (RECEITA MENSAL)</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">@_kpis.MrrEstimado.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">Receita recorrente equivalente</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">CONTRATOS ATIVOS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_kpis.TotalAtivos</MudText>
+                <MudText Typo="Typo.caption">Em vigência</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">A FATURAR (HOJE/VENCIDOS)</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="@(_kpis.PendentesFaturamento > 0 ? Color.Warning : Color.Default)">@_kpis.PendentesFaturamento</MudText>
+                <MudText Typo="Typo.caption">Prontos para gerar título</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">FATURADO NO MÊS</MudText>
+                <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Info">@_kpis.FaturadoNoMes.ToString("C2")</MudText>
+                <MudText Typo="Typo.caption">Gerado no Contas a Receber</MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros -->
+<MudPaper Elevation="1" Class="pa-3 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="5">
+            <MudTextField @bind-Value="_busca" Label="Buscar por número, título ou cliente" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" OnDebounceIntervalElapsed="CarregarAsync" DebounceInterval="350" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="StatusContrato?" Value="_statusFiltro" ValueChanged="OnStatusChanged" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="StatusContrato?" Value="StatusContrato.Ativo">Ativo</MudSelectItem>
+                <MudSelectItem T="StatusContrato?" Value="StatusContrato.Rascunho">Rascunho</MudSelectItem>
+                <MudSelectItem T="StatusContrato?" Value="StatusContrato.Suspenso">Suspenso</MudSelectItem>
+                <MudSelectItem T="StatusContrato?" Value="StatusContrato.Encerrado">Encerrado</MudSelectItem>
+                <MudSelectItem T="StatusContrato?" Value="StatusContrato.Cancelado">Cancelado</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudSelect T="PeriodicidadeContrato?" Value="_periodicidadeFiltro" ValueChanged="OnPeriodicidadeChanged" Label="Periodicidade" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="PeriodicidadeContrato?" Value="PeriodicidadeContrato.Mensal">Mensal</MudSelectItem>
+                <MudSelectItem T="PeriodicidadeContrato?" Value="PeriodicidadeContrato.Trimestral">Trimestral</MudSelectItem>
+                <MudSelectItem T="PeriodicidadeContrato?" Value="PeriodicidadeContrato.Semestral">Semestral</MudSelectItem>
+                <MudSelectItem T="PeriodicidadeContrato?" Value="PeriodicidadeContrato.Anual">Anual</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2" Class="d-flex align-center">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarAsync" FullWidth="true">Atualizar</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else
+{
+    <MudTable Items="_contratos" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>Número</MudTh>
+            <MudTh>Título / Cliente</MudTh>
+            <MudTh>Periodicidade</MudTh>
+            <MudTh>Valor Ciclo</MudTh>
+            <MudTh>Próx. Cobrança</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Número"><b>@context.Numero</b></MudTd>
+            <MudTd DataLabel="Título / Cliente">
+                <b>@context.Titulo</b>
+                <div class="mud-text-secondary" style="font-size: 0.78rem;">@context.ClienteNome</div>
+            </MudTd>
+            <MudTd DataLabel="Periodicidade">@context.Periodicidade.ToString() (dia @context.DiaVencimento)</MudTd>
+            <MudTd DataLabel="Valor"><b>@context.ValorMensal.ToString("C2")</b></MudTd>
+            <MudTd DataLabel="Próx. Cobrança">
+                <MudText Typo="Typo.body2" Color="@(context.CobrancaVencida ? Color.Warning : Color.Default)" Class="@(context.CobrancaVencida ? "font-weight-bold" : "")">
+                    @context.ProximaCobranca.ToLocalTime().ToString("dd/MM/yyyy")
+                </MudText>
+            </MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@CorStatus(context.Status)">@context.Status.ToString()</MudChip>
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                @if (context.Status == StatusContrato.Ativo)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Receipt" Size="Size.Small" Color="Color.Success" Title="Faturar Próximo Ciclo" OnClick="@(() => FaturarUm(context))" />
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Small" Color="Color.Info" Title="Reajustar / Renovar" OnClick="@(() => Reajustar(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Title="Detalhes e Histórico" OnClick="@(() => VerDetalhes(context.Id))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" Title="Editar" OnClick="@(() => EditarContrato(context.Id))" />
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent>
+            <MudText Class="pa-4">Nenhum contrato recorrente encontrado.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private StatusContrato? _statusFiltro;
+    private PeriodicidadeContrato? _periodicidadeFiltro;
+
+    private ContratoResumoKpiDto _kpis = new();
+    private List<ContratoRecorrenteDto> _contratos = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task OnStatusChanged(StatusContrato? status) { _statusFiltro = status; await CarregarAsync(); }
+    private async Task OnPeriodicidadeChanged(PeriodicidadeContrato? p) { _periodicidadeFiltro = p; await CarregarAsync(); }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        _kpis = await Mediator.Send(new ObterResumoKpiContratosQuery());
+        _contratos = await Mediator.Send(new ListarContratosQuery(_busca, _statusFiltro, _periodicidadeFiltro));
+        _carregando = false;
+    }
+
+    private async Task NovoContrato()
+    {
+        var dialog = await DialogService.ShowAsync<ContratoDialog>("Novo Contrato");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task EditarContrato(int id)
+    {
+        var parameters = new DialogParameters<ContratoDialog> { { x => x.ContratoId, id } };
+        var dialog = await DialogService.ShowAsync<ContratoDialog>("Editar Contrato", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task VerDetalhes(int id)
+    {
+        var parameters = new DialogParameters<ContratoDetalhesDialog> { { x => x.ContratoId, id } };
+        await DialogService.ShowAsync<ContratoDetalhesDialog>("Detalhes do Contrato", parameters);
+    }
+
+    private async Task Reajustar(ContratoRecorrenteDto contrato)
+    {
+        var parameters = new DialogParameters<ContratoReajusteDialog> { { x => x.Contrato, contrato } };
+        var dialog = await DialogService.ShowAsync<ContratoReajusteDialog>("Reajuste / Renovação", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task FaturarUm(ContratoRecorrenteDto contrato)
+    {
+        await Mediator.Send(new FaturarContratoCommand(contrato.Id));
+        Snackbar.Add($"Cobrança do contrato {contrato.Numero} gerada no Contas a Receber!", Severity.Success);
+        await CarregarAsync();
+    }
+
+    private async Task FaturarVencidos()
+    {
+        int qtd = await Mediator.Send(new FaturarContratosVencidosCommand());
+        Snackbar.Add(qtd > 0 ? $"{qtd} contrato(s) faturado(s) no Contas a Receber!" : "Nenhum contrato vencido para faturar.", qtd > 0 ? Severity.Success : Severity.Info);
+        await CarregarAsync();
+    }
+
+    private static Color CorStatus(StatusContrato status) => status switch
+    {
+        StatusContrato.Ativo => Color.Success,
+        StatusContrato.Rascunho => Color.Default,
+        StatusContrato.Suspenso => Color.Warning,
+        StatusContrato.Encerrado => Color.Info,
+        StatusContrato.Cancelado => Color.Error,
+        _ => Color.Default
+    };
+}

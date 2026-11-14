@@ -1,0 +1,253 @@
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Servicos.DTOs
+@using ERP.Application.Servicos.Queries
+@using ERP.Domain.Core.Entities
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IApplicationDbContext Context
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center justify-space-between no-print">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Print" Color="Color.Primary" Class="mr-2" />
+                <MudText Typo="Typo.h6">Imprimir Ordem de Serviço</MudText>
+            </div>
+            <div>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="Imprimir">
+                    Imprimir / Salvar PDF
+                </MudButton>
+            </div>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_carregando)
+        {
+            <div class="d-flex justify-center pa-8 no-print">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_os != null)
+        {
+            <div id="print-os-content" class="pa-4 bg-white text-dark" style="font-family: Arial, sans-serif; color: #111;">
+                <!-- CABEÇALHO DA EMPRESA E DA OS -->
+                <div style="border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">@(_empresa?.NomeFantasia ?? _empresa?.RazaoSocial ?? "ERP MULTI-EMPRESA")</h2>
+                        <div style="font-size: 11px; color: #555;">
+                            CNPJ: @(_empresa?.Cnpj ?? "00.000.000/0001-00") • Telefone: @(_empresa?.Telefone ?? "(00) 0000-0000")
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 18px; font-weight: bold; color: #1e3a8a;">ORDEM DE SERVIÇO</div>
+                        <div style="font-size: 16px; font-weight: bold;">@_os.Numero</div>
+                        <div style="font-size: 11px; color: #555;">Entrada: @_os.DataAbertura.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                </div>
+
+                <!-- DADOS DO CLIENTE -->
+                <div style="border: 1px solid #ccc; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 12px;">
+                    <div style="font-weight: bold; border-bottom: 1px solid #eee; margin-bottom: 4px; padding-bottom: 2px; color: #1e3a8a;">
+                        DADOS DO CLIENTE
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span><b>Nome:</b> @_os.ClienteNome</span>
+                        <span><b>CPF/CNPJ:</b> @(_os.ClienteCpfCnpj ?? "-")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                        <span><b>Telefone:</b> @(_os.ClienteTelefone ?? "-")</span>
+                        <span><b>E-mail:</b> @(_os.ClienteEmail ?? "-")</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_os.ClienteEndereco))
+                    {
+                        <div style="margin-top: 2px;"><b>Endereço:</b> @_os.ClienteEndereco</div>
+                    }
+                </div>
+
+                <!-- DADOS DO EQUIPAMENTO / OBJETO -->
+                <div style="border: 1px solid #ccc; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 12px;">
+                    <div style="font-weight: bold; border-bottom: 1px solid #eee; margin-bottom: 4px; padding-bottom: 2px; color: #1e3a8a;">
+                        IDENTIFICAÇÃO DO EQUIPAMENTO / OBJETO
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span><b>Equipamento:</b> @_os.Equipamento</span>
+                        <span><b>Marca/Modelo:</b> @(_os.Marca ?? "") @(_os.Modelo ?? "")</span>
+                        <span><b>S/N ou IMEI:</b> @(_os.NumeroSerie ?? "-")</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_os.Acessorios))
+                    {
+                        <div style="margin-top: 3px;"><b>Acessórios deixados:</b> @_os.Acessorios</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_os.CondicoesGerais))
+                    {
+                        <div style="margin-top: 3px; color: #666;"><b>Estado físico / Avarias pré-existentes:</b> @_os.CondicoesGerais</div>
+                    }
+                </div>
+
+                <!-- DEFEITO RELATADO & LAUDO -->
+                <div style="border: 1px solid #ccc; padding: 8px; margin-bottom: 10px; border-radius: 4px; font-size: 12px;">
+                    <div style="font-weight: bold; border-bottom: 1px solid #eee; margin-bottom: 4px; padding-bottom: 2px; color: #1e3a8a;">
+                        PROBLEMA RELATADO &amp; PARECER TÉCNICO
+                    </div>
+                    <div><b>Defeito informado pelo cliente:</b> @_os.DefeitoRelatado</div>
+                    @if (!string.IsNullOrEmpty(_os.LaudoTecnico))
+                    {
+                        <div style="margin-top: 4px;"><b>Diagnóstico / Laudo Técnico:</b> @_os.LaudoTecnico</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_os.SolucaoTecnica))
+                    {
+                        <div style="margin-top: 4px;"><b>Solução técnica aplicada:</b> @_os.SolucaoTecnica</div>
+                    }
+                </div>
+
+                <!-- ITENS: SERVIÇOS E PEÇAS -->
+                @if (_os.Servicos.Any() || _os.Pecas.Any())
+                {
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                            <thead>
+                                <tr style="background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1;">
+                                    <th style="padding: 4px 6px;">Tipo</th>
+                                    <th style="padding: 4px 6px;">Item / Descrição</th>
+                                    <th style="padding: 4px 6px; text-align: center;">Qtd</th>
+                                    <th style="padding: 4px 6px; text-align: right;">Unitário</th>
+                                    <th style="padding: 4px 6px; text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in _os.Servicos)
+                                {
+                                    <tr style="border-bottom: 1px solid #eee;">
+                                        <td style="padding: 4px 6px; color: #0284c7;">Serviço</td>
+                                        <td style="padding: 4px 6px;">@s.Descricao</td>
+                                        <td style="padding: 4px 6px; text-align: center;">@s.Quantidade.ToString("N1")</td>
+                                        <td style="padding: 4px 6px; text-align: right;">@s.ValorUnitario.ToString("C2")</td>
+                                        <td style="padding: 4px 6px; text-align: right; font-weight: bold;">@s.ValorTotal.ToString("C2")</td>
+                                    </tr>
+                                }
+                                @foreach (var p in _os.Pecas)
+                                {
+                                    <tr style="border-bottom: 1px solid #eee;">
+                                        <td style="padding: 4px 6px; color: #16a34a;">Peça</td>
+                                        <td style="padding: 4px 6px;">@p.Descricao</td>
+                                        <td style="padding: 4px 6px; text-align: center;">@p.Quantidade.ToString("N1")</td>
+                                        <td style="padding: 4px 6px; text-align: right;">@p.ValorUnitario.ToString("C2")</td>
+                                        <td style="padding: 4px 6px; text-align: right; font-weight: bold;">@p.ValorTotal.ToString("C2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <!-- TOTAIS -->
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 12px; font-size: 12px;">
+                    <div style="width: 250px; border: 1px solid #ccc; padding: 6px; border-radius: 4px; background-color: #fafafa;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                            <span>Serviços:</span>
+                            <span>@_os.ValorServicos.ToString("C2")</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                            <span>Peças:</span>
+                            <span>@_os.ValorPecas.ToString("C2")</span>
+                        </div>
+                        @if (_os.ValorDesconto > 0)
+                        {
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #dc2626;">
+                                <span>Desconto:</span>
+                                <span>-@_os.ValorDesconto.ToString("C2")</span>
+                            </div>
+                        }
+                        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; border-top: 1px solid #ccc; padding-top: 4px; margin-top: 2px;">
+                            <span>VALOR TOTAL:</span>
+                            <span style="color: #1e3a8a;">@_os.ValorTotal.ToString("C2")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TERMO DE GARANTIA -->
+                <div style="border: 1px solid #e2e8f0; padding: 8px; margin-bottom: 20px; font-size: 10px; color: #475569; background-color: #f8fafc; border-radius: 4px;">
+                    <b>TERMOS E CONDIÇÕES DE GARANTIA:</b><br />
+                    @(_os.TermoGarantia ?? "A garantia legal é de 90 dias a contar da data de entrega do serviço e refere-se exclusivamente aos serviços e peças substituídas nesta OS. Aparelhos não retirados após 90 dias da notificação de conclusão poderão ser descartados conforme legislação vigente.")
+                </div>
+
+                <!-- ASSINATURAS -->
+                <div style="display: flex; justify-content: space-around; margin-top: 30px; padding-top: 10px;">
+                    <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 4px; font-size: 11px;">
+                        <b>@_os.ClienteNome</b><br />
+                        Cliente / Responsável
+                    </div>
+                    <div style="text-align: center; width: 40%; border-top: 1px solid #333; padding-top: 4px; font-size: 11px;">
+                        <b>@(_os.TecnicoResponsavel ?? _empresa?.NomeFantasia ?? "Oficina Técnica")</b><br />
+                        Técnico / Responsável pelo Atendimento
+                    </div>
+                </div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <div class="no-print d-flex gap-2">
+            <MudButton OnClick="Fechar">Fechar</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Print" OnClick="Imprimir">
+                Imprimir
+            </MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    @@media print {
+        .no-print, .mud-dialog-title, .mud-dialog-actions, .mud-appbar, .mud-drawer {
+            display: none !important;
+        }
+        body, html {
+            background-color: white !important;
+            color: black !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        #print-os-content {
+            padding: 0 !important;
+            width: 100% !important;
+        }
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int OrdemServicoId { get; set; }
+
+    private bool _carregando = true;
+    private OrdemServicoDetalhesDto? _os;
+    private Empresa? _empresa;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _os = await Mediator.Send(new GetOrdemServicoByIdQuery(OrdemServicoId));
+            _empresa = await Context.Empresas.AsNoTracking().FirstOrDefaultAsync(e => e.Ativo);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar dados de impressão: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+        }
+    }
+
+    private async Task Imprimir()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    private void Fechar() => MudDialog.Close();
+}

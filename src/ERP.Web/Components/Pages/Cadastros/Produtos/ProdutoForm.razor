@@ -7,11 +7,15 @@
 @using ERP.Application.Cadastros.Produtos.Queries
 @using ERP.Application.Cadastros.UnidadesMedida.DTOs
 @using ERP.Application.Cadastros.UnidadesMedida.Queries
+@using ERP.Application.Common.Interfaces
 @using ERP.Domain.Core.Enums
 @using MediatR
+@using Microsoft.AspNetCore.Components.Forms
 @inject IMediator Mediator
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IWebHostEnvironment Env
+@inject ICurrentEmpresaService EmpresaService
 
 <PageTitle>@(Id.HasValue ? "Editar Produto" : "Novo Produto")</PageTitle>
 
@@ -39,6 +43,40 @@ else
             </MudItem>
             <MudItem xs="12">
                 <MudTextField @bind-Value="_descricao" Label="Descrição detalhada" Lines="2" MaxLength="500" />
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Outlined="true" Class="pa-3 d-flex align-center gap-4 flex-wrap">
+                    @if (!string.IsNullOrWhiteSpace(_imagemUrl))
+                    {
+                        <MudImage Src="@_imagemUrl" Alt="Foto do Produto" Width="100" Height="100" ObjectFit="ObjectFit.Cover" Class="rounded" />
+                    }
+                    else
+                    {
+                        <MudAvatar Size="Size.Large" Rounded="true" Color="Color.Default" Variant="Variant.Outlined" Style="width:100px;height:100px;">
+                            <MudIcon Icon="@Icons.Material.Filled.AddAPhoto" Size="Size.Large" />
+                        </MudAvatar>
+                    }
+                    <div class="d-flex flex-column gap-2">
+                        <MudText Typo="Typo.subtitle2">Foto do Produto</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Formatos aceitos: JPG, PNG ou WEBP (máx. 5 MB).</MudText>
+                        <div class="d-flex gap-2 align-center">
+                            <MudFileUpload T="IBrowserFile" FilesChanged="OnFotoSelecionada" Accept=".jpg,.jpeg,.png,.webp">
+                                <ActivatorContent>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload" Size="Size.Small">
+                                        @(string.IsNullOrWhiteSpace(_imagemUrl) ? "Escolher Foto" : "Trocar Foto")
+                                    </MudButton>
+                                </ActivatorContent>
+                            </MudFileUpload>
+                            @if (!string.IsNullOrWhiteSpace(_imagemUrl))
+                            {
+                                <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Delete" Size="Size.Small" OnClick="@(() => _imagemUrl = null)">
+                                    Remover
+                                </MudButton>
+                            }
+                        </div>
+                    </div>
+                </MudPaper>
             </MudItem>
 
             <MudItem xs="12" md="6">
@@ -124,6 +162,7 @@ else
     private string _ncm = string.Empty;
     private string _cest = string.Empty;
     private string _cfop = string.Empty;
+    private string? _imagemUrl;
     private bool _ativo = true;
 
     private List<CategoriaDto> _categorias = new();
@@ -158,10 +197,43 @@ else
                 _ncm = p.Ncm ?? string.Empty;
                 _cest = p.Cest ?? string.Empty;
                 _cfop = p.Cfop ?? string.Empty;
+                _imagemUrl = p.ImagemUrl;
                 _ativo = p.Ativo;
             }
             _carregando = false;
         }
+    }
+
+    private async Task OnFotoSelecionada(IBrowserFile? file)
+    {
+        if (file == null) return;
+
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (ext is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+        {
+            Snackbar.Add("Formato inválido. Use JPG, PNG ou WEBP.", Severity.Warning);
+            return;
+        }
+
+        const long maxBytes = 5 * 1024 * 1024;
+        if (file.Size > maxBytes)
+        {
+            Snackbar.Add("A imagem deve ter no máximo 5 MB.", Severity.Warning);
+            return;
+        }
+
+        int empresaId = EmpresaService.EmpresaId ?? 1;
+        var pasta = Path.Combine(Env.WebRootPath, "uploads", "produtos", empresaId.ToString());
+        Directory.CreateDirectory(pasta);
+
+        var nomeArquivo = $"{Guid.NewGuid():N}{ext}";
+        var caminhoCompleto = Path.Combine(pasta, nomeArquivo);
+
+        await using var stream = File.Create(caminhoCompleto);
+        await file.OpenReadStream(maxBytes).CopyToAsync(stream);
+
+        _imagemUrl = $"/uploads/produtos/{empresaId}/{nomeArquivo}";
+        Snackbar.Add("Foto carregada! Clique em Salvar para confirmar.", Severity.Info);
     }
 
     private async Task Salvar()
@@ -171,7 +243,7 @@ else
             var result = await Mediator.Send(new UpdateProdutoCommand(
                 Id.Value, _codigo, _nome, _descricao, _categoriaId, _unidadeMedidaId,
                 _precoVenda, _precoCusto, _estoqueMinimo, _controlaLote, _controlaSerie,
-                _ncm, _cest, _cfop, _codigoBarras, _ativo));
+                _ncm, _cest, _cfop, _codigoBarras, _ativo, _imagemUrl));
             if (result.Sucesso) { Snackbar.Add("Produto atualizado.", Severity.Success); Nav.NavigateTo("/cadastros/produtos"); }
             else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
         }
@@ -180,7 +252,7 @@ else
             var result = await Mediator.Send(new CreateProdutoCommand(
                 _codigo, _nome, _descricao, _categoriaId, _unidadeMedidaId,
                 _precoVenda, _precoCusto, _estoqueMinimo, _controlaLote, _controlaSerie,
-                _ncm, _cest, _cfop, _codigoBarras));
+                _ncm, _cest, _cfop, _codigoBarras, _imagemUrl));
             if (result.Sucesso) { Snackbar.Add("Produto cadastrado.", Severity.Success); Nav.NavigateTo("/cadastros/produtos"); }
             else Snackbar.Add(string.Join(", ", result.Erros), Severity.Error);
         }

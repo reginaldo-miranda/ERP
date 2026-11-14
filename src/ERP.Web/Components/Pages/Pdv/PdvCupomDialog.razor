@@ -1,0 +1,89 @@
+@using ERP.Application.Pdv.DTOs
+@using ERP.Application.Pdv.Queries
+@using MediatR
+@inject IMediator Mediator
+@inject IJSRuntime JS
+
+<MudDialog MaxWidth="MaxWidth.Small" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center no-print">
+            <MudIcon Icon="@Icons.Material.Filled.Print" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Cupom @(_venda?.Numero)</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (_venda != null)
+        {
+            <div style="font-family: monospace; font-size: 13px; max-width: 340px; margin: 0 auto; border: 1px dashed #ccc; padding: 14px; background: #fff; color: #000;">
+                <div style="text-align: center; font-weight: bold; font-size: 15px;">COMPROVANTE DE VENDA</div>
+                <div style="text-align: center;">@_venda.TerminalNome — @_venda.Numero</div>
+                <div style="text-align: center;">@_venda.DataVenda.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;" />
+                <div>Cliente: @(_venda.ClienteNome ?? _venda.ConsumidorNome ?? "Consumidor Final")</div>
+                @if (!string.IsNullOrWhiteSpace(_venda.ConsumidorCpf))
+                {
+                    <div>CPF/CNPJ: @_venda.ConsumidorCpf</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_venda.VendedorNome))
+                {
+                    <div>Vendedor: @_venda.VendedorNome</div>
+                }
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;" />
+                @foreach (var item in _venda.Itens)
+                {
+                    <div>@item.NomeProduto</div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>@item.Quantidade.ToString("N2") x @item.ValorUnitario.ToString("C2")</span>
+                        <b>@((item.Quantidade * item.ValorUnitario - item.ValorDesconto).ToString("C2"))</b>
+                    </div>
+                }
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;" />
+                <div style="display: flex; justify-content: space-between;"><span>Subtotal:</span><span>@_venda.ValorBruto.ToString("C2")</span></div>
+                @if (_venda.ValorDesconto > 0)
+                {
+                    <div style="display: flex; justify-content: space-between;"><span>Desconto:</span><span>- @_venda.ValorDesconto.ToString("C2")</span></div>
+                }
+                <div style="display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin-top: 4px;">
+                    <span>TOTAL:</span><span>@_venda.ValorTotal.ToString("C2")</span>
+                </div>
+                @if (_venda.Pagamentos.Count > 0)
+                {
+                    <hr style="border-top: 1px dashed #000; margin: 8px 0;" />
+                    @foreach (var pag in _venda.Pagamentos)
+                    {
+                        <div style="display: flex; justify-content: space-between;"><span>@pag.DescricaoForma</span><span>@pag.Valor.ToString("C2")</span></div>
+                    }
+                    @if (_venda.Troco > 0)
+                    {
+                        <div style="display: flex; justify-content: space-between; font-weight: bold;"><span>Troco:</span><span>@_venda.Troco.ToString("C2")</span></div>
+                    }
+                }
+                <hr style="border-top: 1px dashed #000; margin: 8px 0;" />
+                <div style="text-align: center; font-size: 11px;">Obrigado pela preferência!</div>
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <div class="no-print d-flex gap-2">
+            <MudButton OnClick="@(() => MudDialog.Close())">Fechar</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Print" OnClick="Imprimir">Imprimir Cupom</MudButton>
+        </div>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public int VendaId { get; set; }
+
+    private VendaPdvDto? _venda;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _venda = await Mediator.Send(new ObterVendaPdvPorIdQuery(VendaId));
+    }
+
+    private async Task Imprimir() => await JS.InvokeVoidAsync("window.print");
+}

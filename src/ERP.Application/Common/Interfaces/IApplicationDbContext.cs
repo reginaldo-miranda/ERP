@@ -79,5 +79,34 @@ public interface IApplicationDbContext
     DbSet<ERP.Domain.Core.Entities.Fiscal.XmlNotaFiscal> XmlNotasFiscais { get; }
     DbSet<ERP.Domain.Core.Entities.Fiscal.CartaCorrecao> CartasCorrecao { get; }
 
+    // Fase 12 - Ordens de Serviço
+    DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServico> OrdensServico { get; }
+    DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServicoPeca> OrdemServicoPecas { get; }
+    DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServicoServico> OrdemServicoServicos { get; }
+    DbSet<ERP.Domain.Core.Entities.Servicos.OrdemServicoHistorico> OrdemServicoHistoricos { get; }
+
+    // Fase 11 - CRM Básico
+    DbSet<ERP.Domain.Core.Entities.Crm.Lead> Leads { get; }
+    DbSet<ERP.Domain.Core.Entities.Crm.Oportunidade> Oportunidades { get; }
+    DbSet<ERP.Domain.Core.Entities.Crm.AtividadeCrm> AtividadesCrm { get; }
+
+    // Fase 13 - Comissões de Vendedores
+    DbSet<ERP.Domain.Core.Entities.Comissoes.Vendedor> Vendedores { get; }
+    DbSet<ERP.Domain.Core.Entities.Comissoes.RegraComissao> RegrasComissao { get; }
+    DbSet<ERP.Domain.Core.Entities.Comissoes.ComissaoVenda> ComissoesVenda { get; }
+
+    // Fase 14 - Contratos Recorrentes
+    DbSet<ERP.Domain.Core.Entities.Contratos.ContratoRecorrente> ContratosRecorrentes { get; }
+    DbSet<ERP.Domain.Core.Entities.Contratos.ContratoFaturamento> ContratoFaturamentos { get; }
+    DbSet<ERP.Domain.Core.Entities.Contratos.ContratoReajuste> ContratoReajustes { get; }
+
+    // Fase 10 - PDV (Multi-Terminal + Pré-Venda)
+    DbSet<ERP.Domain.Core.Entities.Pdv.TerminalPdv> TerminaisPdv { get; }
+    DbSet<ERP.Domain.Core.Entities.Pdv.SessaoCaixaPdv> SessoesCaixaPdv { get; }
+    DbSet<ERP.Domain.Core.Entities.Pdv.MovimentoCaixaPdv> MovimentosCaixaPdv { get; }
+    DbSet<ERP.Domain.Core.Entities.Pdv.VendaPdv> VendasPdv { get; }
+    DbSet<ERP.Domain.Core.Entities.Pdv.VendaPdvItem> VendaPdvItens { get; }
+    DbSet<ERP.Domain.Core.Entities.Pdv.VendaPdvPagamento> VendaPdvPagamentos { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

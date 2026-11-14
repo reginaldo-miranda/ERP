@@ -1,0 +1,63 @@
+@using ERP.Application.Pdv.DTOs
+@using ERP.Application.Pdv.Queries
+@using MediatR
+@inject IMediator Mediator
+
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Primary" Class="mr-2" />
+            <MudText Typo="Typo.h6">Pré-Vendas Abertas</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_busca" Label="Buscar por número (PV-...), cliente ou vendedor" Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" OnDebounceIntervalElapsed="CarregarAsync" DebounceInterval="300" Class="mb-3" />
+
+        <MudTable Items="_preVendas" Hover="true" Dense="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Número</MudTh>
+                <MudTh>Data/Hora</MudTh>
+                <MudTh>Cliente</MudTh>
+                <MudTh>Vendedor</MudTh>
+                <MudTh>Itens</MudTh>
+                <MudTh>Total</MudTh>
+                <MudTh>Ação</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><b>@context.Numero</b></MudTd>
+                <MudTd>@context.DataVenda.ToLocalTime().ToString("dd/MM HH:mm")</MudTd>
+                <MudTd>@(context.ClienteNome ?? context.ConsumidorNome ?? "Consumidor Final")</MudTd>
+                <MudTd>@(context.VendedorNome ?? "-")</MudTd>
+                <MudTd>@context.Itens.Count</MudTd>
+                <MudTd><b>@context.ValorTotal.ToString("C2")</b></MudTd>
+                <MudTd>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="@(() => MudDialog.Close(DialogResult.Ok(context)))">
+                        Puxar p/ Caixa
+                    </MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Class="pa-4">Nenhuma pré-venda aberta no momento.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">Fechar</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string? _busca;
+    private List<VendaPdvDto> _preVendas = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task CarregarAsync()
+    {
+        _preVendas = await Mediator.Send(new ListarPreVendasAbertasQuery(_busca));
+    }
+}

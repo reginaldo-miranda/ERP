@@ -12,5 +12,7 @@ public enum OrigemMovimentacaoEstoque
     Devolucao = 5,
     Transferencia = 6,
     CancelamentoVenda = 7,
-    CancelamentoCompra = 8
+    CancelamentoCompra = 8,
+    OrdemServico = 9,
+    Pdv = 10
 }

@@ -1,0 +1,485 @@
+@page "/servicos/ordens-servico"
+@using ERP.Application.Common.Interfaces
+@using ERP.Application.Servicos.Commands
+@using ERP.Application.Servicos.DTOs
+@using ERP.Application.Servicos.Queries
+@using ERP.Domain.Core.Entities.Cadastros
+@using ERP.Domain.Core.Enums
+@using MediatR
+@using Microsoft.EntityFrameworkCore
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IApplicationDbContext Context
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Ordens de Serviço - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.HomeRepairService" Class="mr-2" />
+            Ordens de Serviço (OS)
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Gestão técnica, laudos, controle de peças e serviços, orçamentos e faturamento integrado.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="NovaOrdemServico">
+        Nova OS
+    </MudButton>
+</div>
+
+<!-- Cards de Indicadores Rápidos -->
+<MudGrid Class="mb-4">
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.ReceiptLong" Color="Color.Default" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">TOTAL GERAL</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold">@_resumo.TotalGeral</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.PendingActions" Color="Color.Info" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">ABERTAS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Info">@_resumo.TotalAbertas</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.HourglassTop" Color="Color.Warning" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">ORÇAMENTOS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Warning">@_resumo.TotalAguardandoAprovacao</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Engineering" Color="Color.Primary" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">EM EXECUÇÃO</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Primary">@_resumo.TotalEmExecucao</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.TaskAlt" Color="Color.Success" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">CONCLUÍDAS</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Success">@_resumo.TotalConcluidas</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="2">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-3">
+                <div class="d-flex align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Payments" Color="Color.Secondary" Class="mr-2" />
+                    <div>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">FATURADAS (MÊS)</MudText>
+                        <MudText Typo="Typo.h6" Class="font-weight-bold" Color="Color.Secondary">@_resumo.ValorFaturadoMes.ToString("C0")</MudText>
+                    </div>
+                </div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+<!-- Filtros e Busca -->
+<MudCard Elevation="1" Class="mb-4">
+    <MudCardContent>
+        <MudGrid AlignItems="Center">
+            <MudItem xs="12" sm="4" md="3">
+                <MudTextField @bind-Value="_termoBusca"
+                              Placeholder="Número, equipamento, cliente, nº série..."
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Immediate="true"
+                              OnKeyDown="@((e) => { if (e.Key == "Enter") CarregarOrdensServico(); })"
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="3" md="2">
+                <MudSelect T="StatusOrdemServico?" Label="Status" @bind-Value="_statusFiltro" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="StatusOrdemServico?" Value="@((StatusOrdemServico?)null)">Todos os status</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.Aberta">Aberta</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.AguardandoAprovacao">Aguardando Aprovação</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.Aprovada">Em Execução (Aprovada)</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.AguardandoPecas">Aguardando Peças</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.Concluida">Concluída / Pronta</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.Faturada">Faturada &amp; Entregue</MudSelectItem>
+                    <MudSelectItem T="StatusOrdemServico?" Value="@StatusOrdemServico.Cancelada">Cancelada</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="3" md="3">
+                <MudSelect T="int?" Label="Cliente" @bind-Value="_clienteIdFiltro" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    <MudSelectItem T="int?" Value="@((int?)null)">Todos os clientes</MudSelectItem>
+                    @foreach (var c in _clientes)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)c.Id)">@c.Nome</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="2" md="2">
+                <MudDatePicker Label="A partir de" @bind-Date="_dataInicio" Editable="true" DateFormat="dd/MM/yyyy" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true" />
+            </MudItem>
+            <MudItem xs="12" sm="2" md="2" Class="d-flex align-center">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CarregarOrdensServico" StartIcon="@Icons.Material.Filled.FilterAlt" Class="mr-2">
+                    Filtrar
+                </MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="LimparFiltros" Color="Color.Default" Title="Limpar filtros" />
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<!-- Tabela de Ordens de Serviço -->
+<MudTable Items="@_ordensServico" Dense="true" Hover="true" Striped="true" Loading="@_carregando" LoadingProgressColor="Color.Primary" Elevation="2">
+    <HeaderContent>
+        <MudTh>Número</MudTh>
+        <MudTh>Cliente</MudTh>
+        <MudTh>Equipamento / Modelo</MudTh>
+        <MudTh>Data Abertura</MudTh>
+        <MudTh>Técnico</MudTh>
+        <MudTh>Prioridade</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh Style="text-align: right;">Total (R$)</MudTh>
+        <MudTh Style="text-align: center;">Ações</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Número">
+            <MudLink Typo="Typo.body2" Class="font-weight-bold" OnClick="@(() => VerDetalhes(context.Id))">
+                @context.Numero
+            </MudLink>
+        </MudTd>
+        <MudTd DataLabel="Cliente">
+            <MudText Typo="Typo.body2" Class="font-weight-bold">@context.ClienteNome</MudText>
+            @if (!string.IsNullOrEmpty(context.ClienteTelefone))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.ClienteTelefone</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Equipamento">
+            <MudText Typo="Typo.body2">@context.Equipamento</MudText>
+            @if (!string.IsNullOrEmpty(context.MarcaModelo))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.MarcaModelo @(string.IsNullOrEmpty(context.NumeroSerie) ? "" : $"• S/N: {context.NumeroSerie}")</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Data Abertura">
+            <MudText Typo="Typo.body2">@context.DataAbertura.ToString("dd/MM/yyyy HH:mm")</MudText>
+            @if (context.PrevisaoConclusao.HasValue)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Prev.: @context.PrevisaoConclusao.Value.ToString("dd/MM/yyyy")</MudText>
+            }
+        </MudTd>
+        <MudTd DataLabel="Técnico">
+            @(string.IsNullOrWhiteSpace(context.TecnicoResponsavel) ? "Não atribuído" : context.TecnicoResponsavel)
+        </MudTd>
+        <MudTd DataLabel="Prioridade">
+            @switch (context.Prioridade)
+            {
+                case PrioridadeOrdemServico.Baixa:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Baixa</MudChip>
+                    break;
+                case PrioridadeOrdemServico.Normal:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Normal</MudChip>
+                    break;
+                case PrioridadeOrdemServico.Alta:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Alta</MudChip>
+                    break;
+                case PrioridadeOrdemServico.Urgente:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Urgente</MudChip>
+                    break;
+            }
+        </MudTd>
+        <MudTd DataLabel="Status">
+            @switch (context.Status)
+            {
+                case StatusOrdemServico.Aberta:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Aberta</MudChip>
+                    break;
+                case StatusOrdemServico.AguardandoAprovacao:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Aguardando Aprovação</MudChip>
+                    break;
+                case StatusOrdemServico.Aprovada:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled">Em Execução</MudChip>
+                    break;
+                case StatusOrdemServico.AguardandoPecas:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">Aguardando Peças</MudChip>
+                    break;
+                case StatusOrdemServico.Concluida:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Concluída / Pronta</MudChip>
+                    break;
+                case StatusOrdemServico.Faturada:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Faturada &amp; Entregue</MudChip>
+                    break;
+                case StatusOrdemServico.Cancelada:
+                    <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined">Cancelada</MudChip>
+                    break;
+            }
+        </MudTd>
+        <MudTd DataLabel="Total (R$)" Style="text-align: right;" Class="font-weight-bold">
+            @context.ValorTotal.ToString("C2")
+        </MudTd>
+        <MudTd DataLabel="Ações" Style="text-align: center;">
+            <div class="d-flex justify-center align-center">
+                <MudTooltip Text="Ver Detalhes">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Default" OnClick="@(() => VerDetalhes(context.Id))" />
+                </MudTooltip>
+
+                <MudTooltip Text="Imprimir Termo / OS">
+                    <MudIconButton Icon="@Icons.Material.Filled.Print" Size="Size.Small" Color="Color.Default" OnClick="@(() => ImprimirOS(context.Id))" />
+                </MudTooltip>
+
+                @if (context.Status != StatusOrdemServico.Faturada && context.Status != StatusOrdemServico.Cancelada)
+                {
+                    <MudTooltip Text="Editar OS">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditarOrdemServico(context.Id))" />
+                    </MudTooltip>
+
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                        @if (context.Status == StatusOrdemServico.Aberta)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Send" OnClick="@(() => AlterarStatus(context.Id, StatusOrdemServico.AguardandoAprovacao, "Orçamento enviado para aprovação do cliente."))">
+                                Enviar Orçamento ao Cliente
+                            </MudMenuItem>
+                        }
+                        @if (context.Status == StatusOrdemServico.Aberta || context.Status == StatusOrdemServico.AguardandoAprovacao || context.Status == StatusOrdemServico.AguardandoPecas)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Check" OnClick="@(() => AlterarStatus(context.Id, StatusOrdemServico.Aprovada, "Orçamento aprovado pelo cliente. Serviço iniciado na bancada."))">
+                                Aprovar / Iniciar Execução
+                            </MudMenuItem>
+                        }
+                        @if (context.Status == StatusOrdemServico.Aprovada)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.Inventory2" OnClick="@(() => AlterarStatus(context.Id, StatusOrdemServico.AguardandoPecas, "Serviço pausado aguardando chegada de peças."))">
+                                Pausar (Aguardando Peças)
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.DoneAll" OnClick="@(() => AlterarStatus(context.Id, StatusOrdemServico.Concluida, "Serviço concluído na bancada. Pronto para retirada."))">
+                                Marcar como Concluída
+                            </MudMenuItem>
+                        }
+                        @if (context.Status == StatusOrdemServico.Concluida)
+                        {
+                            <MudMenuItem Icon="@Icons.Material.Filled.PointOfSale" IconColor="Color.Success" OnClick="@(() => FaturarOS(context.Id))">
+                                <b>Faturar e Entregar ao Cliente</b>
+                            </MudMenuItem>
+                        }
+                        <MudDivider />
+                        <MudMenuItem Icon="@Icons.Material.Filled.Cancel" IconColor="Color.Error" OnClick="@(() => CancelarOS(context.Id, context.Numero))">
+                            Cancelar OS
+                        </MudMenuItem>
+                    </MudMenu>
+                }
+                else if (context.Status == StatusOrdemServico.Faturada)
+                {
+                    <MudTooltip Text="Faturada com sucesso">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" Class="ml-2" />
+                    </MudTooltip>
+                }
+            </div>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent>
+        <div class="pa-4 text-center">
+            <MudText Color="Color.Secondary">Nenhuma ordem de serviço encontrada com os filtros selecionados.</MudText>
+        </div>
+    </NoRecordsContent>
+</MudTable>
+
+@code {
+    private bool _carregando = false;
+    private List<OrdemServicoListItemDto> _ordensServico = new();
+    private ResumoDashboardOrdensServicoDto _resumo = new(0, 0, 0, 0, 0, 0, 0);
+    private List<Cliente> _clientes = new();
+
+    private string? _termoBusca;
+    private StatusOrdemServico? _statusFiltro;
+    private int? _clienteIdFiltro;
+    private DateTime? _dataInicio;
+
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarClientes();
+        await CarregarOrdensServico();
+    }
+
+    private async Task CarregarClientes()
+    {
+        try
+        {
+            _clientes = await Context.Clientes.AsNoTracking().Where(c => c.Ativo).OrderBy(c => c.Nome).ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar clientes: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CarregarOrdensServico()
+    {
+        await _semaphore.WaitAsync();
+        try
+        {
+            _carregando = true;
+            _ordensServico = await Mediator.Send(new GetOrdensServicoQuery(
+                _statusFiltro,
+                _clienteIdFiltro,
+                _dataInicio,
+                null,
+                _termoBusca
+            ));
+
+            _resumo = await Mediator.Send(new GetResumoDashboardOrdensServicoQuery());
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao carregar ordens de serviço: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _carregando = false;
+            _semaphore.Release();
+        }
+    }
+
+    private async Task LimparFiltros()
+    {
+        _termoBusca = null;
+        _statusFiltro = null;
+        _clienteIdFiltro = null;
+        _dataInicio = null;
+        await CarregarOrdensServico();
+    }
+
+    private async Task NovaOrdemServico()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<OrdemServicoDialog>("Nova Ordem de Serviço", options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarOrdensServico();
+        }
+    }
+
+    private async Task EditarOrdemServico(int id)
+    {
+        var parameters = new DialogParameters { { nameof(OrdemServicoDialog.OrdemServicoId), id } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<OrdemServicoDialog>("Editar Ordem de Serviço", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarOrdensServico();
+        }
+    }
+
+    private async Task VerDetalhes(int id)
+    {
+        var parameters = new DialogParameters { { nameof(OrdemServicoDetalhesDialog.OrdemServicoId), id } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true, CloseButton = true };
+        await DialogService.ShowAsync<OrdemServicoDetalhesDialog>("Detalhes da Ordem de Serviço", parameters, options);
+    }
+
+    private async Task ImprimirOS(int id)
+    {
+        var parameters = new DialogParameters { { nameof(OrdemServicoImprimirDialog.OrdemServicoId), id } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseButton = true };
+        await DialogService.ShowAsync<OrdemServicoImprimirDialog>("Comprovante / Termo da OS", parameters, options);
+    }
+
+    private async Task AlterarStatus(int id, StatusOrdemServico novoStatus, string observacao)
+    {
+        try
+        {
+            var ok = await Mediator.Send(new MudarStatusOrdemServicoCommand(new MudarStatusOrdemServicoDto(id, novoStatus, observacao)));
+            if (ok)
+            {
+                Snackbar.Add($"Status da OS alterado para '{novoStatus}' com sucesso!", Severity.Success);
+                await CarregarOrdensServico();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Erro ao mudar status: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task FaturarOS(int id)
+    {
+        var parameters = new DialogParameters { { nameof(OrdemServicoFaturarDialog.OrdemServicoId), id } };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseButton = true };
+        var dialog = await DialogService.ShowAsync<OrdemServicoFaturarDialog>("Faturar Ordem de Serviço", parameters, options);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await CarregarOrdensServico();
+        }
+    }
+
+    private async Task CancelarOS(int id, string numero)
+    {
+        bool? confirmar = await DialogService.ShowMessageBoxAsync(
+            "Cancelar Ordem de Serviço",
+            $"Tem certeza que deseja cancelar a Ordem de Serviço {numero}? Se houver peças e financeiro gerados, serão estornados.",
+            yesText: "Sim, Cancelar", cancelText: "Voltar");
+
+        if (confirmar == true)
+        {
+            try
+            {
+                var ok = await Mediator.Send(new CancelarOrdemServicoCommand(id, "Cancelado pelo usuário"));
+                if (ok)
+                {
+                    Snackbar.Add($"Ordem de Serviço {numero} cancelada com sucesso.", Severity.Warning);
+                    await CarregarOrdensServico();
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Erro ao cancelar OS: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _semaphore.Dispose();
+    }
+}

@@ -1,0 +1,218 @@
+@page "/crm/leads"
+@using ERP.Application.Crm.Commands
+@using ERP.Application.Crm.DTOs
+@using ERP.Application.Crm.Queries
+@using ERP.Domain.Core.Enums
+@using MediatR
+@inject IMediator Mediator
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Leads &amp; Prospects (CRM) - ERP</PageTitle>
+
+<div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-4">
+    <div>
+        <MudText Typo="Typo.h5" Class="font-weight-bold">
+            <MudIcon Icon="@Icons.Material.Filled.PersonSearch" Class="mr-2" />
+            Leads &amp; Prospects
+        </MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Cadastre prospects, registre contatos e converta Leads em Clientes com 1 clique.
+        </MudText>
+    </div>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="NovoLead">
+        Novo Lead
+    </MudButton>
+</div>
+
+<MudPaper Elevation="1" Class="pa-3 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="5">
+            <MudTextField @bind-Value="_busca" Label="Buscar por nome, empresa, e-mail ou telefone" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" OnDebounceIntervalElapsed="CarregarAsync" DebounceInterval="350" />
+        </MudItem>
+        <MudItem xs="12" sm="3">
+            <MudSelect T="StatusLead?" Value="_statusFiltro" ValueChanged="OnStatusChanged" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="StatusLead?" Value="StatusLead.Novo">Novo</MudSelectItem>
+                <MudSelectItem T="StatusLead?" Value="StatusLead.EmContato">Em Contato</MudSelectItem>
+                <MudSelectItem T="StatusLead?" Value="StatusLead.Qualificado">Qualificado</MudSelectItem>
+                <MudSelectItem T="StatusLead?" Value="StatusLead.Convertido">Convertido</MudSelectItem>
+                <MudSelectItem T="StatusLead?" Value="StatusLead.Descartado">Descartado</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2">
+            <MudSelect T="OrigemLead?" Value="_origemFiltro" ValueChanged="OnOrigemChanged" Label="Origem" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                <MudSelectItem T="OrigemLead?" Value="OrigemLead.Indicacao">Indicação</MudSelectItem>
+                <MudSelectItem T="OrigemLead?" Value="OrigemLead.Site">Site</MudSelectItem>
+                <MudSelectItem T="OrigemLead?" Value="OrigemLead.RedesSociais">Redes Sociais</MudSelectItem>
+                <MudSelectItem T="OrigemLead?" Value="OrigemLead.ProspeccaoAtiva">Prospecção Ativa</MudSelectItem>
+                <MudSelectItem T="OrigemLead?" Value="OrigemLead.Telefone">Telefone</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="2" Class="d-flex align-center">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" OnClick="CarregarAsync" FullWidth="true">Atualizar</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_carregando)
+{
+    <div class="d-flex justify-center pa-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </div>
+}
+else
+{
+    <MudTable Items="_leads" Hover="true" Dense="true" Elevation="2">
+        <HeaderContent>
+            <MudTh>Nome / Empresa</MudTh>
+            <MudTh>Contato</MudTh>
+            <MudTh>Origem</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Responsável</MudTh>
+            <MudTh>Oportunidades</MudTh>
+            <MudTh>Ações</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Nome / Empresa">
+                <b>@context.Nome</b>
+                @if (!string.IsNullOrWhiteSpace(context.EmpresaContato))
+                {
+                    <div class="mud-text-secondary" style="font-size: 0.78rem;">@context.EmpresaContato</div>
+                }
+            </MudTd>
+            <MudTd DataLabel="Contato">
+                <div>@(context.Celular ?? context.Telefone ?? "-")</div>
+                @if (!string.IsNullOrWhiteSpace(context.Email))
+                {
+                    <div class="mud-text-secondary" style="font-size: 0.78rem;">@context.Email</div>
+                }
+            </MudTd>
+            <MudTd DataLabel="Origem">@context.Origem.ToString()</MudTd>
+            <MudTd DataLabel="Status">
+                <MudChip T="string" Size="Size.Small" Color="@CorStatus(context.Status)">@context.Status.ToString()</MudChip>
+                @if (!string.IsNullOrWhiteSpace(context.ClienteConvertidoNome))
+                {
+                    <div class="mud-text-secondary" style="font-size: 0.75rem;">Cliente: @context.ClienteConvertidoNome</div>
+                }
+            </MudTd>
+            <MudTd DataLabel="Responsável">@(context.ResponsavelNome ?? "-")</MudTd>
+            <MudTd DataLabel="Oportunidades">
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.TotalOportunidades op.</MudChip>
+                @if (context.AtividadesPendentes > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">@context.AtividadesPendentes pend.</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Ações">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Title="Editar" OnClick="@(() => EditarLead(context.Id))" />
+                <MudIconButton Icon="@Icons.Material.Filled.AddBusiness" Size="Size.Small" Color="Color.Primary" Title="Criar Oportunidade" OnClick="@(() => CriarOportunidadeDoLead(context.Id))" />
+                <MudIconButton Icon="@Icons.Material.Filled.EventAvailable" Size="Size.Small" Color="Color.Info" Title="Registrar Atividade" OnClick="@(() => RegistrarAtividade(context))" />
+                @if (context.Status != StatusLead.Convertido)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.HowToReg" Size="Size.Small" Color="Color.Success" Title="Converter em Cliente" OnClick="@(() => ConverterEmCliente(context))" />
+                }
+                @if (context.Status != StatusLead.Convertido && context.Status != StatusLead.Descartado)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Block" Size="Size.Small" Color="Color.Error" Title="Descartar Lead" OnClick="@(() => DescartarLead(context))" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private bool _carregando = true;
+    private string? _busca;
+    private StatusLead? _statusFiltro;
+    private OrigemLead? _origemFiltro;
+    private List<LeadDto> _leads = new();
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task OnStatusChanged(StatusLead? status) { _statusFiltro = status; await CarregarAsync(); }
+    private async Task OnOrigemChanged(OrigemLead? origem) { _origemFiltro = origem; await CarregarAsync(); }
+
+    private async Task CarregarAsync()
+    {
+        _carregando = true;
+        _leads = await Mediator.Send(new ListarLeadsQuery(_busca, _statusFiltro, _origemFiltro));
+        _carregando = false;
+    }
+
+    private async Task NovoLead()
+    {
+        var dialog = await DialogService.ShowAsync<LeadDialog>("Novo Lead");
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task EditarLead(int id)
+    {
+        var parameters = new DialogParameters<LeadDialog> { { x => x.LeadId, id } };
+        var dialog = await DialogService.ShowAsync<LeadDialog>("Editar Lead", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task CriarOportunidadeDoLead(int leadId)
+    {
+        var parameters = new DialogParameters<OportunidadeDialog> { { x => x.LeadIdInicial, leadId } };
+        var dialog = await DialogService.ShowAsync<OportunidadeDialog>("Nova Oportunidade", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task RegistrarAtividade(LeadDto lead)
+    {
+        var parameters = new DialogParameters<AtividadeCrmDialog>
+        {
+            { x => x.LeadId, lead.Id },
+            { x => x.ResponsavelId, lead.ResponsavelId },
+            { x => x.ResponsavelNome, lead.ResponsavelNome }
+        };
+        var dialog = await DialogService.ShowAsync<AtividadeCrmDialog>("Nova Atividade", parameters);
+        var result = await dialog.Result;
+        if (result != null && !result.Canceled) await CarregarAsync();
+    }
+
+    private async Task ConverterEmCliente(LeadDto lead)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Converter Lead em Cliente",
+            $"Deseja converter o Lead '{lead.Nome}' em um cadastro oficial de Cliente?",
+            yesText: "Sim, Converter", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            await Mediator.Send(new ConverterLeadEmClienteCommand(lead.Id));
+            Snackbar.Add("Lead convertido em Cliente com sucesso!", Severity.Success);
+            await CarregarAsync();
+        }
+    }
+
+    private async Task DescartarLead(LeadDto lead)
+    {
+        bool? confirm = await DialogService.ShowMessageBoxAsync(
+            "Descartar Lead",
+            $"Deseja marcar o Lead '{lead.Nome}' como descartado?",
+            yesText: "Descartar", cancelText: "Cancelar");
+
+        if (confirm == true)
+        {
+            await Mediator.Send(new DescartarLeadCommand(lead.Id));
+            Snackbar.Add("Lead descartado.", Severity.Info);
+            await CarregarAsync();
+        }
+    }
+
+    private static Color CorStatus(StatusLead status) => status switch
+    {
+        StatusLead.Novo => Color.Info,
+        StatusLead.EmContato => Color.Primary,
+        StatusLead.Qualificado => Color.Warning,
+        StatusLead.Convertido => Color.Success,
+        StatusLead.Descartado => Color.Error,
+        _ => Color.Default
+    };
+}
